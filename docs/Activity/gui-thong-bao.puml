@@ -1,0 +1,58 @@
+@startuml
+title Biểu đồ hoạt động - Chức năng Gửi thông báo
+
+|Quản lý|
+start
+:Đăng nhập hệ thống\nvới quyền quản lý;
+:Chọn chức năng Thông báo;
+
+|Hệ thống|
+:Hiển thị màn hình\ntạo thông báo;
+
+repeat
+  |Quản lý|
+  :Nhập tiêu đề, nội dung,\nđối tượng nhận và thời điểm gửi;
+
+  |Hệ thống|
+  :Kiểm tra quyền thực hiện,\nnội dung và danh sách người nhận;
+  if (Có quyền?) then (Không)
+    :Thông báo không đủ quyền\nthực hiện;
+  else (Có)
+    if (Nội dung hợp lệ?) then (Không hợp lệ)
+      :Thông báo cần nhập đầy đủ\nnội dung thông báo;
+    else (Hợp lệ)
+      if (Đã chọn người nhận?) then (Không)
+        :Thông báo cần chọn ít nhất\nmột nhân viên nhận thông báo;
+      else (Có)
+        if (Người nhận hợp lệ?) then (Không hợp lệ)
+          :Thông báo danh sách\nngười nhận không hợp lệ;
+        else (Hợp lệ)
+          :Hiển thị thông tin thông báo\nđể quản lý xác nhận;
+        endif
+      endif
+    endif
+  endif
+repeat while (Quay lại màn hình tạo thông báo?) is (Có) not (Không)
+
+repeat
+  |Quản lý|
+  if (Xác nhận gửi thông báo?) then (Không)
+    :Hủy thao tác\ngửi thông báo;
+
+    |Hệ thống|
+    :Không gửi thông báo\nvà giữ màn hình xác nhận;
+  else (Có)
+    |Hệ thống|
+    :Ghi nhận thông báo mới\nvào hệ thống;
+    :Gửi thông báo đến\ncác nhân viên được chọn;
+
+    |Nhân viên|
+    :Nhận thông báo\ntừ hệ thống;
+
+    |Hệ thống|
+    :Thông báo gửi thông báo\nthành công;
+  endif
+repeat while (Quay lại màn hình xác nhận?) is (Có) not (Không)
+
+stop
+@enduml

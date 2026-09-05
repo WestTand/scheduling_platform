@@ -1,0 +1,64 @@
+@startuml
+title Biểu đồ hoạt động - Chức năng Tạo lịch tự động
+
+|Quản lý|
+start
+:Đăng nhập hệ thống\nvới quyền quản lý;
+:Chọn chức năng\nTạo lịch tự động;
+
+|Hệ thống|
+:Hiển thị màn hình\ncấu hình kỳ lập lịch;
+
+repeat
+  |Quản lý|
+  :Nhập thông tin kỳ lập lịch,\nphạm vi thời gian, ràng buộc\nvà nhấn "Tạo lịch";
+
+  |Hệ thống|
+  :Kiểm tra quyền thực hiện,\ndữ liệu đầu vào và dữ liệu lập lịch;
+  if (Dữ liệu hợp lệ?) then (Không hợp lệ)
+    :Thông báo dữ liệu chưa hợp lệ\nhoặc chưa đầy đủ;
+  else (Hợp lệ)
+    :Tổng hợp dữ liệu lập lịch\nvà gửi yêu cầu tạo lịch tối ưu;
+
+    |Dịch vụ tối ưu AI|
+    :Phân tích ràng buộc\nvà tạo phương án lịch phù hợp;
+
+    |Hệ thống|
+    if (Dịch vụ phản hồi?) then (Không)
+      :Thông báo không thể tạo lịch\ntại thời điểm hiện tại;
+    else (Có)
+      |Dịch vụ tối ưu AI|
+      :Trả về lịch dự kiến,\nđiểm đánh giá và cảnh báo nếu có;
+
+      |Hệ thống|
+      :Kiểm tra kết quả tạo lịch\ntừ dịch vụ tối ưu AI;
+      if (Có phương án?) then (Không có)
+        :Hiển thị nguyên nhân\nvà gợi ý điều chỉnh ràng buộc;
+      else (Có)
+        if (Có cảnh báo?) then (Có)
+          :Hiển thị cảnh báo về thiếu nhân sự\nhoặc mức độ tối ưu chưa đạt yêu cầu;
+        else (Không)
+          :Ghi nhận kết quả lịch\nkhông có cảnh báo nghiêm trọng;
+        endif
+        :Hiển thị lịch phân công dự kiến\ncho quản lý xem xét;
+      endif
+    endif
+  endif
+repeat while (Quay lại cấu hình kỳ lập lịch?) is (Có) not (Không)
+
+repeat
+  |Quản lý|
+  if (Xác nhận lưu lịch?) then (Không)
+    :Không xác nhận lưu\nlịch dự kiến;
+
+    |Hệ thống|
+    :Không lưu lịch dự kiến\nvà giữ màn hình xem xét lịch;
+  else (Có)
+    |Hệ thống|
+    :Lưu lịch dự kiến\nvà lịch sử lần tạo lịch;
+    :Thông báo tạo lịch\ntự động thành công;
+  endif
+repeat while (Quay lại xem xét lịch dự kiến?) is (Có) not (Không)
+
+stop
+@enduml
