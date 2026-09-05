@@ -1,0 +1,48 @@
+@startuml
+title Biểu đồ hoạt động - Chức năng Gửi yêu cầu đổi ca
+
+|Nhân viên|
+start
+:Đăng nhập hệ thống;
+:Chọn chức năng\nGửi yêu cầu đổi ca;
+
+|Hệ thống|
+:Hiển thị danh sách ca trực\nhiện tại của nhân viên;
+
+repeat
+  |Nhân viên|
+  :Chọn ca trực cần đổi\nvà nhập lý do đổi ca;
+
+  |Hệ thống|
+  :Kiểm tra ca trực, trạng thái lịch\nvà nguyện vọng đổi ca đã chấp thuận;
+  if (Ca trực hợp lệ?) then (Không hợp lệ)
+    :Thông báo ca trực không hợp lệ\nvà yêu cầu chọn lại;
+  else (Hợp lệ)
+    if (Ca được phép đổi?) then (Không)
+      :Thông báo ca trực chưa đủ\nđiều kiện đổi;
+    else (Có)
+      if (Nguyện vọng đã chấp thuận?) then (Không)
+        :Thông báo cần đăng ký nguyện vọng\nvà được chấp thuận trước;
+      else (Có)
+        :Hiển thị thông tin yêu cầu đổi ca\nđể nhân viên xác nhận;
+      endif
+    endif
+  endif
+repeat while (Quay lại danh sách ca trực?) is (Có) not (Không)
+
+repeat
+  |Nhân viên|
+  if (Xác nhận gửi yêu cầu?) then (Không)
+    :Hủy thao tác gửi\nyêu cầu đổi ca;
+
+    |Hệ thống|
+    :Không tạo yêu cầu đổi ca\nvà giữ màn hình xác nhận;
+  else (Có)
+    |Hệ thống|
+    :Ghi nhận yêu cầu đổi ca\nhợp lệ vào hệ thống;
+    :Thông báo gửi yêu cầu\nđổi ca thành công;
+  endif
+repeat while (Quay lại màn hình xác nhận?) is (Có) not (Không)
+
+stop
+@enduml

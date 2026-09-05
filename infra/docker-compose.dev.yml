@@ -1,0 +1,102 @@
+name: ${COMPOSE_PROJECT_NAME:-scheduling_platform}
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-scheduling_platform}
+      POSTGRES_USER: ${POSTGRES_USER:-scheduling_platform}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-scheduling_platform_dev_password}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  adminer:
+    image: adminer:5-standalone
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    ports:
+      - "${ADMINER_PORT:-8081}:8080"
+
+  ai-service:
+    build:
+      context: ../ai-service
+      dockerfile: Dockerfile.dev
+    restart: unless-stopped
+    environment:
+      WATCHFILES_FORCE_POLLING: "true"
+    ports:
+      - "${AI_SERVICE_PORT:-8001}:8001"
+    volumes:
+      - ../ai-service:/app
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8001/health', timeout=5).read()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.dev
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ai-service:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-scheduling_platform}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-scheduling_platform}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-scheduling_platform_dev_password}
+      AI_SERVICE_URL: ${AI_SERVICE_URL:-http://ai-service:8001}
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    volumes:
+      - ../backend:/app
+      - backend-maven-cache:/root/.m2
+    develop:
+      watch:
+        - action: restart
+          path: ../backend/src
+        - action: rebuild
+          path: ../backend/pom.xml
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      start_period: 60s
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile.dev
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:${BACKEND_PORT:-8080}}
+      CHOKIDAR_USEPOLLING: "true"
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    volumes:
+      - ../frontend:/app
+      - frontend-node-modules:/app/node_modules
+
+volumes:
+  postgres-data:
+  backend-maven-cache:
+  frontend-node-modules:

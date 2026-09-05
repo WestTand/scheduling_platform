@@ -1,0 +1,31 @@
+  @startuml
+  title Biểu đồ hoạt động - Chức năng Đăng xuất
+
+  |Người dùng|
+  start
+  :Đang sử dụng hệ thống\nvới phiên đăng nhập hợp lệ;
+  :Chọn chức năng Đăng xuất;
+
+  |Hệ thống|
+  :Hiển thị thông báo\nxác nhận đăng xuất;
+
+  |Người dùng|
+  if (Xác nhận đăng xuất?) then (Không)
+    :Hủy thao tác đăng xuất;
+
+    |Hệ thống|
+    :Giữ nguyên phiên làm việc\nvà quay lại màn hình trước đó;
+  else (Có)
+    |Hệ thống|
+    :Kiểm tra thông tin\nxác thực JWT;
+    if (JWT hợp lệ?) then (Không hợp lệ)
+      :Thông báo phiên đăng nhập\nđã hết hạn;
+      :Chuyển người dùng về\nmàn hình đăng nhập;
+    else (Hợp lệ)
+      :Kết thúc trạng thái\nđăng nhập hiện tại;
+      :Chuyển người dùng về\nmàn hình đăng nhập;
+    endif
+  endif
+
+  stop
+  @enduml

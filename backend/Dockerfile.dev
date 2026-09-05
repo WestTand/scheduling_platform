@@ -1,0 +1,11 @@
+FROM maven:3.9.11-eclipse-temurin-21
+
+WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
+EXPOSE 8080
+
+CMD ["mvn", "spring-boot:run", "-Dspring-boot.run.jvmArguments=-Dserver.address=0.0.0.0"]
