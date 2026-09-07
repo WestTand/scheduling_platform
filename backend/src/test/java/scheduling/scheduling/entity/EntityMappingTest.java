@@ -25,7 +25,8 @@ class EntityMappingTest {
                 Map.entry(OptimizationRun.class, "run_id"),
                 Map.entry(SwapRequest.class, "swap_request_id"),
                 Map.entry(Notification.class, "notification_id"),
-                Map.entry(ActivityLog.class, "log_id"));
+                Map.entry(ActivityLog.class, "log_id"),
+                Map.entry(RefreshToken.class, "refresh_token_id"));
 
         assertThat(expectedIdColumns).allSatisfy((entityClass, expectedColumnName) -> {
             AttributeOverride override = entityClass.getAnnotation(AttributeOverride.class);
@@ -54,6 +55,13 @@ class EntityMappingTest {
         assertThat(declaredColumnNames(SchedulingRule.class)).doesNotContain("created_at", "updated_at");
         assertThat(declaredColumnNames(OptimizationRun.class)).doesNotContain("created_at", "updated_at");
         assertThat(declaredColumnNames(SwapRequest.class)).doesNotContain("created_at", "updated_at");
+    }
+
+    @Test
+    void refreshTokenDeclaresRequiredColumns() {
+        assertThat(declaredColumnNames(RefreshToken.class))
+                .contains("token_hash", "expires_at", "revoked_at", "created_at")
+                .doesNotContain("updated_at");
     }
 
     @Test
