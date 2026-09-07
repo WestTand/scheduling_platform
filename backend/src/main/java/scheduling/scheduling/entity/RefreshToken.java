@@ -9,6 +9,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDateTime;
+import java.util.Objects;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
@@ -19,7 +20,7 @@ import org.hibernate.annotations.CreationTimestamp;
 
 @Getter
 @Setter
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -50,6 +51,7 @@ public class RefreshToken extends BaseEntity {
     }
 
     public boolean isExpired(LocalDateTime now) {
+        Objects.requireNonNull(now, "now");
         return !expiresAt.isAfter(now);
     }
 }
