@@ -1,4 +1,4 @@
-package com.example.scheduling.entity;
+package scheduling.scheduling.entity;
 
 import lombok.*;
 import jakarta.persistence.*;
