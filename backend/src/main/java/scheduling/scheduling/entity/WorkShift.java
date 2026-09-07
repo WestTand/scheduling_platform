@@ -3,7 +3,6 @@ package scheduling.scheduling.entity;
 import lombok.*;
 import jakarta.persistence.*;
 import java.time.LocalDate;
-import java.time.LocalTime;
 import java.util.Set;
 
 /**
@@ -16,6 +15,7 @@ import java.util.Set;
 @AllArgsConstructor
 @Builder
 @Entity
+@AttributeOverride(name = "id", column = @Column(name = "work_shift_id"))
 @Table(name = "work_shifts",
        indexes = {@Index(name = "idx_work_shifts_date_type", columnList = "work_date,shift_type_id")})
 public class WorkShift extends BaseEntity {

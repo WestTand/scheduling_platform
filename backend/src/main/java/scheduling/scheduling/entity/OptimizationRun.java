@@ -2,7 +2,6 @@ package scheduling.scheduling.entity;
 
 import lombok.*;
 import jakarta.persistence.*;
-import org.hibernate.annotations.CreationTimestamp;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -18,6 +17,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 @Entity
+@AttributeOverride(name = "id", column = @Column(name = "run_id"))
 @Table(name = "optimization_runs",
        indexes = {
            @Index(name = "idx_opt_runs_period", columnList = "period_id"),

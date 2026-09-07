@@ -14,6 +14,7 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @Builder
 @Entity
+@AttributeOverride(name = "id", column = @Column(name = "leave_request_id"))
 @Table(name = "leave_requests",
        indexes = {@Index(name = "idx_leave_employee", columnList = "employee_id,start_date,end_date")})
 public class LeaveRequest extends BaseEntity {
@@ -32,6 +33,7 @@ public class LeaveRequest extends BaseEntity {
     private String reason;
 
     @Column(name = "status", nullable = false, length = 20)
+    @Builder.Default
     private String status = "PENDING"; // could be enum
 
     @ManyToOne(fetch = FetchType.LAZY)

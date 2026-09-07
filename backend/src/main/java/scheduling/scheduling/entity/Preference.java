@@ -14,6 +14,7 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @Builder
 @Entity
+@AttributeOverride(name = "id", column = @Column(name = "preference_id"))
 @Table(name = "preferences",
        indexes = {
            @Index(name = "idx_pref_employee", columnList = "employee_id"),
@@ -34,14 +35,17 @@ public class Preference extends BaseEntity {
     private LocalDate preferenceDate;
 
     @Column(name = "preference_type", nullable = false, length = 20)
+    @Builder.Default
     private String preferenceType = "WANT"; // WANT / AVOID, could be enum
 
     @Column(name = "priority", nullable = false)
+    @Builder.Default
     private Integer priority = 1;
 
     @Column(name = "note", columnDefinition = "TEXT")
     private String note;
 
     @Column(name = "status", nullable = false, length = 20)
+    @Builder.Default
     private String status = "PENDING"; // could be enum
 }

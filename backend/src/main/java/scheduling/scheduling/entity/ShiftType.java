@@ -14,6 +14,7 @@ import java.util.Set;
 @AllArgsConstructor
 @Builder
 @Entity
+@AttributeOverride(name = "id", column = @Column(name = "shift_type_id"))
 @Table(name = "shift_types", uniqueConstraints = {@UniqueConstraint(columnNames = {"shift_name"})})
 public class ShiftType extends BaseEntity {
 
@@ -30,9 +31,11 @@ public class ShiftType extends BaseEntity {
     private java.math.BigDecimal durationHours;
 
     @Column(name = "is_overnight", nullable = false)
+    @Builder.Default
     private Boolean overnight = false;
 
     @Column(name = "is_heavy", nullable = false)
+    @Builder.Default
     private Boolean heavy = false;
 
     @Column(name = "min_staff", nullable = false)
@@ -42,6 +45,7 @@ public class ShiftType extends BaseEntity {
     private Integer maxStaff;
 
     @Column(name = "status", nullable = false, length = 20)
+    @Builder.Default
     private String status = "ACTIVE";
 
     @OneToMany(mappedBy = "shiftType", fetch = FetchType.LAZY, cascade = CascadeType.ALL)

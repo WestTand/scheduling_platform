@@ -23,6 +23,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 @Entity
+@AttributeOverride(name = "id", column = @Column(name = "swap_request_id"))
 @Table(name = "swap_requests",
        indexes = {
            @Index(name = "idx_swap_requester", columnList = "requester_assignment_id"),
@@ -55,6 +56,7 @@ public class SwapRequest extends BaseEntity {
      * REJECTED         — từ chối
      */
     @Column(name = "status", nullable = false, length = 20)
+    @Builder.Default
     private String status = "PENDING_TARGET";
 
     /** Quản lý duyệt yêu cầu. */

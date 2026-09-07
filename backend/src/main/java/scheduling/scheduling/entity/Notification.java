@@ -19,6 +19,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 @Entity
+@AttributeOverride(name = "id", column = @Column(name = "notification_id"))
 @Table(name = "notifications",
        indexes = {
            @Index(name = "idx_notif_recipient", columnList = "recipient_id"),
@@ -41,6 +42,7 @@ public class Notification extends BaseEntity {
     private String notificationType;
 
     @Column(name = "is_read", nullable = false)
+    @Builder.Default
     private Boolean read = false;
 
     @CreationTimestamp

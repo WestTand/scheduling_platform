@@ -14,6 +14,7 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 @Builder
 @Entity
+@AttributeOverride(name = "id", column = @Column(name = "rule_id"))
 @Table(name = "scheduling_rules",
        uniqueConstraints = {@UniqueConstraint(columnNames = {"rule_code"})})
 public class SchedulingRule extends BaseEntity {
@@ -34,5 +35,6 @@ public class SchedulingRule extends BaseEntity {
     private BigDecimal weight; // nullable for HARD rules
 
     @Column(name = "is_active", nullable = false)
+    @Builder.Default
     private Boolean active = true;
 }

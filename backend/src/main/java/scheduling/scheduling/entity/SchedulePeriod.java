@@ -15,6 +15,7 @@ import java.util.Set;
 @AllArgsConstructor
 @Builder
 @Entity
+@AttributeOverride(name = "id", column = @Column(name = "period_id"))
 @Table(name = "schedule_periods", uniqueConstraints = {@UniqueConstraint(columnNames = {"start_date", "end_date", "version_no"})})
 public class SchedulePeriod extends BaseEntity {
 
@@ -28,9 +29,11 @@ public class SchedulePeriod extends BaseEntity {
     private LocalDate endDate;
 
     @Column(name = "version_no", nullable = false)
+    @Builder.Default
     private Integer versionNo = 1;
 
     @Column(name = "status", nullable = false, length = 20)
+    @Builder.Default
     private String status = "DRAFT";
 
     @ManyToOne(fetch = FetchType.LAZY)

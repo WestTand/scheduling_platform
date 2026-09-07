@@ -2,6 +2,7 @@ package scheduling.scheduling.entity;
 
 import lombok.*;
 import jakarta.persistence.*;
+import org.hibernate.annotations.CreationTimestamp;
 import java.time.LocalDateTime;
 import java.util.Set;
 
@@ -15,6 +16,7 @@ import java.util.Set;
 @AllArgsConstructor
 @Builder
 @Entity
+@AttributeOverride(name = "id", column = @Column(name = "account_id"))
 @Table(name = "accounts", uniqueConstraints = {@UniqueConstraint(columnNames = {"username"})})
 public class Account extends BaseEntity {
 
@@ -29,10 +31,15 @@ public class Account extends BaseEntity {
     private AccountRole role;
 
     @Column(name = "is_active", nullable = false)
+    @Builder.Default
     private Boolean isActive = true;
 
     @Column(name = "last_login")
     private LocalDateTime lastLogin;
+
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
 
     // Optional one-to-one link to Employee (manager accounts have null employee)
     @OneToOne(fetch = FetchType.LAZY)

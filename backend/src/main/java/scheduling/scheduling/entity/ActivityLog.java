@@ -17,6 +17,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 @Entity
+@AttributeOverride(name = "id", column = @Column(name = "log_id"))
 @Table(name = "activity_logs",
        indexes = {
            @Index(name = "idx_activity_account", columnList = "account_id"),

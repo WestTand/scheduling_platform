@@ -2,6 +2,9 @@ package scheduling.scheduling.entity;
 
 import lombok.*;
 import jakarta.persistence.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+import java.time.LocalDateTime;
 import java.util.Set;
 
 /**
@@ -14,6 +17,7 @@ import java.util.Set;
 @AllArgsConstructor
 @Builder
 @Entity
+@AttributeOverride(name = "id", column = @Column(name = "employee_id"))
 @Table(name = "employees", uniqueConstraints = {@UniqueConstraint(columnNames = {"employee_code"})})
 public class Employee extends BaseEntity {
 
@@ -30,7 +34,16 @@ public class Employee extends BaseEntity {
     private String phone;
 
     @Column(name = "status", nullable = false, length = 20)
+    @Builder.Default
     private String status = "ACTIVE";
+
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
 
     // bi‑directional one‑to‑many to ShiftAssignment
     @OneToMany(mappedBy = "employee", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
