@@ -4,9 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import jakarta.persistence.LockModeType;
+import java.lang.reflect.Method;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -15,6 +18,7 @@ import java.time.ZoneOffset;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.data.jpa.repository.Lock;
 import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
 import scheduling.scheduling.entity.RefreshToken;
@@ -67,7 +71,7 @@ class RefreshTokenServiceTest {
     void rotateRevokesOldTokenAndReturnsNewTokenForSameAccount() {
         Account account = account("employee01");
         RefreshToken oldToken = refreshToken("raw", account, NOW.plus(TTL));
-        when(repository.findByTokenHash(RefreshTokenService.hashTokenForTest("raw"))).thenReturn(Optional.of(oldToken));
+        when(repository.findLockedByTokenHash(RefreshTokenService.hashTokenForTest("raw"))).thenReturn(Optional.of(oldToken));
         when(repository.save(any(RefreshToken.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         RefreshTokenResult result = service.rotate("raw");
@@ -79,7 +83,28 @@ class RefreshTokenServiceTest {
 
         ArgumentCaptor<RefreshToken> savedToken = ArgumentCaptor.forClass(RefreshToken.class);
         verify(repository).save(savedToken.capture());
+        verify(repository).findLockedByTokenHash(RefreshTokenService.hashTokenForTest("raw"));
+        verify(repository, never()).findByTokenHash(RefreshTokenService.hashTokenForTest("raw"));
         assertThat(savedToken.getValue()).isSameAs(result.entity());
+    }
+
+    @Test
+    void revokeUsesLockedTokenLookup() {
+        RefreshToken token = refreshToken("raw", account("employee01"), NOW.plus(TTL));
+        when(repository.findLockedByTokenHash(RefreshTokenService.hashTokenForTest("raw"))).thenReturn(Optional.of(token));
+
+        service.revoke("raw");
+
+        assertThat(token.getRevokedAt()).isEqualTo(NOW);
+        verify(repository).findLockedByTokenHash(RefreshTokenService.hashTokenForTest("raw"));
+        verify(repository, never()).findByTokenHash(RefreshTokenService.hashTokenForTest("raw"));
+    }
+
+    @Test
+    void lockedLookupUsesPessimisticWriteLock() throws NoSuchMethodException {
+        Method method = RefreshTokenRepository.class.getMethod("findLockedByTokenHash", String.class);
+
+        assertThat(method.getAnnotation(Lock.class).value()).isEqualTo(LockModeType.PESSIMISTIC_WRITE);
     }
 
     private static RefreshToken refreshToken(String rawToken, Account account, LocalDateTime expiresAt) {

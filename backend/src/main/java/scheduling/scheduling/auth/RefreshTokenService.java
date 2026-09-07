@@ -60,14 +60,8 @@ public class RefreshTokenService {
             throw invalidRefreshToken();
         }
 
-        RefreshToken refreshToken = refreshTokenRepository.findByTokenHash(hashToken(rawToken))
-                .orElseThrow(RefreshTokenService::invalidRefreshToken);
-
-        if (refreshToken.isRevoked() || refreshToken.isExpired(now())) {
-            throw invalidRefreshToken();
-        }
-
-        return refreshToken;
+        return requireValid(refreshTokenRepository.findByTokenHash(hashToken(rawToken))
+                .orElseThrow(RefreshTokenService::invalidRefreshToken));
     }
 
     @Transactional
@@ -76,16 +70,29 @@ public class RefreshTokenService {
             return;
         }
 
-        refreshTokenRepository.findByTokenHash(hashToken(rawToken))
+        refreshTokenRepository.findLockedByTokenHash(hashToken(rawToken))
                 .filter(refreshToken -> !refreshToken.isRevoked())
                 .ifPresent(refreshToken -> refreshToken.setRevokedAt(now()));
     }
 
     @Transactional
     public RefreshTokenResult rotate(String rawToken) {
-        RefreshToken oldToken = validate(rawToken);
+        if (rawToken == null || rawToken.isBlank()) {
+            throw invalidRefreshToken();
+        }
+
+        RefreshToken oldToken = requireValid(refreshTokenRepository.findLockedByTokenHash(hashToken(rawToken))
+                .orElseThrow(RefreshTokenService::invalidRefreshToken));
         oldToken.setRevokedAt(now());
         return create(oldToken.getAccount());
+    }
+
+    private RefreshToken requireValid(RefreshToken refreshToken) {
+        if (refreshToken.isRevoked() || refreshToken.isExpired(now())) {
+            throw invalidRefreshToken();
+        }
+
+        return refreshToken;
     }
 
     static String hashTokenForTest(String rawToken) {
