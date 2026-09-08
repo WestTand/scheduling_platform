@@ -174,6 +174,19 @@ class AuthServiceTest {
     }
 
     @Test
+    void refreshRejectsInactiveAccount() {
+        Account account = account(1L, "employee01", "hash", false, null);
+        RefreshToken refreshToken = RefreshToken.builder().account(account).build();
+        when(refreshTokenService.rotate("old-refresh-token")).thenReturn(new RefreshTokenResult("new-refresh-token", refreshToken));
+
+        assertThatThrownBy(() -> service.refresh("old-refresh-token"))
+                .isInstanceOf(InvalidTokenException.class)
+                .hasMessage("Invalid refresh token");
+
+        verify(jwtService, never()).createAccessToken(any(), any(), any());
+    }
+
+    @Test
     void logoutRevokesRefreshTokenWhenCookieExists() {
         service.logout("refresh-token");
 
@@ -205,6 +218,16 @@ class AuthServiceTest {
                 "employee01@example.com",
                 "0900000001",
                 "ACTIVE"));
+    }
+
+    @Test
+    void meRejectsInactiveAccount() {
+        Account account = account(1L, "employee01", "hash", false, null);
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account));
+
+        assertThatThrownBy(() -> service.me(new CurrentAccountPrincipal(1L, "employee01", AccountRole.EMPLOYEE)))
+                .isInstanceOf(InvalidTokenException.class)
+                .hasMessage("Invalid access token");
     }
 
     private static RegisterRequest registerRequest() {
