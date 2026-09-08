@@ -8,14 +8,21 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import scheduling.scheduling.auth.JwtAuthenticationFilter;
+import scheduling.scheduling.auth.JwtService;
+import scheduling.scheduling.auth.SecurityConfig;
 
 @WebMvcTest(HealthController.class)
-@Import(HealthSecurityConfig.class)
+@Import({ SecurityConfig.class, JwtAuthenticationFilter.class })
 class HealthControllerTest {
 
 	@Autowired
 	private MockMvc mockMvc;
+
+	@MockitoBean
+	private JwtService jwtService;
 
 	@Test
 	void healthReturnsBackendServiceStatus() throws Exception {
