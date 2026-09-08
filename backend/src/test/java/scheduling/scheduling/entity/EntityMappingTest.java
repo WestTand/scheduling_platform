@@ -1,10 +1,12 @@
 package scheduling.scheduling.entity;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
 import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
 import java.lang.reflect.Field;
+import java.time.LocalDateTime;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
@@ -25,7 +27,8 @@ class EntityMappingTest {
                 Map.entry(OptimizationRun.class, "run_id"),
                 Map.entry(SwapRequest.class, "swap_request_id"),
                 Map.entry(Notification.class, "notification_id"),
-                Map.entry(ActivityLog.class, "log_id"));
+                Map.entry(ActivityLog.class, "log_id"),
+                Map.entry(RefreshToken.class, "refresh_token_id"));
 
         assertThat(expectedIdColumns).allSatisfy((entityClass, expectedColumnName) -> {
             AttributeOverride override = entityClass.getAnnotation(AttributeOverride.class);
@@ -54,6 +57,44 @@ class EntityMappingTest {
         assertThat(declaredColumnNames(SchedulingRule.class)).doesNotContain("created_at", "updated_at");
         assertThat(declaredColumnNames(OptimizationRun.class)).doesNotContain("created_at", "updated_at");
         assertThat(declaredColumnNames(SwapRequest.class)).doesNotContain("created_at", "updated_at");
+    }
+
+    @Test
+    void refreshTokenDeclaresRequiredColumns() {
+        assertThat(declaredColumnNames(RefreshToken.class))
+                .contains("token_hash", "expires_at", "revoked_at", "created_at")
+                .doesNotContain("updated_at");
+    }
+
+    @Test
+    void refreshTokenEqualityUsesOnlyBaseEntityFields() {
+        RefreshToken first = RefreshToken.builder()
+                .account(Account.builder().username("alice").build())
+                .tokenHash("first-token-hash")
+                .expiresAt(LocalDateTime.now().plusDays(1))
+                .build();
+        RefreshToken second = RefreshToken.builder()
+                .account(Account.builder().username("bob").build())
+                .tokenHash("second-token-hash")
+                .expiresAt(LocalDateTime.now().plusDays(2))
+                .build();
+
+        first.setId(1L);
+        second.setId(1L);
+
+        assertThat(first).isEqualTo(second);
+        assertThat(first.hashCode()).isEqualTo(second.hashCode());
+    }
+
+    @Test
+    void refreshTokenExpirationRequiresNow() {
+        RefreshToken refreshToken = RefreshToken.builder()
+                .expiresAt(LocalDateTime.now())
+                .build();
+
+        assertThatNullPointerException()
+                .isThrownBy(() -> refreshToken.isExpired(null))
+                .withMessage("now");
     }
 
     @Test
