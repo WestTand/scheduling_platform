@@ -108,6 +108,20 @@ class AuthControllerTest {
     }
 
     @Test
+    void refreshIgnoresInvalidBearerTokenWhenRefreshCookieIsValid() throws Exception {
+        when(jwtService.parseAccessToken("bad-token")).thenThrow(new InvalidTokenException("Invalid access token"));
+        when(authService.refresh("old-refresh-token"))
+                .thenReturn(new LoginResult(authResponse("new-access-token", "employee01"), "new-refresh-token"));
+
+        mockMvc.perform(post("/api/auth/refresh")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer bad-token")
+                        .cookie(new Cookie("refresh_token", "old-refresh-token")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").value("new-access-token"));
+        verify(authService).refresh("old-refresh-token");
+    }
+
+    @Test
     void refreshRejectsMissingCookieWithInvalidTokenResponse() throws Exception {
         mockMvc.perform(post("/api/auth/refresh"))
                 .andExpect(status().isUnauthorized())
