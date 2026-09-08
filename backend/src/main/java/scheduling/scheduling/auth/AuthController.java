@@ -6,6 +6,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -49,7 +50,10 @@ public class AuthController {
     }
 
     @PostMapping("/refresh")
-    ResponseEntity<AuthResponse> refresh(@CookieValue(name = "${app.auth.refresh-cookie-name}") String refreshToken) {
+    ResponseEntity<AuthResponse> refresh(@CookieValue(name = "${app.auth.refresh-cookie-name}", required = false) String refreshToken) {
+        if (!StringUtils.hasText(refreshToken)) {
+            throw new InvalidTokenException("Invalid refresh token");
+        }
         LoginResult result = authService.refresh(refreshToken);
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, refreshCookie(result.refreshToken()).toString())

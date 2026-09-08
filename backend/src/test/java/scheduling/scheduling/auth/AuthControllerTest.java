@@ -108,6 +108,14 @@ class AuthControllerTest {
     }
 
     @Test
+    void refreshRejectsMissingCookieWithInvalidTokenResponse() throws Exception {
+        mockMvc.perform(post("/api/auth/refresh"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("INVALID_TOKEN"))
+                .andExpect(jsonPath("$.message").value("Invalid refresh token"));
+    }
+
+    @Test
     void logoutClearsRefreshCookie() throws Exception {
         mockMvc.perform(post("/api/auth/logout")
                         .cookie(new Cookie("refresh_token", "refresh-token")))
