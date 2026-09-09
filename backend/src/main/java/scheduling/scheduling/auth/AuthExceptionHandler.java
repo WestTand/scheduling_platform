@@ -15,6 +15,18 @@ public class AuthExceptionHandler {
                 .body(new ErrorResponse("DUPLICATE_RESOURCE", ex.getMessage()));
     }
 
+    @ExceptionHandler(AccountNotFoundException.class)
+    ResponseEntity<ErrorResponse> handleAccountNotFound(AccountNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ErrorResponse("ACCOUNT_NOT_FOUND", ex.getMessage()));
+    }
+
+    @ExceptionHandler(InvalidAccountStateException.class)
+    ResponseEntity<ErrorResponse> handleInvalidAccountState(InvalidAccountStateException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErrorResponse("INVALID_ACCOUNT_STATE", ex.getMessage()));
+    }
+
     @ExceptionHandler(AuthenticationFailedException.class)
     ResponseEntity<ErrorResponse> handleAuthenticationFailed(AuthenticationFailedException ex) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)

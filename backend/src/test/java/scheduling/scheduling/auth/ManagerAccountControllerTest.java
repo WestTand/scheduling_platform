@@ -87,4 +87,40 @@ class ManagerAccountControllerTest {
 
         verifyNoInteractions(managerAccountService);
     }
+
+    @Test
+    void managerResendsActivationOtp() throws Exception {
+        CurrentAccountPrincipal manager = new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
+        when(jwtService.parseAccessToken("manager-token")).thenReturn(manager);
+
+        mockMvc.perform(post("/api/manager/accounts/20/activation/resend")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer manager-token"))
+                .andExpect(status().isNoContent());
+
+        verify(managerAccountService).resendActivationOtp(20L);
+    }
+
+    @Test
+    void managerResetsPassword() throws Exception {
+        CurrentAccountPrincipal manager = new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
+        when(jwtService.parseAccessToken("manager-token")).thenReturn(manager);
+
+        mockMvc.perform(post("/api/manager/accounts/20/password/reset")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer manager-token"))
+                .andExpect(status().isNoContent());
+
+        verify(managerAccountService).resetPassword(20L);
+    }
+
+    @Test
+    void employeeCannotResendActivationOtp() throws Exception {
+        CurrentAccountPrincipal employee = new CurrentAccountPrincipal(2L, "employee02", AccountRole.EMPLOYEE);
+        when(jwtService.parseAccessToken("employee-token")).thenReturn(employee);
+
+        mockMvc.perform(post("/api/manager/accounts/20/activation/resend")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer employee-token"))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(managerAccountService);
+    }
 }

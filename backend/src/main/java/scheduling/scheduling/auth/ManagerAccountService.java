@@ -21,6 +21,7 @@ public class ManagerAccountService {
     private final EmployeeRepository employeeRepository;
     private final PasswordEncoder passwordEncoder;
     private final AccountActivationOtpService otpService;
+    private final RefreshTokenService refreshTokenService;
     private final String defaultEmployeePassword;
 
     public ManagerAccountService(
@@ -28,11 +29,13 @@ public class ManagerAccountService {
             EmployeeRepository employeeRepository,
             PasswordEncoder passwordEncoder,
             AccountActivationOtpService otpService,
+            RefreshTokenService refreshTokenService,
             @Value("${app.auth.default-employee-password}") String defaultEmployeePassword) {
         this.accountRepository = Objects.requireNonNull(accountRepository, "accountRepository");
         this.employeeRepository = Objects.requireNonNull(employeeRepository, "employeeRepository");
         this.passwordEncoder = Objects.requireNonNull(passwordEncoder, "passwordEncoder");
         this.otpService = Objects.requireNonNull(otpService, "otpService");
+        this.refreshTokenService = Objects.requireNonNull(refreshTokenService, "refreshTokenService");
         this.defaultEmployeePassword = Objects.requireNonNull(defaultEmployeePassword, "defaultEmployeePassword");
     }
 
@@ -67,5 +70,30 @@ public class ManagerAccountService {
         otpService.createActivationOtp(savedAccount);
 
         return AccountResponse.from(savedAccount);
+    }
+
+    @Transactional
+    public void resendActivationOtp(Long accountId) {
+        Account account = accountRepository.findById(accountId)
+                .orElseThrow(AccountNotFoundException::new);
+        if (!Boolean.TRUE.equals(account.getIsActive()) || account.getStatus() != AccountStatus.PENDING_ACTIVATION) {
+            throw new InvalidAccountStateException();
+        }
+
+        otpService.createActivationOtp(account);
+    }
+
+    @Transactional
+    public void resetPassword(Long accountId) {
+        Account account = accountRepository.findById(accountId)
+                .orElseThrow(AccountNotFoundException::new);
+        if (!Boolean.TRUE.equals(account.getIsActive()) || account.getRole() != AccountRole.EMPLOYEE) {
+            throw new InvalidAccountStateException();
+        }
+
+        account.setPasswordHash(passwordEncoder.encode(defaultEmployeePassword));
+        account.setStatus(AccountStatus.FORCE_PASSWORD_CHANGE);
+        accountRepository.save(account);
+        refreshTokenService.revokeAllForAccount(accountId);
     }
 }

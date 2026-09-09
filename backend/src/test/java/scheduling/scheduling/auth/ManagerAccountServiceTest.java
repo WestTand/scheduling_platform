@@ -6,8 +6,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -26,11 +28,13 @@ class ManagerAccountServiceTest {
     private final EmployeeRepository employeeRepository = mock(EmployeeRepository.class);
     private final PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
     private final AccountActivationOtpService otpService = mock(AccountActivationOtpService.class);
+    private final RefreshTokenService refreshTokenService = mock(RefreshTokenService.class);
     private final ManagerAccountService service = new ManagerAccountService(
             accountRepository,
             employeeRepository,
             passwordEncoder,
             otpService,
+            refreshTokenService,
             "configured-default");
 
     @Test
@@ -97,6 +101,74 @@ class ManagerAccountServiceTest {
         verify(accountRepository, never()).save(any());
     }
 
+    @Test
+    void resendActivationOtpCreatesNewOtpForPendingActivationAccount() {
+        Account account = account(20L, AccountStatus.PENDING_ACTIVATION, AccountRole.EMPLOYEE, true);
+        when(accountRepository.findById(20L)).thenReturn(Optional.of(account));
+
+        service.resendActivationOtp(20L);
+
+        verify(otpService).createActivationOtp(account);
+    }
+
+    @Test
+    void resendActivationOtpRejectsMissingAccount() {
+        when(accountRepository.findById(20L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.resendActivationOtp(20L))
+                .isInstanceOf(AccountNotFoundException.class)
+                .hasMessage("Account not found");
+
+        verifyNoInteractions(otpService);
+    }
+
+    @Test
+    void resendActivationOtpRejectsNonPendingAccount() {
+        Account account = account(20L, AccountStatus.ACTIVE, AccountRole.EMPLOYEE, true);
+        when(accountRepository.findById(20L)).thenReturn(Optional.of(account));
+
+        assertThatThrownBy(() -> service.resendActivationOtp(20L))
+                .isInstanceOf(InvalidAccountStateException.class)
+                .hasMessage("Invalid account state");
+
+        verifyNoInteractions(otpService);
+    }
+
+    @Test
+    void resetPasswordSetsDefaultPasswordForcePasswordChangeAndRevokesTokens() {
+        Account account = account(20L, AccountStatus.ACTIVE, AccountRole.EMPLOYEE, true);
+        when(accountRepository.findById(20L)).thenReturn(Optional.of(account));
+        when(passwordEncoder.encode("configured-default")).thenReturn("encoded-default");
+
+        service.resetPassword(20L);
+
+        assertThat(account.getPasswordHash()).isEqualTo("encoded-default");
+        assertThat(account.getStatus()).isEqualTo(AccountStatus.FORCE_PASSWORD_CHANGE);
+        verify(accountRepository).save(account);
+        verify(refreshTokenService).revokeAllForAccount(20L);
+    }
+
+    @Test
+    void resetPasswordRejectsMissingAccount() {
+        when(accountRepository.findById(20L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.resetPassword(20L))
+                .isInstanceOf(AccountNotFoundException.class)
+                .hasMessage("Account not found");
+    }
+
+    @Test
+    void resetPasswordRejectsManagerAccount() {
+        Account account = account(20L, AccountStatus.ACTIVE, AccountRole.MANAGER, true);
+        when(accountRepository.findById(20L)).thenReturn(Optional.of(account));
+
+        assertThatThrownBy(() -> service.resetPassword(20L))
+                .isInstanceOf(InvalidAccountStateException.class)
+                .hasMessage("Invalid account state");
+
+        verifyNoInteractions(refreshTokenService);
+    }
+
     private static CreateEmployeeAccountRequest request() {
         return new CreateEmployeeAccountRequest(
                 "employee01",
@@ -114,5 +186,18 @@ class ManagerAccountServiceTest {
                 .phone("0900000001")
                 .status("ACTIVE")
                 .build();
+    }
+
+    private static Account account(Long id, AccountStatus status, AccountRole role, boolean active) {
+        Account account = Account.builder()
+                .username("employee01")
+                .passwordHash("old-hash")
+                .role(role)
+                .status(status)
+                .isActive(active)
+                .employee(employee())
+                .build();
+        account.setId(id);
+        return account;
     }
 }
