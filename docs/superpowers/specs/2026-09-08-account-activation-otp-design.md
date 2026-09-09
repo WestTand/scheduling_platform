@@ -83,6 +83,21 @@ The OTP record stores:
 
 After saving the account and OTP, backend sends an activation email to the employee email address. If SMTP username/password is not configured, the mail service logs and skips delivery for local development. If SMTP is configured and delivery fails, the service throws an error so account creation fails transactionally.
 
+## Required Password Change Slice
+
+`POST /api/auth/password/change-required` completes first-login activation after OTP verification or a manager password reset. The endpoint is public because `FORCE_PASSWORD_CHANGE` accounts do not receive JWTs from `POST /api/auth/login`.
+
+Request body:
+
+```json
+{
+  "accountId": 42,
+  "newPassword": "new-secure-password"
+}
+```
+
+The backend only accepts the request when the account exists, `isActive = true`, and `status = FORCE_PASSWORD_CHANGE`. On success it BCrypt-hashes the new password, sets `status = ACTIVE`, saves the account, and returns the normal login response with an access token and refresh token HttpOnly cookie. Invalid account, inactive account, or wrong lifecycle state returns `401 INVALID_PASSWORD_CHANGE_STATE`.
+
 ## Acceptance Criteria
 
 - Public self-registration is removed from security config and controller.
