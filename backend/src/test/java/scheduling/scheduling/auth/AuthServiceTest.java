@@ -229,6 +229,20 @@ class AuthServiceTest {
     }
 
     @Test
+    void refreshRejectsForcePasswordChangeAccount() {
+        Account account = account(1L, "employee01", "hash", true, null);
+        account.setStatus(AccountStatus.FORCE_PASSWORD_CHANGE);
+        RefreshToken refreshToken = RefreshToken.builder().account(account).build();
+        when(refreshTokenService.rotate("old-refresh-token")).thenReturn(new RefreshTokenResult("new-refresh-token", refreshToken));
+
+        assertThatThrownBy(() -> service.refresh("old-refresh-token"))
+                .isInstanceOf(InvalidTokenException.class)
+                .hasMessage("Invalid refresh token");
+
+        verify(jwtService, never()).createAccessToken(any(), any(), any());
+    }
+
+    @Test
     void logoutRevokesRefreshTokenWhenCookieExists() {
         service.logout("refresh-token");
 
@@ -265,6 +279,17 @@ class AuthServiceTest {
     @Test
     void meRejectsInactiveAccount() {
         Account account = account(1L, "employee01", "hash", false, null);
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account));
+
+        assertThatThrownBy(() -> service.me(new CurrentAccountPrincipal(1L, "employee01", AccountRole.EMPLOYEE)))
+                .isInstanceOf(InvalidTokenException.class)
+                .hasMessage("Invalid access token");
+    }
+
+    @Test
+    void meRejectsPendingActivationAccount() {
+        Account account = account(1L, "employee01", "hash", true, null);
+        account.setStatus(AccountStatus.PENDING_ACTIVATION);
         when(accountRepository.findById(1L)).thenReturn(Optional.of(account));
 
         assertThatThrownBy(() -> service.me(new CurrentAccountPrincipal(1L, "employee01", AccountRole.EMPLOYEE)))

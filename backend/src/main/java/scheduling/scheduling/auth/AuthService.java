@@ -104,9 +104,7 @@ public class AuthService {
     public LoginResult refresh(String rawRefreshToken) {
         RefreshTokenResult refreshToken = refreshTokenService.rotate(rawRefreshToken);
         Account account = refreshToken.entity().getAccount();
-        if (!Boolean.TRUE.equals(account.getIsActive())) {
-            throw new InvalidTokenException("Invalid refresh token");
-        }
+        requireUsableAccount(account, "Invalid refresh token");
         return loginResult(account, refreshToken);
     }
 
@@ -141,11 +139,15 @@ public class AuthService {
     public MeResponse me(CurrentAccountPrincipal principal) {
         Account account = accountRepository.findById(principal.accountId())
                 .orElseThrow(() -> new InvalidTokenException("Invalid access token"));
-        if (!Boolean.TRUE.equals(account.getIsActive())) {
-            throw new InvalidTokenException("Invalid access token");
-        }
+        requireUsableAccount(account, "Invalid access token");
         Employee employee = account.getEmployee();
         return new MeResponse(AccountResponse.from(account), employee == null ? null : EmployeeResponse.from(employee));
+    }
+
+    private void requireUsableAccount(Account account, String message) {
+        if (!Boolean.TRUE.equals(account.getIsActive()) || account.getStatus() != AccountStatus.ACTIVE) {
+            throw new InvalidTokenException(message);
+        }
     }
 
     private LoginResult loginResult(Account account, RefreshTokenResult refreshToken) {
