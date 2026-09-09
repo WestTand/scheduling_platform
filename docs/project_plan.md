@@ -80,7 +80,8 @@
 - Chan account chua kich hoat refresh/me
 - Revoke refresh token cu khi account bi reset mat khau
 - Cau hinh Spring Security stateless
-- Public `/api/auth/login`, `/api/auth/activate/verify-otp`, `/api/auth/activate/resend-otp`, `/api/auth/password/change-required`, `/api/auth/refresh`, `/api/auth/logout`, `/api/health`
+- Public `/api/auth/login`, `/api/auth/activation/verify-otp`, `/api/auth/password/change-required`, `/api/auth/refresh`, `/api/auth/logout`, `/api/health`
+- Manager-only `/api/manager/accounts/{accountId}/activation/resend` and `/api/manager/accounts/{accountId}/password/reset`
 - Protect cac API con lai bang Bearer token
 - Viet test `AuthService`
 - Viet test `AuthController`

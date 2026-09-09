@@ -98,6 +98,14 @@ Request body:
 
 The backend only accepts the request when the account exists, `isActive = true`, and `status = FORCE_PASSWORD_CHANGE`. On success it BCrypt-hashes the new password, sets `status = ACTIVE`, saves the account, and returns the normal login response with an access token and refresh token HttpOnly cookie. Invalid account, inactive account, or wrong lifecycle state returns `401 INVALID_PASSWORD_CHANGE_STATE`.
 
+## Remaining Phase 2 Completion Slice
+
+Refresh token rotation and `GET /api/auth/me` only accept accounts where `isActive = true` and `status = ACTIVE`. Accounts in `PENDING_ACTIVATION`, `FORCE_PASSWORD_CHANGE`, or `INACTIVE` cannot use existing tokens or inspect `/me`.
+
+Managers and admins can resend activation OTP with `POST /api/manager/accounts/{accountId}/activation/resend`. Resend is valid only for active, pending-activation accounts. It creates a fresh activation OTP using the existing OTP service and returns `204 No Content`. Missing accounts return `404 ACCOUNT_NOT_FOUND`; invalid lifecycle state returns `409 INVALID_ACCOUNT_STATE`.
+
+Managers and admins can reset an employee password with `POST /api/manager/accounts/{accountId}/password/reset`. Reset is valid only for active employee accounts. It hashes the configured default employee password, sets account status to `FORCE_PASSWORD_CHANGE`, revokes all refresh tokens for that account, saves the account, and returns `204 No Content`. Missing accounts return `404 ACCOUNT_NOT_FOUND`; invalid lifecycle state or role returns `409 INVALID_ACCOUNT_STATE`.
+
 ## Acceptance Criteria
 
 - Public self-registration is removed from security config and controller.
