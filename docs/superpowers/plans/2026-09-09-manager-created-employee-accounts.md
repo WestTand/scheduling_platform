@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add `ADMIN` role and `POST /api/manager/accounts` so managers/admins can create employee accounts with default password `1111@`.
+**Goal:** Add `ADMIN` role and `POST /api/manager/accounts` so managers/admins can create employee accounts with a default password loaded from configuration.
 
 **Architecture:** Keep the existing auth service unchanged except for role enum compatibility. Add a focused manager account service and controller under the auth package, following existing DTO, exception, and MockMvc test patterns. Defer OTP/Gmail activation behavior to later phases.
 
@@ -122,7 +122,7 @@ class ManagerAccountServiceTest {
                 .employee(savedEmployee)
                 .build();
         savedAccount.setId(20L);
-        when(passwordEncoder.encode("1111@")).thenReturn("encoded-1111");
+        when(passwordEncoder.encode("configured-default")).thenReturn("encoded-1111");
         when(employeeRepository.save(any(Employee.class))).thenReturn(savedEmployee);
         when(accountRepository.save(any(Account.class))).thenReturn(savedAccount);
 
@@ -241,19 +241,20 @@ import scheduling.scheduling.repository.EmployeeRepository;
 @Service
 public class ManagerAccountService {
 
-    private static final String DEFAULT_EMPLOYEE_PASSWORD = "1111@";
-
     private final AccountRepository accountRepository;
     private final EmployeeRepository employeeRepository;
     private final PasswordEncoder passwordEncoder;
+    private final String defaultEmployeePassword;
 
     public ManagerAccountService(
             AccountRepository accountRepository,
             EmployeeRepository employeeRepository,
-            PasswordEncoder passwordEncoder) {
+            PasswordEncoder passwordEncoder,
+            @Value("${app.auth.default-employee-password}") String defaultEmployeePassword) {
         this.accountRepository = Objects.requireNonNull(accountRepository, "accountRepository");
         this.employeeRepository = Objects.requireNonNull(employeeRepository, "employeeRepository");
         this.passwordEncoder = Objects.requireNonNull(passwordEncoder, "passwordEncoder");
+        this.defaultEmployeePassword = Objects.requireNonNull(defaultEmployeePassword, "defaultEmployeePassword");
     }
 
     @Transactional
@@ -276,7 +277,7 @@ public class ManagerAccountService {
 
         Account account = Account.builder()
                 .username(request.username())
-                .passwordHash(passwordEncoder.encode(DEFAULT_EMPLOYEE_PASSWORD))
+                .passwordHash(passwordEncoder.encode(defaultEmployeePassword))
                 .role(AccountRole.EMPLOYEE)
                 .isActive(true)
                 .status(AccountStatus.PENDING_ACTIVATION)

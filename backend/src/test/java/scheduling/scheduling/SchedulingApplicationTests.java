@@ -15,6 +15,7 @@ import scheduling.scheduling.repository.EmployeeRepository;
 @SpringBootTest(properties = {
 		"spring.autoconfigure.exclude=org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration,org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration",
 		"spring.mail.host=smtp.gmail.com",
+		"app.auth.default-employee-password=configured-default",
 		"app.jwt.secret=test-secret-key-with-at-least-32-characters" })
 class SchedulingApplicationTests {
 

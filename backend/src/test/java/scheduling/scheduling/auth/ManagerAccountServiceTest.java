@@ -29,7 +29,7 @@ class ManagerAccountServiceTest {
             accountRepository,
             employeeRepository,
             passwordEncoder,
-            "1111@");
+            "configured-default");
 
     @Test
     void createEmployeeAccountUsesDefaultPasswordAndPendingActivationStatus() {
@@ -45,7 +45,7 @@ class ManagerAccountServiceTest {
                 .employee(savedEmployee)
                 .build();
         savedAccount.setId(20L);
-        when(passwordEncoder.encode("1111@")).thenReturn("encoded-1111");
+        when(passwordEncoder.encode("configured-default")).thenReturn("encoded-1111");
         when(employeeRepository.save(any(Employee.class))).thenReturn(savedEmployee);
         when(accountRepository.save(any(Account.class))).thenReturn(savedAccount);
 

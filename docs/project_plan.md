@@ -303,7 +303,7 @@
 
 - Phase 0: Gan xong, da co monorepo, Docker setup, backend/frontend/AI health scaffold.
 - Phase 1: Entity chinh da co va da fix mapping theo database design v2. Da bo sung `AccountStatus` gom `ACTIVE`, `PENDING_ACTIVATION`, `FORCE_PASSWORD_CHANGE`, `INACTIVE` vao `Account`.
-- Phase 2: Auth/JWT/refresh cookie da merge tu branch `feature/auth-jwt-refresh-cookie`. Tren branch `feature/account-lifecycle` da bo public self-registration `/api/auth/register`, them `spring-boot-starter-mail`, them config SMTP/Gmail qua env, them role `ADMIN`, va them endpoint `POST /api/manager/accounts` de `MANAGER`/`ADMIN` tao account nhan vien voi password mac dinh `1111@` va `status = PENDING_ACTIVATION`.
+- Phase 2: Auth/JWT/refresh cookie da merge tu branch `feature/auth-jwt-refresh-cookie`. Tren branch `feature/account-lifecycle` da bo public self-registration `/api/auth/register`, them `spring-boot-starter-mail`, them config SMTP/Gmail qua env, them role `ADMIN`, va them endpoint `POST /api/manager/accounts` de `MANAGER`/`ADMIN` tao account nhan vien voi password mac dinh lay tu bien moi truong `DEFAULT_EMPLOYEE_PASSWORD` va `status = PENDING_ACTIVATION`.
 - Phase 2 con thieu: flow login cho account `PENDING_ACTIVATION` tra ve trang thai can OTP, gui/verify/resend OTP qua email, bat buoc doi mat khau sau OTP/reset, chan refresh/me cho account chua kich hoat, revoke refresh token khi reset mat khau, va test day du cho OTP/force password change.
 - Phase 3: Da bat dau phan account creation API bang endpoint `POST /api/manager/accounts`. Cac API admin core khac chua lam.
 

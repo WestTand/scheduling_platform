@@ -32,7 +32,7 @@ Request body:
 }
 ```
 
-The client does not send a password. The backend assigns the default password `1111@` and stores only the encoded password hash.
+The client does not send a password. The backend assigns the default password from the `DEFAULT_EMPLOYEE_PASSWORD` environment variable and stores only the encoded password hash.
 
 ## Created Account State
 
