@@ -22,6 +22,7 @@ import scheduling.scheduling.auth.dto.MeResponse;
 import scheduling.scheduling.auth.dto.RegisterRequest;
 import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
+import scheduling.scheduling.entity.AccountStatus;
 import scheduling.scheduling.entity.Employee;
 import scheduling.scheduling.entity.RefreshToken;
 import scheduling.scheduling.repository.AccountRepository;
@@ -153,6 +154,42 @@ class AuthServiceTest {
                 "Bearer",
                 900L,
                 new AccountResponse(1L, "employee01", AccountRole.EMPLOYEE)));
+    }
+
+    @Test
+    void loginReturnsOtpRequiredForPendingActivationAccountWithoutTokens() {
+        Account account = account(1L, "employee01", "hash", true, null);
+        account.setStatus(AccountStatus.PENDING_ACTIVATION);
+        when(accountRepository.findByUsername("employee01")).thenReturn(Optional.of(account));
+        when(passwordEncoder.matches("password", "hash")).thenReturn(true);
+
+        LoginResult result = service.login(new LoginRequest("employee01", "password"));
+
+        assertThat(result.response()).isNull();
+        assertThat(result.refreshToken()).isNull();
+        assertThat(result.stateResponse().status()).isEqualTo("OTP_REQUIRED");
+        assertThat(result.stateResponse().accountId()).isEqualTo(1L);
+        assertThat(result.stateResponse().username()).isEqualTo("employee01");
+        verify(accountRepository, never()).save(account);
+        verifyNoInteractions(jwtService, refreshTokenService);
+    }
+
+    @Test
+    void loginReturnsPasswordChangeRequiredForForcePasswordChangeAccountWithoutTokens() {
+        Account account = account(1L, "employee01", "hash", true, null);
+        account.setStatus(AccountStatus.FORCE_PASSWORD_CHANGE);
+        when(accountRepository.findByUsername("employee01")).thenReturn(Optional.of(account));
+        when(passwordEncoder.matches("password", "hash")).thenReturn(true);
+
+        LoginResult result = service.login(new LoginRequest("employee01", "password"));
+
+        assertThat(result.response()).isNull();
+        assertThat(result.refreshToken()).isNull();
+        assertThat(result.stateResponse().status()).isEqualTo("PASSWORD_CHANGE_REQUIRED");
+        assertThat(result.stateResponse().accountId()).isEqualTo(1L);
+        assertThat(result.stateResponse().username()).isEqualTo("employee01");
+        verify(accountRepository, never()).save(account);
+        verifyNoInteractions(jwtService, refreshTokenService);
     }
 
     @Test

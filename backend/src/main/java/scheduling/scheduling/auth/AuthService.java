@@ -10,10 +10,12 @@ import scheduling.scheduling.auth.dto.AccountResponse;
 import scheduling.scheduling.auth.dto.AuthResponse;
 import scheduling.scheduling.auth.dto.EmployeeResponse;
 import scheduling.scheduling.auth.dto.LoginRequest;
+import scheduling.scheduling.auth.dto.LoginStateResponse;
 import scheduling.scheduling.auth.dto.MeResponse;
 import scheduling.scheduling.auth.dto.RegisterRequest;
 import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
+import scheduling.scheduling.entity.AccountStatus;
 import scheduling.scheduling.entity.Employee;
 import scheduling.scheduling.repository.AccountRepository;
 import scheduling.scheduling.repository.EmployeeRepository;
@@ -78,6 +80,12 @@ public class AuthService {
         }
         if (!passwordEncoder.matches(request.password(), account.getPasswordHash())) {
             throw new AuthenticationFailedException();
+        }
+        if (account.getStatus() == AccountStatus.PENDING_ACTIVATION) {
+            return LoginResult.state(new LoginStateResponse("OTP_REQUIRED", account.getId(), account.getUsername()));
+        }
+        if (account.getStatus() == AccountStatus.FORCE_PASSWORD_CHANGE) {
+            return LoginResult.state(new LoginStateResponse("PASSWORD_CHANGE_REQUIRED", account.getId(), account.getUsername()));
         }
 
         account.setLastLogin(LocalDateTime.now());
