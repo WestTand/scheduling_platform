@@ -1,9 +1,21 @@
 package scheduling.scheduling.repository;
 
+import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import scheduling.scheduling.entity.Employee;
 
 public interface EmployeeRepository extends JpaRepository<Employee, Long> {
 
     boolean existsByEmployeeCode(String employeeCode);
+
+    @Query("""
+            select e from Employee e
+            where (:query is null
+                or lower(e.employeeCode) like lower(concat('%', :query, '%'))
+                or lower(e.fullName) like lower(concat('%', :query, '%')))
+            and (:status is null or e.status = :status)
+            order by e.employeeCode asc
+            """)
+    List<Employee> search(String query, String status);
 }
