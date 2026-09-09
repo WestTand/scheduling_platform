@@ -15,11 +15,13 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import scheduling.scheduling.auth.dto.AccountResponse;
+import scheduling.scheduling.auth.dto.ActivationStateResponse;
 import scheduling.scheduling.auth.dto.AuthResponse;
 import scheduling.scheduling.auth.dto.EmployeeResponse;
 import scheduling.scheduling.auth.dto.LoginRequest;
 import scheduling.scheduling.auth.dto.MeResponse;
 import scheduling.scheduling.auth.dto.RegisterRequest;
+import scheduling.scheduling.auth.dto.VerifyActivationOtpRequest;
 import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
 import scheduling.scheduling.entity.AccountStatus;
@@ -35,12 +37,14 @@ class AuthServiceTest {
     private final PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
     private final JwtService jwtService = mock(JwtService.class);
     private final RefreshTokenService refreshTokenService = mock(RefreshTokenService.class);
+    private final AccountActivationOtpService accountActivationOtpService = mock(AccountActivationOtpService.class);
     private final AuthService service = new AuthService(
             accountRepository,
             employeeRepository,
             passwordEncoder,
             jwtService,
-            refreshTokenService);
+            refreshTokenService,
+            accountActivationOtpService);
 
     @Test
     void registerCreatesEmployeeAndEmployeeAccount() {
@@ -265,6 +269,17 @@ class AuthServiceTest {
         assertThatThrownBy(() -> service.me(new CurrentAccountPrincipal(1L, "employee01", AccountRole.EMPLOYEE)))
                 .isInstanceOf(InvalidTokenException.class)
                 .hasMessage("Invalid access token");
+    }
+
+    @Test
+    void verifyActivationOtpReturnsPasswordChangeRequiredState() {
+        Account account = account(42L, "employee01", "hash", true, null);
+        VerifyActivationOtpRequest request = new VerifyActivationOtpRequest(42L, "123456");
+        when(accountActivationOtpService.verifyActivationOtp(42L, "123456")).thenReturn(account);
+
+        ActivationStateResponse response = service.verifyActivationOtp(request);
+
+        assertThat(response).isEqualTo(new ActivationStateResponse("PASSWORD_CHANGE_REQUIRED", 42L, "employee01"));
     }
 
     private static RegisterRequest registerRequest() {

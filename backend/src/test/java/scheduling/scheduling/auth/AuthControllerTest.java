@@ -22,10 +22,12 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import scheduling.scheduling.auth.dto.AccountResponse;
+import scheduling.scheduling.auth.dto.ActivationStateResponse;
 import scheduling.scheduling.auth.dto.AuthResponse;
 import scheduling.scheduling.auth.dto.LoginRequest;
 import scheduling.scheduling.auth.dto.LoginStateResponse;
 import scheduling.scheduling.auth.dto.MeResponse;
+import scheduling.scheduling.auth.dto.VerifyActivationOtpRequest;
 import scheduling.scheduling.entity.AccountRole;
 
 @WebMvcTest(AuthController.class)
@@ -124,6 +126,44 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.accountId").value(42))
                 .andExpect(jsonPath("$.username").value("employee01"))
                 .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
+    }
+
+    @Test
+    void verifyActivationOtpReturnsPasswordChangeRequiredWithoutRefreshCookie() throws Exception {
+        when(authService.verifyActivationOtp(any(VerifyActivationOtpRequest.class)))
+                .thenReturn(new ActivationStateResponse("PASSWORD_CHANGE_REQUIRED", 42L, "employee01"));
+
+        mockMvc.perform(post("/api/auth/activation/verify-otp")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "accountId": 42,
+                                  "otp": "123456"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PASSWORD_CHANGE_REQUIRED"))
+                .andExpect(jsonPath("$.accountId").value(42))
+                .andExpect(jsonPath("$.username").value("employee01"))
+                .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
+    }
+
+    @Test
+    void verifyActivationOtpRejectsInvalidOtp() throws Exception {
+        when(authService.verifyActivationOtp(any(VerifyActivationOtpRequest.class)))
+                .thenThrow(new InvalidActivationOtpException());
+
+        mockMvc.perform(post("/api/auth/activation/verify-otp")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "accountId": 42,
+                                  "otp": "000000"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("INVALID_ACTIVATION_OTP"))
+                .andExpect(jsonPath("$.message").value("Invalid activation OTP"));
     }
 
     @Test

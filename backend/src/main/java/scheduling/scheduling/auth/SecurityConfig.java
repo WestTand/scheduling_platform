@@ -41,6 +41,7 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/health",
                                 "/api/auth/login",
+                                "/api/auth/activation/verify-otp",
                                 "/api/auth/refresh",
                                 "/api/auth/logout",
                                 "/v3/api-docs/**",

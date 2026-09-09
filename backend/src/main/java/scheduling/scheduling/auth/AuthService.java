@@ -7,12 +7,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import scheduling.scheduling.auth.dto.AccountResponse;
+import scheduling.scheduling.auth.dto.ActivationStateResponse;
 import scheduling.scheduling.auth.dto.AuthResponse;
 import scheduling.scheduling.auth.dto.EmployeeResponse;
 import scheduling.scheduling.auth.dto.LoginRequest;
 import scheduling.scheduling.auth.dto.LoginStateResponse;
 import scheduling.scheduling.auth.dto.MeResponse;
 import scheduling.scheduling.auth.dto.RegisterRequest;
+import scheduling.scheduling.auth.dto.VerifyActivationOtpRequest;
 import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
 import scheduling.scheduling.entity.AccountStatus;
@@ -28,18 +30,21 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
+    private final AccountActivationOtpService accountActivationOtpService;
 
     public AuthService(
             AccountRepository accountRepository,
             EmployeeRepository employeeRepository,
             PasswordEncoder passwordEncoder,
             JwtService jwtService,
-            RefreshTokenService refreshTokenService) {
+            RefreshTokenService refreshTokenService,
+            AccountActivationOtpService accountActivationOtpService) {
         this.accountRepository = Objects.requireNonNull(accountRepository, "accountRepository");
         this.employeeRepository = Objects.requireNonNull(employeeRepository, "employeeRepository");
         this.passwordEncoder = Objects.requireNonNull(passwordEncoder, "passwordEncoder");
         this.jwtService = Objects.requireNonNull(jwtService, "jwtService");
         this.refreshTokenService = Objects.requireNonNull(refreshTokenService, "refreshTokenService");
+        this.accountActivationOtpService = Objects.requireNonNull(accountActivationOtpService, "accountActivationOtpService");
     }
 
     @Transactional
@@ -102,6 +107,12 @@ public class AuthService {
             throw new InvalidTokenException("Invalid refresh token");
         }
         return loginResult(account, refreshToken);
+    }
+
+    @Transactional
+    public ActivationStateResponse verifyActivationOtp(VerifyActivationOtpRequest request) {
+        Account account = accountActivationOtpService.verifyActivationOtp(request.accountId(), request.otp());
+        return new ActivationStateResponse("PASSWORD_CHANGE_REQUIRED", account.getId(), account.getUsername());
     }
 
     @Transactional

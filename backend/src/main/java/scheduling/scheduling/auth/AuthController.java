@@ -14,7 +14,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import scheduling.scheduling.auth.dto.AuthResponse;
+import scheduling.scheduling.auth.dto.ActivationStateResponse;
 import scheduling.scheduling.auth.dto.LoginRequest;
+import scheduling.scheduling.auth.dto.VerifyActivationOtpRequest;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -55,6 +57,11 @@ public class AuthController {
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, refreshCookie(result.refreshToken()).toString())
                 .body(result.response());
+    }
+
+    @PostMapping("/activation/verify-otp")
+    ResponseEntity<ActivationStateResponse> verifyActivationOtp(@Valid @RequestBody VerifyActivationOtpRequest request) {
+        return ResponseEntity.ok(authService.verifyActivationOtp(request));
     }
 
     @PostMapping("/logout")

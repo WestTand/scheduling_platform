@@ -27,6 +27,12 @@ public class AuthExceptionHandler {
                 .body(new ErrorResponse("INVALID_TOKEN", ex.getMessage()));
     }
 
+    @ExceptionHandler(InvalidActivationOtpException.class)
+    ResponseEntity<ErrorResponse> handleInvalidActivationOtp(InvalidActivationOtpException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(new ErrorResponse("INVALID_ACTIVATION_OTP", ex.getMessage()));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ResponseEntity<ErrorResponse> handleValidationFailure(MethodArgumentNotValidException ex) {
         return ResponseEntity.badRequest()
