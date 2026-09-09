@@ -15,7 +15,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import scheduling.scheduling.auth.dto.AuthResponse;
 import scheduling.scheduling.auth.dto.LoginRequest;
-import scheduling.scheduling.auth.dto.RegisterRequest;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -34,11 +33,6 @@ public class AuthController {
         this.authService = authService;
         this.refreshCookieName = refreshCookieName;
         this.refreshCookieSecure = refreshCookieSecure;
-    }
-
-    @PostMapping("/register")
-    ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
-        return ResponseEntity.status(201).body(authService.register(request));
     }
 
     @PostMapping("/login")
