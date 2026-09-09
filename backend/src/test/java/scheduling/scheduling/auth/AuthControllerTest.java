@@ -24,6 +24,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import scheduling.scheduling.auth.dto.AccountResponse;
 import scheduling.scheduling.auth.dto.AuthResponse;
 import scheduling.scheduling.auth.dto.LoginRequest;
+import scheduling.scheduling.auth.dto.LoginStateResponse;
 import scheduling.scheduling.auth.dto.MeResponse;
 import scheduling.scheduling.entity.AccountRole;
 
@@ -83,6 +84,46 @@ class AuthControllerTest {
                         org.hamcrest.Matchers.containsString("Path=/api/auth"),
                         org.hamcrest.Matchers.containsString("SameSite=Lax"),
                         org.hamcrest.Matchers.containsString("HttpOnly"))));
+    }
+
+    @Test
+    void loginReturnsOtpRequiredWithoutRefreshCookie() throws Exception {
+        when(authService.login(any(LoginRequest.class)))
+                .thenReturn(LoginResult.state(new LoginStateResponse("OTP_REQUIRED", 42L, "employee01")));
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "employee01",
+                                  "password": "secret123"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("OTP_REQUIRED"))
+                .andExpect(jsonPath("$.accountId").value(42))
+                .andExpect(jsonPath("$.username").value("employee01"))
+                .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
+    }
+
+    @Test
+    void loginReturnsPasswordChangeRequiredWithoutRefreshCookie() throws Exception {
+        when(authService.login(any(LoginRequest.class)))
+                .thenReturn(LoginResult.state(new LoginStateResponse("PASSWORD_CHANGE_REQUIRED", 42L, "employee01")));
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "employee01",
+                                  "password": "secret123"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PASSWORD_CHANGE_REQUIRED"))
+                .andExpect(jsonPath("$.accountId").value(42))
+                .andExpect(jsonPath("$.username").value("employee01"))
+                .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
     }
 
     @Test

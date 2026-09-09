@@ -36,8 +36,11 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
+    ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
         LoginResult result = authService.login(request);
+        if (result.stateResponse() != null) {
+            return ResponseEntity.ok(result.stateResponse());
+        }
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, refreshCookie(result.refreshToken()).toString())
                 .body(result.response());
