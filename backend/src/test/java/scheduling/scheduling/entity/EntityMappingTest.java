@@ -131,6 +131,13 @@ class EntityMappingTest {
         assertThat(status.getAnnotation(Column.class).nullable()).isFalse();
     }
 
+    @Test
+    void accountRolesIncludeSystemAdminManagerAndEmployee() {
+        assertThat(AccountRole.values())
+                .containsExactly(AccountRole.ADMIN, AccountRole.MANAGER, AccountRole.EMPLOYEE);
+        assertThat(AccountRole.ADMIN.getValue()).isEqualTo("ADMIN");
+    }
+
     private static Iterable<String> declaredColumnNames(Class<?> entityClass) {
         return java.util.Arrays.stream(entityClass.getDeclaredFields())
                 .map(field -> field.getAnnotation(Column.class))

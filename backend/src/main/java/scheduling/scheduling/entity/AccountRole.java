@@ -10,6 +10,7 @@ import java.util.Set;
 @Getter
 @AllArgsConstructor
 public enum AccountRole {
+    ADMIN("ADMIN"),
     MANAGER("MANAGER"),
     EMPLOYEE("EMPLOYEE");
 
