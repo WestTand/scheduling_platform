@@ -1,12 +1,16 @@
 package scheduling.scheduling.admin;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import scheduling.scheduling.admin.dto.AdminEmployeeResponse;
+import scheduling.scheduling.admin.dto.UpdateEmployeeRequest;
 import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
 import scheduling.scheduling.entity.AccountStatus;
@@ -44,6 +48,63 @@ class AdminEmployeeServiceTest {
 
         assertThat(response).extracting(AdminEmployeeResponse::employeeCode).containsExactly("EMP002");
         assertThat(response).extracting(AdminEmployeeResponse::status).containsExactly("INACTIVE");
+    }
+
+    @Test
+    void getEmployeeReturnsEmployeeWithAccountSummary() {
+        Employee employee = employee(10L, "EMP001", "Nguyen Van A", "ACTIVE");
+        employee.setAccount(account(20L, "employee01", AccountStatus.FORCE_PASSWORD_CHANGE, true));
+        when(employeeRepository.findById(10L)).thenReturn(Optional.of(employee));
+
+        AdminEmployeeResponse response = service.getEmployee(10L);
+
+        assertThat(response.id()).isEqualTo(10L);
+        assertThat(response.account().id()).isEqualTo(20L);
+        assertThat(response.account().status()).isEqualTo(AccountStatus.FORCE_PASSWORD_CHANGE);
+    }
+
+    @Test
+    void getEmployeeRejectsMissingEmployee() {
+        when(employeeRepository.findById(10L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.getEmployee(10L))
+                .isInstanceOf(EmployeeNotFoundException.class)
+                .hasMessage("Employee not found");
+    }
+
+    @Test
+    void updateEmployeeChangesEditableFields() {
+        Employee employee = employee(10L, "EMP001", "Nguyen Van A", "ACTIVE");
+        when(employeeRepository.findById(10L)).thenReturn(Optional.of(employee));
+        when(employeeRepository.save(employee)).thenReturn(employee);
+        UpdateEmployeeRequest request = new UpdateEmployeeRequest(
+                "Nguyen Van A Updated",
+                "employee01.updated@example.com",
+                "0900000002",
+                "INACTIVE");
+
+        AdminEmployeeResponse response = service.updateEmployee(10L, request);
+
+        assertThat(employee.getFullName()).isEqualTo("Nguyen Van A Updated");
+        assertThat(employee.getEmail()).isEqualTo("employee01.updated@example.com");
+        assertThat(employee.getPhone()).isEqualTo("0900000002");
+        assertThat(employee.getStatus()).isEqualTo("INACTIVE");
+        verify(employeeRepository).save(employee);
+        assertThat(response.status()).isEqualTo("INACTIVE");
+    }
+
+    @Test
+    void updateEmployeeRejectsMissingEmployee() {
+        when(employeeRepository.findById(10L)).thenReturn(Optional.empty());
+        UpdateEmployeeRequest request = new UpdateEmployeeRequest(
+                "Nguyen Van A Updated",
+                "employee01.updated@example.com",
+                "0900000002",
+                "ACTIVE");
+
+        assertThatThrownBy(() -> service.updateEmployee(10L, request))
+                .isInstanceOf(EmployeeNotFoundException.class)
+                .hasMessage("Employee not found");
     }
 
     private static Employee employee(Long id, String employeeCode, String fullName, String status) {

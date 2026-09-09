@@ -5,7 +5,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import scheduling.scheduling.admin.dto.AdminEmployeeResponse;
+import scheduling.scheduling.admin.dto.UpdateEmployeeRequest;
 import scheduling.scheduling.auth.RefreshTokenService;
+import scheduling.scheduling.entity.Employee;
 import scheduling.scheduling.repository.EmployeeRepository;
 
 @Service
@@ -31,5 +33,25 @@ public class AdminEmployeeService {
         return employeeRepository.search(normalizedQuery, normalizedStatus).stream()
                 .map(AdminEmployeeResponse::from)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public AdminEmployeeResponse getEmployee(Long employeeId) {
+        return AdminEmployeeResponse.from(findEmployee(employeeId));
+    }
+
+    @Transactional
+    public AdminEmployeeResponse updateEmployee(Long employeeId, UpdateEmployeeRequest request) {
+        Employee employee = findEmployee(employeeId);
+        employee.setFullName(request.fullName());
+        employee.setEmail(request.email());
+        employee.setPhone(request.phone());
+        employee.setStatus(request.status());
+        return AdminEmployeeResponse.from(employeeRepository.save(employee));
+    }
+
+    private Employee findEmployee(Long employeeId) {
+        return employeeRepository.findById(employeeId)
+                .orElseThrow(EmployeeNotFoundException::new);
     }
 }
