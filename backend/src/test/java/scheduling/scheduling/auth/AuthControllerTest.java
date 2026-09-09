@@ -27,6 +27,7 @@ import scheduling.scheduling.auth.dto.AuthResponse;
 import scheduling.scheduling.auth.dto.LoginRequest;
 import scheduling.scheduling.auth.dto.LoginStateResponse;
 import scheduling.scheduling.auth.dto.MeResponse;
+import scheduling.scheduling.auth.dto.RequiredPasswordChangeRequest;
 import scheduling.scheduling.auth.dto.VerifyActivationOtpRequest;
 import scheduling.scheduling.entity.AccountRole;
 
@@ -164,6 +165,47 @@ class AuthControllerTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("INVALID_ACTIVATION_OTP"))
                 .andExpect(jsonPath("$.message").value("Invalid activation OTP"));
+    }
+
+    @Test
+    void changeRequiredPasswordReturnsTokensAndRefreshCookie() throws Exception {
+        when(authService.changeRequiredPassword(any(RequiredPasswordChangeRequest.class)))
+                .thenReturn(new LoginResult(authResponse("access-token", "employee01"), "refresh-token"));
+
+        mockMvc.perform(post("/api/auth/password/change-required")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "accountId": 42,
+                                  "newPassword": "new-password"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").value("access-token"))
+                .andExpect(cookie().httpOnly("refresh_token", true))
+                .andExpect(header().string(HttpHeaders.SET_COOKIE, org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.containsString("refresh_token=refresh-token"),
+                        org.hamcrest.Matchers.containsString("Path=/api/auth"),
+                        org.hamcrest.Matchers.containsString("SameSite=Lax"),
+                        org.hamcrest.Matchers.containsString("HttpOnly"))));
+    }
+
+    @Test
+    void changeRequiredPasswordRejectsInvalidState() throws Exception {
+        when(authService.changeRequiredPassword(any(RequiredPasswordChangeRequest.class)))
+                .thenThrow(new InvalidPasswordChangeStateException());
+
+        mockMvc.perform(post("/api/auth/password/change-required")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "accountId": 42,
+                                  "newPassword": "new-password"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("INVALID_PASSWORD_CHANGE_STATE"))
+                .andExpect(jsonPath("$.message").value("Invalid password change state"));
     }
 
     @Test

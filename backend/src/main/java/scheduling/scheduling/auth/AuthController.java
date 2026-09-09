@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import scheduling.scheduling.auth.dto.AuthResponse;
 import scheduling.scheduling.auth.dto.ActivationStateResponse;
 import scheduling.scheduling.auth.dto.LoginRequest;
+import scheduling.scheduling.auth.dto.RequiredPasswordChangeRequest;
 import scheduling.scheduling.auth.dto.VerifyActivationOtpRequest;
 
 @RestController
@@ -62,6 +63,14 @@ public class AuthController {
     @PostMapping("/activation/verify-otp")
     ResponseEntity<ActivationStateResponse> verifyActivationOtp(@Valid @RequestBody VerifyActivationOtpRequest request) {
         return ResponseEntity.ok(authService.verifyActivationOtp(request));
+    }
+
+    @PostMapping("/password/change-required")
+    ResponseEntity<AuthResponse> changeRequiredPassword(@Valid @RequestBody RequiredPasswordChangeRequest request) {
+        LoginResult result = authService.changeRequiredPassword(request);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, refreshCookie(result.refreshToken()).toString())
+                .body(result.response());
     }
 
     @PostMapping("/logout")

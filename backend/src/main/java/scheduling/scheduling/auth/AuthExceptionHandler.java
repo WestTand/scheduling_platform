@@ -33,6 +33,12 @@ public class AuthExceptionHandler {
                 .body(new ErrorResponse("INVALID_ACTIVATION_OTP", ex.getMessage()));
     }
 
+    @ExceptionHandler(InvalidPasswordChangeStateException.class)
+    ResponseEntity<ErrorResponse> handleInvalidPasswordChangeState(InvalidPasswordChangeStateException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(new ErrorResponse("INVALID_PASSWORD_CHANGE_STATE", ex.getMessage()));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ResponseEntity<ErrorResponse> handleValidationFailure(MethodArgumentNotValidException ex) {
         return ResponseEntity.badRequest()
