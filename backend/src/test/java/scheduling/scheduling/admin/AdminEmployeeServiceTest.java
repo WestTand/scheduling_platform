@@ -11,6 +11,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import scheduling.scheduling.admin.dto.AdminEmployeeResponse;
 import scheduling.scheduling.admin.dto.UpdateEmployeeRequest;
+import scheduling.scheduling.auth.RefreshTokenService;
 import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
 import scheduling.scheduling.entity.AccountStatus;
@@ -20,7 +21,8 @@ import scheduling.scheduling.repository.EmployeeRepository;
 class AdminEmployeeServiceTest {
 
     private final EmployeeRepository employeeRepository = mock(EmployeeRepository.class);
-    private final AdminEmployeeService service = new AdminEmployeeService(employeeRepository, null);
+    private final RefreshTokenService refreshTokenService = mock(RefreshTokenService.class);
+    private final AdminEmployeeService service = new AdminEmployeeService(employeeRepository, refreshTokenService);
 
     @Test
     void listEmployeesReturnsAllEmployeesWhenNoFilters() {
@@ -105,6 +107,37 @@ class AdminEmployeeServiceTest {
         assertThatThrownBy(() -> service.updateEmployee(10L, request))
                 .isInstanceOf(EmployeeNotFoundException.class)
                 .hasMessage("Employee not found");
+    }
+
+    @Test
+    void lockEmployeeMarksEmployeeInactiveLocksAccountAndRevokesTokens() {
+        Employee employee = employee(10L, "EMP001", "Nguyen Van A", "ACTIVE");
+        Account account = account(20L, "employee01", AccountStatus.ACTIVE, true);
+        employee.setAccount(account);
+        when(employeeRepository.findById(10L)).thenReturn(Optional.of(employee));
+
+        service.lockEmployee(10L);
+
+        assertThat(employee.getStatus()).isEqualTo("INACTIVE");
+        assertThat(account.getIsActive()).isFalse();
+        assertThat(account.getStatus()).isEqualTo(AccountStatus.INACTIVE);
+        verify(refreshTokenService).revokeAllForAccount(20L);
+        verify(employeeRepository).save(employee);
+    }
+
+    @Test
+    void unlockEmployeeMarksEmployeeActiveAndUnlocksAccount() {
+        Employee employee = employee(10L, "EMP001", "Nguyen Van A", "INACTIVE");
+        Account account = account(20L, "employee01", AccountStatus.INACTIVE, false);
+        employee.setAccount(account);
+        when(employeeRepository.findById(10L)).thenReturn(Optional.of(employee));
+
+        service.unlockEmployee(10L);
+
+        assertThat(employee.getStatus()).isEqualTo("ACTIVE");
+        assertThat(account.getIsActive()).isTrue();
+        assertThat(account.getStatus()).isEqualTo(AccountStatus.ACTIVE);
+        verify(employeeRepository).save(employee);
     }
 
     private static Employee employee(Long id, String employeeCode, String fullName, String status) {

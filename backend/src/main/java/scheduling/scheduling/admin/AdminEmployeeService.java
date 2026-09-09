@@ -7,6 +7,8 @@ import org.springframework.util.StringUtils;
 import scheduling.scheduling.admin.dto.AdminEmployeeResponse;
 import scheduling.scheduling.admin.dto.UpdateEmployeeRequest;
 import scheduling.scheduling.auth.RefreshTokenService;
+import scheduling.scheduling.entity.Account;
+import scheduling.scheduling.entity.AccountStatus;
 import scheduling.scheduling.entity.Employee;
 import scheduling.scheduling.repository.EmployeeRepository;
 
@@ -48,6 +50,33 @@ public class AdminEmployeeService {
         employee.setPhone(request.phone());
         employee.setStatus(request.status());
         return AdminEmployeeResponse.from(employeeRepository.save(employee));
+    }
+
+    @Transactional
+    public void lockEmployee(Long employeeId) {
+        Employee employee = findEmployee(employeeId);
+        employee.setStatus("INACTIVE");
+        Account account = employee.getAccount();
+        if (account != null) {
+            account.setIsActive(false);
+            account.setStatus(AccountStatus.INACTIVE);
+            refreshTokenService.revokeAllForAccount(account.getId());
+        }
+        employeeRepository.save(employee);
+    }
+
+    @Transactional
+    public void unlockEmployee(Long employeeId) {
+        Employee employee = findEmployee(employeeId);
+        employee.setStatus("ACTIVE");
+        Account account = employee.getAccount();
+        if (account != null) {
+            account.setIsActive(true);
+            if (account.getStatus() == AccountStatus.INACTIVE) {
+                account.setStatus(AccountStatus.ACTIVE);
+            }
+        }
+        employeeRepository.save(employee);
     }
 
     private Employee findEmployee(Long employeeId) {
