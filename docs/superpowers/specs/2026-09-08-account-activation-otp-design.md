@@ -69,6 +69,20 @@ If credentials are invalid, `isActive` is false, or the account is `INACTIVE`, l
 
 Initial implementation may use a mail service abstraction with a development logger implementation if SMTP is not configured. The interface should be stable so SMTP can be plugged in later.
 
+## OTP Creation Slice
+
+When `POST /api/manager/accounts` creates an employee account, backend also generates a numeric 6-digit activation OTP. The raw OTP is used only for email delivery and is never returned in the API response.
+
+The OTP record stores:
+
+- linked account
+- BCrypt hash of the OTP
+- expiry timestamp, default 10 minutes from creation
+- used timestamp, initially null
+- created timestamp
+
+After saving the account and OTP, backend sends an activation email to the employee email address. If SMTP username/password is not configured, the mail service logs and skips delivery for local development. If SMTP is configured and delivery fails, the service throws an error so account creation fails transactionally.
+
 ## Acceptance Criteria
 
 - Public self-registration is removed from security config and controller.
