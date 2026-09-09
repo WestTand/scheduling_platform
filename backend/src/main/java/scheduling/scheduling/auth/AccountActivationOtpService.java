@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountActivationOtp;
+import scheduling.scheduling.entity.AccountStatus;
 import scheduling.scheduling.repository.AccountActivationOtpRepository;
 
 @Service
@@ -44,5 +45,27 @@ public class AccountActivationOtpService {
                 .build();
         otpRepository.save(otp);
         accountMailService.sendActivationOtp(account, rawOtp);
+    }
+
+    @Transactional
+    public Account verifyActivationOtp(Long accountId, String rawOtp) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        AccountActivationOtp otp = otpRepository.findTopByAccountIdAndUsedAtIsNullOrderByCreatedAtDesc(accountId)
+                .orElseThrow(InvalidActivationOtpException::new);
+        Account account = otp.getAccount();
+        if (account.getStatus() != AccountStatus.PENDING_ACTIVATION) {
+            throw new InvalidActivationOtpException();
+        }
+        if (!otp.getExpiresAt().isAfter(now)) {
+            throw new InvalidActivationOtpException();
+        }
+        if (!passwordEncoder.matches(rawOtp, otp.getOtpHash())) {
+            throw new InvalidActivationOtpException();
+        }
+
+        otp.setUsedAt(now);
+        account.setStatus(AccountStatus.FORCE_PASSWORD_CHANGE);
+        otpRepository.save(otp);
+        return account;
     }
 }
