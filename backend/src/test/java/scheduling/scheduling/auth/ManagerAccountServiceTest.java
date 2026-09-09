@@ -28,7 +28,8 @@ class ManagerAccountServiceTest {
     private final ManagerAccountService service = new ManagerAccountService(
             accountRepository,
             employeeRepository,
-            passwordEncoder);
+            passwordEncoder,
+            "1111@");
 
     @Test
     void createEmployeeAccountUsesDefaultPasswordAndPendingActivationStatus() {

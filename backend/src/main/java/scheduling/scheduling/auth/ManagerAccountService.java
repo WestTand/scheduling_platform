@@ -1,6 +1,7 @@
 package scheduling.scheduling.auth;
 
 import java.util.Objects;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,19 +17,20 @@ import scheduling.scheduling.repository.EmployeeRepository;
 @Service
 public class ManagerAccountService {
 
-    private static final String DEFAULT_EMPLOYEE_PASSWORD = "1111@";
-
     private final AccountRepository accountRepository;
     private final EmployeeRepository employeeRepository;
     private final PasswordEncoder passwordEncoder;
+    private final String defaultEmployeePassword;
 
     public ManagerAccountService(
             AccountRepository accountRepository,
             EmployeeRepository employeeRepository,
-            PasswordEncoder passwordEncoder) {
+            PasswordEncoder passwordEncoder,
+            @Value("${app.auth.default-employee-password}") String defaultEmployeePassword) {
         this.accountRepository = Objects.requireNonNull(accountRepository, "accountRepository");
         this.employeeRepository = Objects.requireNonNull(employeeRepository, "employeeRepository");
         this.passwordEncoder = Objects.requireNonNull(passwordEncoder, "passwordEncoder");
+        this.defaultEmployeePassword = Objects.requireNonNull(defaultEmployeePassword, "defaultEmployeePassword");
     }
 
     @Transactional
@@ -51,7 +53,7 @@ public class ManagerAccountService {
 
         Account account = Account.builder()
                 .username(request.username())
-                .passwordHash(passwordEncoder.encode(DEFAULT_EMPLOYEE_PASSWORD))
+                .passwordHash(passwordEncoder.encode(defaultEmployeePassword))
                 .role(AccountRole.EMPLOYEE)
                 .isActive(true)
                 .status(AccountStatus.PENDING_ACTIVATION)
