@@ -21,7 +21,7 @@
 - Phase 0: Gan xong, da co monorepo, Docker setup, backend/frontend/AI health scaffold.
 - Phase 1: Entity chinh da co va da fix mapping theo database design v2. Da bo sung `AccountStatus` gom `ACTIVE`, `PENDING_ACTIVATION`, `FORCE_PASSWORD_CHANGE`, `INACTIVE` vao `Account`.
 - Phase 2: Auth/JWT/refresh cookie da merge. Da bo public self-registration `/api/auth/register`, them `spring-boot-starter-mail`, them config SMTP/Gmail qua env, them role `ADMIN`, them endpoint `POST /api/manager/accounts` de `MANAGER`/`ADMIN` tao account nhan vien voi password mac dinh lay tu bien moi truong `DEFAULT_EMPLOYEE_PASSWORD` va `status = PENDING_ACTIVATION`. Da hoan tat login lifecycle cho `PENDING_ACTIVATION`, gui/verify/resend OTP qua email, bat buoc doi mat khau sau OTP/reset, chan refresh/me cho account chua kich hoat, revoke refresh token khi reset mat khau, va test auth/OTP/force password change.
-- Phase 3: Da bat dau phan account creation API bang endpoint `POST /api/manager/accounts`. Cac API admin core khac chua lam. Viec tiep theo la `01 Admin/Manager Employee APIs` theo plan `docs/superpowers/plans/2026-09-09-admin-manager-employee-apis.md`.
+- Phase 3: Da bat dau phan account creation API bang endpoint `POST /api/manager/accounts`. Da implement `01 Admin/Manager Employee APIs` cho list/search/detail/update/lock/unlock nhan vien. Cac API admin core tiep theo chua lam: account list/lock/unlock rieng, shift type, scheduling rules.
 
 ## Phase 0 - Setup
 
@@ -99,11 +99,11 @@
 
 ## Phase 3 - Admin Core
 
-- [ ] API danh sach nhan vien
+- [x] API danh sach nhan vien
 - [x] API them nhan vien kem tao account bang email
-- [ ] API cap nhat nhan vien
-- [ ] API khoa/mo khoa nhan vien
-- [ ] API tim kiem nhan vien
+- [x] API cap nhat nhan vien
+- [x] API khoa/mo khoa nhan vien
+- [x] API tim kiem nhan vien
 - API danh sach tai khoan
 - [x] API quan ly tao account nhan vien voi email
 - [x] API gui lai OTP kich hoat cho nhan vien
@@ -119,7 +119,7 @@
 - API quan ly scheduling rules
 - API cau hinh dinh muc ca/tuan
 - API cau hinh trong so soft constraints
-- Test admin employee APIs
+- [x] Test admin employee APIs
 - Test admin account creation APIs
 - Test admin password reset/reactivation APIs
 - Test shift type APIs
