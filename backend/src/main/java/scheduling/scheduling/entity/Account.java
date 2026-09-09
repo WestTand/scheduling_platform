@@ -34,6 +34,11 @@ public class Account extends BaseEntity {
     @Builder.Default
     private Boolean isActive = true;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    @Builder.Default
+    private AccountStatus status = AccountStatus.ACTIVE;
+
     @Column(name = "last_login")
     private LocalDateTime lastLogin;
 
