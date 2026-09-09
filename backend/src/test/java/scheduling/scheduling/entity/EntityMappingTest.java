@@ -30,7 +30,8 @@ class EntityMappingTest {
                 Map.entry(SwapRequest.class, "swap_request_id"),
                 Map.entry(Notification.class, "notification_id"),
                 Map.entry(ActivityLog.class, "log_id"),
-                Map.entry(RefreshToken.class, "refresh_token_id"));
+                Map.entry(RefreshToken.class, "refresh_token_id"),
+                Map.entry(AccountActivationOtp.class, "activation_otp_id"));
 
         assertThat(expectedIdColumns).allSatisfy((entityClass, expectedColumnName) -> {
             AttributeOverride override = entityClass.getAnnotation(AttributeOverride.class);
@@ -65,6 +66,13 @@ class EntityMappingTest {
     void refreshTokenDeclaresRequiredColumns() {
         assertThat(declaredColumnNames(RefreshToken.class))
                 .contains("token_hash", "expires_at", "revoked_at", "created_at")
+                .doesNotContain("updated_at");
+    }
+
+    @Test
+    void accountActivationOtpDeclaresRequiredColumns() {
+        assertThat(declaredColumnNames(AccountActivationOtp.class))
+                .contains("otp_hash", "expires_at", "used_at", "created_at")
                 .doesNotContain("updated_at");
     }
 
