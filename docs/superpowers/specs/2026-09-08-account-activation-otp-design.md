@@ -40,12 +40,22 @@ Replace public self-registration with a manager-created account flow where the e
 ## API Changes
 
 - Remove public `POST /api/auth/register`.
-- Add manager endpoint `POST /api/admin/accounts/employees` to create employee account.
-- Add manager endpoint `POST /api/admin/accounts/{accountId}/activation/resend`.
-- Add manager endpoint `POST /api/admin/accounts/{accountId}/password/reset`.
+- Add manager endpoint `POST /api/manager/accounts` to create employee account.
+- Add manager endpoint `POST /api/manager/accounts/{accountId}/activation/resend`.
+- Add manager endpoint `POST /api/manager/accounts/{accountId}/password/reset`.
 - Add public endpoint `POST /api/auth/activation/verify-otp`.
 - Add public endpoint `POST /api/auth/password/change-required`.
 - Keep `POST /api/auth/login`, `/refresh`, `/logout`, and `GET /api/auth/me`.
+
+## Login State Response
+
+`POST /api/auth/login` keeps the existing success response for `ACTIVE` accounts: access token in the JSON body and refresh token in an HttpOnly cookie.
+
+If credentials are valid but the account is `PENDING_ACTIVATION`, login returns `200 OK` without issuing access or refresh tokens. The response body contains `status = OTP_REQUIRED`, `accountId`, and `username` so the frontend can route the user to OTP verification.
+
+If credentials are valid but the account is `FORCE_PASSWORD_CHANGE`, login returns `200 OK` without issuing access or refresh tokens. The response body contains `status = PASSWORD_CHANGE_REQUIRED`, `accountId`, and `username` so the frontend can route the user to required password change.
+
+If credentials are invalid, `isActive` is false, or the account is `INACTIVE`, login keeps the generic authentication failure response and does not reveal which check failed.
 
 ## Security Rules
 
