@@ -20,16 +20,19 @@ public class ManagerAccountService {
     private final AccountRepository accountRepository;
     private final EmployeeRepository employeeRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AccountActivationOtpService otpService;
     private final String defaultEmployeePassword;
 
     public ManagerAccountService(
             AccountRepository accountRepository,
             EmployeeRepository employeeRepository,
             PasswordEncoder passwordEncoder,
+            AccountActivationOtpService otpService,
             @Value("${app.auth.default-employee-password}") String defaultEmployeePassword) {
         this.accountRepository = Objects.requireNonNull(accountRepository, "accountRepository");
         this.employeeRepository = Objects.requireNonNull(employeeRepository, "employeeRepository");
         this.passwordEncoder = Objects.requireNonNull(passwordEncoder, "passwordEncoder");
+        this.otpService = Objects.requireNonNull(otpService, "otpService");
         this.defaultEmployeePassword = Objects.requireNonNull(defaultEmployeePassword, "defaultEmployeePassword");
     }
 
@@ -60,6 +63,9 @@ public class ManagerAccountService {
                 .employee(savedEmployee)
                 .build();
 
-        return AccountResponse.from(accountRepository.save(account));
+        Account savedAccount = accountRepository.save(account);
+        otpService.createActivationOtp(savedAccount);
+
+        return AccountResponse.from(savedAccount);
     }
 }

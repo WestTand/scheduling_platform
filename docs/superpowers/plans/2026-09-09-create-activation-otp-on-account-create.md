@@ -51,5 +51,5 @@
 - [ ] Update Spring context test mocks if needed.
 - [ ] Run `./mvnw.cmd "-Dtest=ManagerAccountServiceTest,AccountActivationOtpServiceTest" test`.
 - [ ] Run `./mvnw.cmd clean test`.
-- [ ] Run grep for forbidden literals: `1111@|111@`.
+- [ ] Run a repo-wide search to confirm no default-password literal remains in source or docs.
 - [ ] Commit with `feat: create activation otp for employee accounts` and push `main`.

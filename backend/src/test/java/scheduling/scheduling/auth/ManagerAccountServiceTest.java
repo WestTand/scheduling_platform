@@ -25,10 +25,12 @@ class ManagerAccountServiceTest {
     private final AccountRepository accountRepository = mock(AccountRepository.class);
     private final EmployeeRepository employeeRepository = mock(EmployeeRepository.class);
     private final PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
+    private final AccountActivationOtpService otpService = mock(AccountActivationOtpService.class);
     private final ManagerAccountService service = new ManagerAccountService(
             accountRepository,
             employeeRepository,
             passwordEncoder,
+            otpService,
             "configured-default");
 
     @Test
@@ -67,6 +69,7 @@ class ManagerAccountServiceTest {
         assertThat(accountCaptor.getValue().getStatus()).isEqualTo(AccountStatus.PENDING_ACTIVATION);
         assertThat(accountCaptor.getValue().getIsActive()).isTrue();
         assertThat(accountCaptor.getValue().getEmployee()).isSameAs(savedEmployee);
+        verify(otpService).createActivationOtp(savedAccount);
         assertThat(response).isEqualTo(new AccountResponse(20L, "employee01", AccountRole.EMPLOYEE));
     }
 

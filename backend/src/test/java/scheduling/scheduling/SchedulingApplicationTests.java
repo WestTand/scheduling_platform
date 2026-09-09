@@ -9,6 +9,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import scheduling.scheduling.repository.RefreshTokenRepository;
+import scheduling.scheduling.repository.AccountActivationOtpRepository;
 import scheduling.scheduling.repository.AccountRepository;
 import scheduling.scheduling.repository.EmployeeRepository;
 
@@ -27,6 +28,9 @@ class SchedulingApplicationTests {
 
 	@MockitoBean
 	private EmployeeRepository employeeRepository;
+
+	@MockitoBean
+	private AccountActivationOtpRepository accountActivationOtpRepository;
 
 	@Autowired
 	private JavaMailSender mailSender;
