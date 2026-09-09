@@ -14,6 +14,7 @@ import scheduling.scheduling.auth.dto.LoginRequest;
 import scheduling.scheduling.auth.dto.LoginStateResponse;
 import scheduling.scheduling.auth.dto.MeResponse;
 import scheduling.scheduling.auth.dto.RegisterRequest;
+import scheduling.scheduling.auth.dto.RequiredPasswordChangeRequest;
 import scheduling.scheduling.auth.dto.VerifyActivationOtpRequest;
 import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
@@ -113,6 +114,20 @@ public class AuthService {
     public ActivationStateResponse verifyActivationOtp(VerifyActivationOtpRequest request) {
         Account account = accountActivationOtpService.verifyActivationOtp(request.accountId(), request.otp());
         return new ActivationStateResponse("PASSWORD_CHANGE_REQUIRED", account.getId(), account.getUsername());
+    }
+
+    @Transactional
+    public LoginResult changeRequiredPassword(RequiredPasswordChangeRequest request) {
+        Account account = accountRepository.findById(request.accountId())
+                .orElseThrow(InvalidPasswordChangeStateException::new);
+        if (!Boolean.TRUE.equals(account.getIsActive()) || account.getStatus() != AccountStatus.FORCE_PASSWORD_CHANGE) {
+            throw new InvalidPasswordChangeStateException();
+        }
+
+        account.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+        account.setStatus(AccountStatus.ACTIVE);
+        accountRepository.save(account);
+        return loginResult(account, refreshTokenService.create(account));
     }
 
     @Transactional

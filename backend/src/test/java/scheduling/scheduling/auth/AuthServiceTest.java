@@ -21,6 +21,7 @@ import scheduling.scheduling.auth.dto.EmployeeResponse;
 import scheduling.scheduling.auth.dto.LoginRequest;
 import scheduling.scheduling.auth.dto.MeResponse;
 import scheduling.scheduling.auth.dto.RegisterRequest;
+import scheduling.scheduling.auth.dto.RequiredPasswordChangeRequest;
 import scheduling.scheduling.auth.dto.VerifyActivationOtpRequest;
 import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
@@ -280,6 +281,57 @@ class AuthServiceTest {
         ActivationStateResponse response = service.verifyActivationOtp(request);
 
         assertThat(response).isEqualTo(new ActivationStateResponse("PASSWORD_CHANGE_REQUIRED", 42L, "employee01"));
+    }
+
+    @Test
+    void changeRequiredPasswordActivatesAccountAndReturnsTokens() {
+        Account account = account(42L, "employee01", "old-hash", true, null);
+        account.setStatus(AccountStatus.FORCE_PASSWORD_CHANGE);
+        RequiredPasswordChangeRequest request = new RequiredPasswordChangeRequest(42L, "new-password");
+        RefreshToken refreshToken = RefreshToken.builder().account(account).build();
+        when(accountRepository.findById(42L)).thenReturn(Optional.of(account));
+        when(passwordEncoder.encode("new-password")).thenReturn("new-hash");
+        when(refreshTokenService.create(account)).thenReturn(new RefreshTokenResult("refresh-token", refreshToken));
+        when(jwtService.createAccessToken(42L, "employee01", AccountRole.EMPLOYEE)).thenReturn("access-token");
+        when(jwtService.getAccessTokenTtlSeconds()).thenReturn(900L);
+
+        LoginResult result = service.changeRequiredPassword(request);
+
+        assertThat(account.getPasswordHash()).isEqualTo("new-hash");
+        assertThat(account.getStatus()).isEqualTo(AccountStatus.ACTIVE);
+        verify(accountRepository).save(account);
+        assertThat(result.refreshToken()).isEqualTo("refresh-token");
+        assertThat(result.response().accessToken()).isEqualTo("access-token");
+        assertThat(result.response().account().id()).isEqualTo(42L);
+    }
+
+    @Test
+    void changeRequiredPasswordRejectsMissingAccount() {
+        when(accountRepository.findById(42L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.changeRequiredPassword(new RequiredPasswordChangeRequest(42L, "new-password")))
+                .isInstanceOf(InvalidPasswordChangeStateException.class)
+                .hasMessage("Invalid password change state");
+    }
+
+    @Test
+    void changeRequiredPasswordRejectsInactiveAccount() {
+        Account account = account(42L, "employee01", "old-hash", false, null);
+        account.setStatus(AccountStatus.FORCE_PASSWORD_CHANGE);
+        when(accountRepository.findById(42L)).thenReturn(Optional.of(account));
+
+        assertThatThrownBy(() -> service.changeRequiredPassword(new RequiredPasswordChangeRequest(42L, "new-password")))
+                .isInstanceOf(InvalidPasswordChangeStateException.class);
+    }
+
+    @Test
+    void changeRequiredPasswordRejectsWrongStatus() {
+        Account account = account(42L, "employee01", "old-hash", true, null);
+        account.setStatus(AccountStatus.PENDING_ACTIVATION);
+        when(accountRepository.findById(42L)).thenReturn(Optional.of(account));
+
+        assertThatThrownBy(() -> service.changeRequiredPassword(new RequiredPasswordChangeRequest(42L, "new-password")))
+                .isInstanceOf(InvalidPasswordChangeStateException.class);
     }
 
     private static RegisterRequest registerRequest() {
