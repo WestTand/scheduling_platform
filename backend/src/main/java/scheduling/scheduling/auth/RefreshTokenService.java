@@ -76,6 +76,12 @@ public class RefreshTokenService {
     }
 
     @Transactional
+    public void revokeAllForAccount(Long accountId) {
+        refreshTokenRepository.findByAccountIdAndRevokedAtIsNull(accountId)
+                .forEach(refreshToken -> refreshToken.setRevokedAt(now()));
+    }
+
+    @Transactional
     public RefreshTokenResult rotate(String rawToken) {
         if (rawToken == null || rawToken.isBlank()) {
             throw invalidRefreshToken();

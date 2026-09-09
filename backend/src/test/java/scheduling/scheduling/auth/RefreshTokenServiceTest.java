@@ -15,6 +15,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -98,6 +99,18 @@ class RefreshTokenServiceTest {
         assertThat(token.getRevokedAt()).isEqualTo(NOW);
         verify(repository).findLockedByTokenHash(RefreshTokenService.hashTokenForTest("raw"));
         verify(repository, never()).findByTokenHash(RefreshTokenService.hashTokenForTest("raw"));
+    }
+
+    @Test
+    void revokeAllForAccountMarksUnrevokedAccountTokensRevoked() {
+        RefreshToken first = refreshToken("raw-1", account("employee01"), NOW.plus(TTL));
+        RefreshToken second = refreshToken("raw-2", account("employee01"), NOW.plus(TTL));
+        when(repository.findByAccountIdAndRevokedAtIsNull(42L)).thenReturn(List.of(first, second));
+
+        service.revokeAllForAccount(42L);
+
+        assertThat(first.getRevokedAt()).isEqualTo(NOW);
+        assertThat(second.getRevokedAt()).isEqualTo(NOW);
     }
 
     @Test
