@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
 import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import java.lang.reflect.Field;
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -100,6 +102,7 @@ class EntityMappingTest {
     @Test
     void lombokBuildersPreserveEntityDefaults() {
         assertThat(Account.builder().build().getIsActive()).isTrue();
+        assertThat(Account.builder().build().getStatus()).isEqualTo(AccountStatus.ACTIVE);
         assertThat(Employee.builder().build().getStatus()).isEqualTo("ACTIVE");
         assertThat(ShiftType.builder().build().getOvernight()).isFalse();
         assertThat(ShiftType.builder().build().getHeavy()).isFalse();
@@ -116,6 +119,23 @@ class EntityMappingTest {
         assertThat(SchedulingRule.builder().build().getActive()).isTrue();
         assertThat(SwapRequest.builder().build().getStatus()).isEqualTo("PENDING_TARGET");
         assertThat(Notification.builder().build().getRead()).isFalse();
+    }
+
+    @Test
+    void accountStatusIsStoredAsRequiredEnumColumn() throws NoSuchFieldException {
+        Field status = Account.class.getDeclaredField("status");
+
+        assertThat(status.getType()).isEqualTo(AccountStatus.class);
+        assertThat(status.getAnnotation(Enumerated.class).value()).isEqualTo(EnumType.STRING);
+        assertThat(status.getAnnotation(Column.class).name()).isEqualTo("status");
+        assertThat(status.getAnnotation(Column.class).nullable()).isFalse();
+    }
+
+    @Test
+    void accountRolesIncludeSystemAdminManagerAndEmployee() {
+        assertThat(AccountRole.values())
+                .containsExactly(AccountRole.ADMIN, AccountRole.MANAGER, AccountRole.EMPLOYEE);
+        assertThat(AccountRole.ADMIN.getValue()).isEqualTo("ADMIN");
     }
 
     private static Iterable<String> declaredColumnNames(Class<?> entityClass) {

@@ -1,6 +1,7 @@
 package scheduling.scheduling.auth;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -24,7 +25,6 @@ import scheduling.scheduling.auth.dto.AccountResponse;
 import scheduling.scheduling.auth.dto.AuthResponse;
 import scheduling.scheduling.auth.dto.LoginRequest;
 import scheduling.scheduling.auth.dto.MeResponse;
-import scheduling.scheduling.auth.dto.RegisterRequest;
 import scheduling.scheduling.entity.AccountRole;
 
 @WebMvcTest(AuthController.class)
@@ -45,10 +45,7 @@ class AuthControllerTest {
     private JwtService jwtService;
 
     @Test
-    void registerIsPublicAndReturnsCreatedAccount() throws Exception {
-        when(authService.register(any(RegisterRequest.class)))
-                .thenReturn(new AccountResponse(42L, "employee01", AccountRole.EMPLOYEE));
-
+    void registerEndpointIsNotAvailable() throws Exception {
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -61,10 +58,8 @@ class AuthControllerTest {
                                   "phone": "0900000001"
                                 }
                                 """))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").value(42))
-                .andExpect(jsonPath("$.username").value("employee01"))
-                .andExpect(jsonPath("$.role").value("EMPLOYEE"));
+                .andExpect(status().isUnauthorized());
+        verifyNoInteractions(authService);
     }
 
     @Test
