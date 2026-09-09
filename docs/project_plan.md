@@ -56,38 +56,39 @@
 
 ## Phase 2 - Auth & Security
 
-- Them dependency JWT
-- Them dependency gui mail neu can
-- Them config JWT secret, access token TTL, refresh token TTL
-- Them config SMTP/mail sender cho moi truong dev/prod
-- Bo public self-registration cua nhan vien
-- Implement login bang username/password
-- Neu account chua kich hoat, login tra ve trang thai can xac thuc OTP
-- Neu account bi khoa, login bi tu choi
-- Implement gui OTP kich hoat tai khoan qua email
-- Implement verify OTP kich hoat tai khoan
-- Implement resend OTP kich hoat tai khoan
-- Implement bat buoc doi mat khau lan dau sau khi OTP hop le
-- Implement bat buoc doi mat khau sau khi quan ly reset mat khau
-- Hash password bang BCrypt
-- Generate access token JWT
-- Luu refresh token hash vao DB
-- Set refresh token vao `HttpOnly Cookie`
-- Implement refresh token rotation
-- Implement revoke refresh token khi logout
-- Implement `/api/auth/me`
-- Chan inactive account login/refresh/me
-- Chan account chua kich hoat refresh/me
-- Revoke refresh token cu khi account bi reset mat khau
-- Cau hinh Spring Security stateless
-- Public `/api/auth/login`, `/api/auth/activation/verify-otp`, `/api/auth/password/change-required`, `/api/auth/refresh`, `/api/auth/logout`, `/api/health`
-- Manager-only `/api/manager/accounts/{accountId}/activation/resend` and `/api/manager/accounts/{accountId}/password/reset`
-- Protect cac API con lai bang Bearer token
-- Viet test `AuthService`
-- Viet test `AuthController`
-- Viet test OTP activation flow
-- Viet test force change password flow
-- Push branch auth len GitHub
+- Status: completed on `main`; verified with backend `mvnw clean test` passing 75 tests.
+- [x] Them dependency JWT
+- [x] Them dependency gui mail neu can
+- [x] Them config JWT secret, access token TTL, refresh token TTL
+- [x] Them config SMTP/mail sender cho moi truong dev/prod
+- [x] Bo public self-registration cua nhan vien
+- [x] Implement login bang username/password
+- [x] Neu account chua kich hoat, login tra ve trang thai can xac thuc OTP
+- [x] Neu account bi khoa, login bi tu choi
+- [x] Implement gui OTP kich hoat tai khoan qua email
+- [x] Implement verify OTP kich hoat tai khoan
+- [x] Implement resend OTP kich hoat tai khoan
+- [x] Implement bat buoc doi mat khau lan dau sau khi OTP hop le
+- [x] Implement bat buoc doi mat khau sau khi quan ly reset mat khau
+- [x] Hash password bang BCrypt
+- [x] Generate access token JWT
+- [x] Luu refresh token hash vao DB
+- [x] Set refresh token vao `HttpOnly Cookie`
+- [x] Implement refresh token rotation
+- [x] Implement revoke refresh token khi logout
+- [x] Implement `/api/auth/me`
+- [x] Chan inactive account login/refresh/me
+- [x] Chan account chua kich hoat refresh/me
+- [x] Revoke refresh token cu khi account bi reset mat khau
+- [x] Cau hinh Spring Security stateless
+- [x] Public `/api/auth/login`, `/api/auth/activation/verify-otp`, `/api/auth/password/change-required`, `/api/auth/refresh`, `/api/auth/logout`, `/api/health`
+- [x] Manager-only `/api/manager/accounts`, `/api/manager/accounts/{accountId}/activation/resend`, `/api/manager/accounts/{accountId}/password/reset`
+- [x] Protect cac API con lai bang Bearer token
+- [x] Viet test `AuthService`
+- [x] Viet test `AuthController`
+- [x] Viet test OTP activation flow
+- [x] Viet test force change password flow
+- [x] Push auth work len GitHub `main`
 
 ## Phase 3 - Admin Core
 
