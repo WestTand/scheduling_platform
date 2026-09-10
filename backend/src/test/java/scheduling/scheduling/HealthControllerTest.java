@@ -13,6 +13,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import scheduling.scheduling.auth.JwtAuthenticationFilter;
 import scheduling.scheduling.auth.JwtService;
 import scheduling.scheduling.auth.SecurityConfig;
+import scheduling.scheduling.repository.AccountRepository;
 
 @WebMvcTest(HealthController.class)
 @Import({ SecurityConfig.class, JwtAuthenticationFilter.class })
@@ -23,6 +24,9 @@ class HealthControllerTest {
 
 	@MockitoBean
 	private JwtService jwtService;
+
+	@MockitoBean
+	private AccountRepository accountRepository;
 
 	@Test
 	void healthReturnsBackendServiceStatus() throws Exception {

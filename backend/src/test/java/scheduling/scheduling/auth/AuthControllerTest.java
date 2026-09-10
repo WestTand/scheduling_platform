@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import jakarta.servlet.http.Cookie;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -29,7 +30,10 @@ import scheduling.scheduling.auth.dto.LoginStateResponse;
 import scheduling.scheduling.auth.dto.MeResponse;
 import scheduling.scheduling.auth.dto.RequiredPasswordChangeRequest;
 import scheduling.scheduling.auth.dto.VerifyActivationOtpRequest;
+import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
+import scheduling.scheduling.entity.AccountStatus;
+import scheduling.scheduling.repository.AccountRepository;
 
 @WebMvcTest(AuthController.class)
 @Import({ SecurityConfig.class, JwtAuthenticationFilter.class, AuthExceptionHandler.class })
@@ -47,6 +51,9 @@ class AuthControllerTest {
 
     @MockitoBean
     private JwtService jwtService;
+
+    @MockitoBean
+    private AccountRepository accountRepository;
 
     @Test
     void registerEndpointIsNotAvailable() throws Exception {
@@ -175,10 +182,11 @@ class AuthControllerTest {
         mockMvc.perform(post("/api/auth/password/change-required")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {
-                                  "accountId": 42,
-                                  "newPassword": "new-password"
-                                }
+                                 {
+                                   "accountId": 42,
+                                   "currentPassword": "old-password",
+                                   "newPassword": "new-password"
+                                 }
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").value("access-token"))
@@ -198,14 +206,35 @@ class AuthControllerTest {
         mockMvc.perform(post("/api/auth/password/change-required")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {
-                                  "accountId": 42,
-                                  "newPassword": "new-password"
-                                }
+                                 {
+                                   "accountId": 42,
+                                   "currentPassword": "old-password",
+                                   "newPassword": "new-password"
+                                 }
                                 """))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("INVALID_PASSWORD_CHANGE_STATE"))
                 .andExpect(jsonPath("$.message").value("Invalid password change state"));
+    }
+
+    @Test
+    void changeRequiredPasswordIgnoresInvalidBearerToken() throws Exception {
+        when(jwtService.parseAccessToken("bad-token")).thenThrow(new InvalidTokenException("Invalid access token"));
+        when(authService.changeRequiredPassword(any(RequiredPasswordChangeRequest.class)))
+                .thenReturn(new LoginResult(authResponse("access-token", "employee01"), "refresh-token"));
+
+        mockMvc.perform(post("/api/auth/password/change-required")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer bad-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "accountId": 42,
+                                  "currentPassword": "old-password",
+                                  "newPassword": "new-password"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").value("access-token"));
     }
 
     @Test
@@ -273,6 +302,7 @@ class AuthControllerTest {
     void meReturnsCurrentUserWithBearerToken() throws Exception {
         CurrentAccountPrincipal principal = new CurrentAccountPrincipal(42L, "employee01", AccountRole.EMPLOYEE);
         when(jwtService.parseAccessToken("valid-access-token")).thenReturn(principal);
+        when(accountRepository.findById(42L)).thenReturn(Optional.of(account(42L, "employee01", AccountRole.EMPLOYEE, AccountStatus.ACTIVE, true)));
         when(authService.me(principal)).thenReturn(new MeResponse(
                 new AccountResponse(42L, "employee01", AccountRole.EMPLOYEE),
                 null));
@@ -286,11 +316,38 @@ class AuthControllerTest {
         verify(authService).me(principal);
     }
 
+    @Test
+    void meRejectsBearerTokenForInactiveAccount() throws Exception {
+        CurrentAccountPrincipal principal = new CurrentAccountPrincipal(42L, "employee01", AccountRole.EMPLOYEE);
+        when(jwtService.parseAccessToken("stale-access-token")).thenReturn(principal);
+        when(accountRepository.findById(42L)).thenReturn(Optional.of(account(42L, "employee01", AccountRole.EMPLOYEE, AccountStatus.INACTIVE, false)));
+
+        mockMvc.perform(get("/api/auth/me")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer stale-access-token"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("INVALID_TOKEN"))
+                .andExpect(jsonPath("$.message").value("Invalid access token"));
+
+        verifyNoInteractions(authService);
+    }
+
     private static AuthResponse authResponse(String accessToken, String username) {
         return new AuthResponse(
                 accessToken,
                 "Bearer",
                 900,
                 new AccountResponse(42L, username, AccountRole.EMPLOYEE));
+    }
+
+    private static Account account(Long id, String username, AccountRole role, AccountStatus status, boolean active) {
+        Account account = Account.builder()
+                .username(username)
+                .passwordHash("hash")
+                .role(role)
+                .status(status)
+                .isActive(active)
+                .build();
+        account.setId(id);
+        return account;
     }
 }

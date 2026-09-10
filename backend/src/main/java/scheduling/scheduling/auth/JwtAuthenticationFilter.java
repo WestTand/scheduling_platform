@@ -14,22 +14,29 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import scheduling.scheduling.entity.Account;
+import scheduling.scheduling.entity.AccountStatus;
+import scheduling.scheduling.repository.AccountRepository;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
+    private final AccountRepository accountRepository;
 
     private static final List<String> PUBLIC_EXACT_PATHS = List.of(
             "/api/auth/register",
             "/api/auth/login",
+            "/api/auth/activation/verify-otp",
+            "/api/auth/password/change-required",
             "/api/auth/refresh",
             "/api/auth/logout",
             "/api/health",
             "/swagger-ui.html");
 
-    public JwtAuthenticationFilter(JwtService jwtService) {
+    public JwtAuthenticationFilter(JwtService jwtService, AccountRepository accountRepository) {
         this.jwtService = jwtService;
+        this.accountRepository = accountRepository;
     }
 
     @Override
@@ -55,6 +62,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         try {
             CurrentAccountPrincipal principal = jwtService.parseAccessToken(authorization.substring(7));
+            Account account = accountRepository.findById(principal.accountId())
+                    .orElseThrow(() -> new InvalidTokenException("Invalid access token"));
+            if (!isUsable(account) || !account.getUsername().equals(principal.username()) || account.getRole() != principal.role()) {
+                throw new InvalidTokenException("Invalid access token");
+            }
             UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                     principal,
                     null,
@@ -68,5 +80,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
             response.getWriter().write("{\"code\":\"INVALID_TOKEN\",\"message\":\"" + ex.getMessage() + "\"}");
         }
+    }
+
+    private static boolean isUsable(Account account) {
+        return Boolean.TRUE.equals(account.getIsActive()) && account.getStatus() == AccountStatus.ACTIVE;
     }
 }
