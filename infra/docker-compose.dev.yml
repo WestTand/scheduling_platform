@@ -57,10 +57,18 @@ services:
       ai-service:
         condition: service_healthy
     environment:
+      SPRING_PROFILES_ACTIVE: dev
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-scheduling_platform}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-scheduling_platform}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-scheduling_platform_dev_password}
       AI_SERVICE_URL: ${AI_SERVICE_URL:-http://ai-service:8001}
+      JWT_SECRET: ${JWT_SECRET:-dev-only-change-me-dev-only-change-me-dev-only-change-me}
+      DEFAULT_EMPLOYEE_PASSWORD: ${DEFAULT_EMPLOYEE_PASSWORD}
+      MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_APP_PASSWORD: ${MAIL_APP_PASSWORD}
+      MAIL_FROM: ${MAIL_FROM}
     ports:
       - "${BACKEND_PORT:-8080}:8080"
     volumes:
