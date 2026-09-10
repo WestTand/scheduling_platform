@@ -27,7 +27,7 @@ public class Account extends BaseEntity {
     private String passwordHash;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "role", nullable = false, columnDefinition = "account_role")
+    @Column(name = "role", nullable = false, length = 20)
     private AccountRole role;
 
     @Column(name = "is_active", nullable = false)
