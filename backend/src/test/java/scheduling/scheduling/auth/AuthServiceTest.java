@@ -312,9 +312,10 @@ class AuthServiceTest {
     void changeRequiredPasswordActivatesAccountAndReturnsTokens() {
         Account account = account(42L, "employee01", "old-hash", true, null);
         account.setStatus(AccountStatus.FORCE_PASSWORD_CHANGE);
-        RequiredPasswordChangeRequest request = new RequiredPasswordChangeRequest(42L, "new-password");
+        RequiredPasswordChangeRequest request = new RequiredPasswordChangeRequest(42L, "old-password", "new-password");
         RefreshToken refreshToken = RefreshToken.builder().account(account).build();
         when(accountRepository.findById(42L)).thenReturn(Optional.of(account));
+        when(passwordEncoder.matches("old-password", "old-hash")).thenReturn(true);
         when(passwordEncoder.encode("new-password")).thenReturn("new-hash");
         when(refreshTokenService.create(account)).thenReturn(new RefreshTokenResult("refresh-token", refreshToken));
         when(jwtService.createAccessToken(42L, "employee01", AccountRole.EMPLOYEE)).thenReturn("access-token");
@@ -331,10 +332,25 @@ class AuthServiceTest {
     }
 
     @Test
+    void changeRequiredPasswordRejectsWrongCurrentPassword() {
+        Account account = account(42L, "employee01", "old-hash", true, null);
+        account.setStatus(AccountStatus.FORCE_PASSWORD_CHANGE);
+        when(accountRepository.findById(42L)).thenReturn(Optional.of(account));
+        when(passwordEncoder.matches("wrong-password", "old-hash")).thenReturn(false);
+
+        assertThatThrownBy(() -> service.changeRequiredPassword(new RequiredPasswordChangeRequest(42L, "wrong-password", "new-password")))
+                .isInstanceOf(InvalidPasswordChangeStateException.class)
+                .hasMessage("Invalid password change state");
+
+        verify(accountRepository, never()).save(account);
+        verifyNoInteractions(jwtService, refreshTokenService);
+    }
+
+    @Test
     void changeRequiredPasswordRejectsMissingAccount() {
         when(accountRepository.findById(42L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.changeRequiredPassword(new RequiredPasswordChangeRequest(42L, "new-password")))
+        assertThatThrownBy(() -> service.changeRequiredPassword(new RequiredPasswordChangeRequest(42L, "old-password", "new-password")))
                 .isInstanceOf(InvalidPasswordChangeStateException.class)
                 .hasMessage("Invalid password change state");
     }
@@ -345,7 +361,7 @@ class AuthServiceTest {
         account.setStatus(AccountStatus.FORCE_PASSWORD_CHANGE);
         when(accountRepository.findById(42L)).thenReturn(Optional.of(account));
 
-        assertThatThrownBy(() -> service.changeRequiredPassword(new RequiredPasswordChangeRequest(42L, "new-password")))
+        assertThatThrownBy(() -> service.changeRequiredPassword(new RequiredPasswordChangeRequest(42L, "old-password", "new-password")))
                 .isInstanceOf(InvalidPasswordChangeStateException.class);
     }
 
@@ -355,7 +371,7 @@ class AuthServiceTest {
         account.setStatus(AccountStatus.PENDING_ACTIVATION);
         when(accountRepository.findById(42L)).thenReturn(Optional.of(account));
 
-        assertThatThrownBy(() -> service.changeRequiredPassword(new RequiredPasswordChangeRequest(42L, "new-password")))
+        assertThatThrownBy(() -> service.changeRequiredPassword(new RequiredPasswordChangeRequest(42L, "old-password", "new-password")))
                 .isInstanceOf(InvalidPasswordChangeStateException.class);
     }
 

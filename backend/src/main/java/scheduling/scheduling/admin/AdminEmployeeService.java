@@ -59,7 +59,9 @@ public class AdminEmployeeService {
         Account account = employee.getAccount();
         if (account != null) {
             account.setIsActive(false);
-            account.setStatus(AccountStatus.INACTIVE);
+            if (account.getStatus() == AccountStatus.ACTIVE) {
+                account.setStatus(AccountStatus.INACTIVE);
+            }
             refreshTokenService.revokeAllForAccount(account.getId());
         }
         employeeRepository.save(employee);

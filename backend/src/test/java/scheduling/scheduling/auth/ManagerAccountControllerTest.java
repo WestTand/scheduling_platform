@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -19,7 +20,10 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import scheduling.scheduling.auth.dto.AccountResponse;
 import scheduling.scheduling.auth.dto.CreateEmployeeAccountRequest;
+import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
+import scheduling.scheduling.entity.AccountStatus;
+import scheduling.scheduling.repository.AccountRepository;
 
 @WebMvcTest(ManagerAccountController.class)
 @Import({ SecurityConfig.class, JwtAuthenticationFilter.class, AuthExceptionHandler.class })
@@ -41,10 +45,13 @@ class ManagerAccountControllerTest {
     @MockitoBean
     private AuthService authService;
 
+    @MockitoBean
+    private AccountRepository accountRepository;
+
     @Test
     void managerCreatesEmployeeAccount() throws Exception {
         CurrentAccountPrincipal manager = new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
-        when(jwtService.parseAccessToken("manager-token")).thenReturn(manager);
+        givenToken("manager-token", manager);
         when(managerAccountService.createEmployeeAccount(any(CreateEmployeeAccountRequest.class)))
                 .thenReturn(new AccountResponse(20L, "employee01", AccountRole.EMPLOYEE));
 
@@ -71,7 +78,7 @@ class ManagerAccountControllerTest {
     @Test
     void employeeCannotCreateEmployeeAccount() throws Exception {
         CurrentAccountPrincipal employee = new CurrentAccountPrincipal(2L, "employee02", AccountRole.EMPLOYEE);
-        when(jwtService.parseAccessToken("employee-token")).thenReturn(employee);
+        givenToken("employee-token", employee);
 
         mockMvc.perform(post("/api/manager/accounts")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer employee-token")
@@ -91,7 +98,7 @@ class ManagerAccountControllerTest {
     @Test
     void managerResendsActivationOtp() throws Exception {
         CurrentAccountPrincipal manager = new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
-        when(jwtService.parseAccessToken("manager-token")).thenReturn(manager);
+        givenToken("manager-token", manager);
 
         mockMvc.perform(post("/api/manager/accounts/20/activation/resend")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer manager-token"))
@@ -103,7 +110,7 @@ class ManagerAccountControllerTest {
     @Test
     void managerResetsPassword() throws Exception {
         CurrentAccountPrincipal manager = new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
-        when(jwtService.parseAccessToken("manager-token")).thenReturn(manager);
+        givenToken("manager-token", manager);
 
         mockMvc.perform(post("/api/manager/accounts/20/password/reset")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer manager-token"))
@@ -115,12 +122,29 @@ class ManagerAccountControllerTest {
     @Test
     void employeeCannotResendActivationOtp() throws Exception {
         CurrentAccountPrincipal employee = new CurrentAccountPrincipal(2L, "employee02", AccountRole.EMPLOYEE);
-        when(jwtService.parseAccessToken("employee-token")).thenReturn(employee);
+        givenToken("employee-token", employee);
 
         mockMvc.perform(post("/api/manager/accounts/20/activation/resend")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer employee-token"))
                 .andExpect(status().isForbidden());
 
         verifyNoInteractions(managerAccountService);
+    }
+
+    private void givenToken(String token, CurrentAccountPrincipal principal) {
+        when(jwtService.parseAccessToken(token)).thenReturn(principal);
+        when(accountRepository.findById(principal.accountId())).thenReturn(Optional.of(account(principal)));
+    }
+
+    private static Account account(CurrentAccountPrincipal principal) {
+        Account account = Account.builder()
+                .username(principal.username())
+                .passwordHash("hash")
+                .role(principal.role())
+                .status(AccountStatus.ACTIVE)
+                .isActive(true)
+                .build();
+        account.setId(principal.accountId());
+        return account;
     }
 }

@@ -121,6 +121,9 @@ public class AuthService {
         if (!Boolean.TRUE.equals(account.getIsActive()) || account.getStatus() != AccountStatus.FORCE_PASSWORD_CHANGE) {
             throw new InvalidPasswordChangeStateException();
         }
+        if (!passwordEncoder.matches(request.currentPassword(), account.getPasswordHash())) {
+            throw new InvalidPasswordChangeStateException();
+        }
 
         account.setPasswordHash(passwordEncoder.encode(request.newPassword()));
         account.setStatus(AccountStatus.ACTIVE);

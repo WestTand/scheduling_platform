@@ -6,5 +6,6 @@ import jakarta.validation.constraints.Size;
 
 public record RequiredPasswordChangeRequest(
         @NotNull Long accountId,
+        @NotBlank @Size(max = 100) String currentPassword,
         @NotBlank @Size(min = 8, max = 100) String newPassword) {
 }

@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -29,8 +30,10 @@ import scheduling.scheduling.auth.CurrentAccountPrincipal;
 import scheduling.scheduling.auth.JwtAuthenticationFilter;
 import scheduling.scheduling.auth.JwtService;
 import scheduling.scheduling.auth.SecurityConfig;
+import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
 import scheduling.scheduling.entity.AccountStatus;
+import scheduling.scheduling.repository.AccountRepository;
 
 @WebMvcTest(AdminEmployeeController.class)
 @Import({ SecurityConfig.class, JwtAuthenticationFilter.class, AuthExceptionHandler.class })
@@ -52,9 +55,12 @@ class AdminEmployeeControllerTest {
     @MockitoBean
     private AuthService authService;
 
+    @MockitoBean
+    private AccountRepository accountRepository;
+
     @Test
     void managerListsEmployees() throws Exception {
-        when(jwtService.parseAccessToken("manager-token")).thenReturn(manager());
+        givenToken("manager-token", manager());
         when(adminEmployeeService.listEmployees("nguyen", "ACTIVE"))
                 .thenReturn(List.of(employeeResponse()));
 
@@ -70,7 +76,7 @@ class AdminEmployeeControllerTest {
 
     @Test
     void managerGetsEmployeeDetail() throws Exception {
-        when(jwtService.parseAccessToken("manager-token")).thenReturn(manager());
+        givenToken("manager-token", manager());
         when(adminEmployeeService.getEmployee(10L)).thenReturn(employeeResponse());
 
         mockMvc.perform(get("/api/admin/employees/10")
@@ -82,7 +88,7 @@ class AdminEmployeeControllerTest {
 
     @Test
     void managerUpdatesEmployee() throws Exception {
-        when(jwtService.parseAccessToken("manager-token")).thenReturn(manager());
+        givenToken("manager-token", manager());
         when(adminEmployeeService.updateEmployee(any(Long.class), any(UpdateEmployeeRequest.class)))
                 .thenReturn(employeeResponse());
 
@@ -103,7 +109,7 @@ class AdminEmployeeControllerTest {
 
     @Test
     void managerLocksEmployee() throws Exception {
-        when(jwtService.parseAccessToken("manager-token")).thenReturn(manager());
+        givenToken("manager-token", manager());
 
         mockMvc.perform(post("/api/admin/employees/10/lock")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer manager-token"))
@@ -114,7 +120,7 @@ class AdminEmployeeControllerTest {
 
     @Test
     void managerUnlocksEmployee() throws Exception {
-        when(jwtService.parseAccessToken("manager-token")).thenReturn(manager());
+        givenToken("manager-token", manager());
 
         mockMvc.perform(post("/api/admin/employees/10/unlock")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer manager-token"))
@@ -125,7 +131,7 @@ class AdminEmployeeControllerTest {
 
     @Test
     void employeeCannotAccessAdminEmployeeApis() throws Exception {
-        when(jwtService.parseAccessToken("employee-token")).thenReturn(employee());
+        givenToken("employee-token", employee());
 
         mockMvc.perform(get("/api/admin/employees")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer employee-token"))
@@ -140,6 +146,23 @@ class AdminEmployeeControllerTest {
 
     private static CurrentAccountPrincipal employee() {
         return new CurrentAccountPrincipal(2L, "employee01", AccountRole.EMPLOYEE);
+    }
+
+    private void givenToken(String token, CurrentAccountPrincipal principal) {
+        when(jwtService.parseAccessToken(token)).thenReturn(principal);
+        when(accountRepository.findById(principal.accountId())).thenReturn(Optional.of(account(principal)));
+    }
+
+    private static Account account(CurrentAccountPrincipal principal) {
+        Account account = Account.builder()
+                .username(principal.username())
+                .passwordHash("hash")
+                .role(principal.role())
+                .status(AccountStatus.ACTIVE)
+                .isActive(true)
+                .build();
+        account.setId(principal.accountId());
+        return account;
     }
 
     private static AdminEmployeeResponse employeeResponse() {

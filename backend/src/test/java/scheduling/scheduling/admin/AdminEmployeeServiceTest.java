@@ -140,6 +140,22 @@ class AdminEmployeeServiceTest {
         verify(employeeRepository).save(employee);
     }
 
+    @Test
+    void lockThenUnlockEmployeeDoesNotBypassPendingActivation() {
+        Employee employee = employee(10L, "EMP001", "Nguyen Van A", "ACTIVE");
+        Account account = account(20L, "employee01", AccountStatus.PENDING_ACTIVATION, true);
+        employee.setAccount(account);
+        when(employeeRepository.findById(10L)).thenReturn(Optional.of(employee));
+
+        service.lockEmployee(10L);
+        service.unlockEmployee(10L);
+
+        assertThat(employee.getStatus()).isEqualTo("ACTIVE");
+        assertThat(account.getIsActive()).isTrue();
+        assertThat(account.getStatus()).isEqualTo(AccountStatus.PENDING_ACTIVATION);
+        verify(refreshTokenService).revokeAllForAccount(20L);
+    }
+
     private static Employee employee(Long id, String employeeCode, String fullName, String status) {
         Employee employee = Employee.builder()
                 .employeeCode(employeeCode)
