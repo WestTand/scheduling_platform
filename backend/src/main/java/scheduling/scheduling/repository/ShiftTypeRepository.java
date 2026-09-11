@@ -17,6 +17,7 @@ public interface ShiftTypeRepository extends JpaRepository<ShiftType, Long> {
             from ShiftType s
             where (:query is null or lower(s.shiftName) like lower(concat('%', :query, '%')))
               and (:status is null or s.status = :status)
+            order by s.shiftName asc
             """)
     List<ShiftType> search(@Param("query") String query, @Param("status") String status);
 }
