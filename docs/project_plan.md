@@ -21,7 +21,7 @@
 - Phase 0: Gan xong, da co monorepo, Docker setup, backend/frontend/AI health scaffold.
 - Phase 1: Entity chinh da co va da fix mapping theo database design v2. Da bo sung `AccountStatus` gom `ACTIVE`, `PENDING_ACTIVATION`, `FORCE_PASSWORD_CHANGE`, `INACTIVE` vao `Account`.
 - Phase 2: Auth/JWT/refresh cookie da merge. Da bo public self-registration `/api/auth/register`, them `spring-boot-starter-mail`, them config SMTP/Gmail qua env, them role `ADMIN`, them endpoint `POST /api/manager/accounts` de `MANAGER`/`ADMIN` tao account nhan vien voi password mac dinh lay tu bien moi truong `DEFAULT_EMPLOYEE_PASSWORD` va `status = PENDING_ACTIVATION`. Da hoan tat login lifecycle cho `PENDING_ACTIVATION`, gui/verify/resend OTP qua email, bat buoc doi mat khau sau OTP/reset, chan refresh/me cho account chua kich hoat, revoke refresh token khi reset mat khau, va test auth/OTP/force password change.
-- Phase 3: Da bat dau phan account creation API bang endpoint `POST /api/manager/accounts`. Da implement `01 Admin/Manager Employee APIs` cho list/search/detail/update/lock/unlock nhan vien. Cac API admin core tiep theo chua lam: account list/lock/unlock rieng, shift type, scheduling rules.
+- Phase 3: Da bat dau phan account creation API bang endpoint `POST /api/manager/accounts`. Da implement `01 Admin/Manager Employee APIs` cho list/search/detail/update/lock/unlock nhan vien va admin account APIs cho list/lock/unlock tai khoan nhan vien. Cac API admin core tiep theo chua lam: shift type, scheduling rules.
 
 ## Phase 0 - Setup
 
@@ -312,22 +312,14 @@
 
 - Phase 0: Gan xong, da co monorepo, Docker setup, backend/frontend/AI health scaffold.
 - Phase 1: Entity chinh da co va da fix mapping theo database design v2. Da bo sung `AccountStatus` gom `ACTIVE`, `PENDING_ACTIVATION`, `FORCE_PASSWORD_CHANGE`, `INACTIVE` vao `Account`.
-- Phase 2: Auth/JWT/refresh cookie da merge tu branch `feature/auth-jwt-refresh-cookie`. Tren branch `feature/account-lifecycle` da bo public self-registration `/api/auth/register`, them `spring-boot-starter-mail`, them config SMTP/Gmail qua env, them role `ADMIN`, va them endpoint `POST /api/manager/accounts` de `MANAGER`/`ADMIN` tao account nhan vien voi password mac dinh lay tu bien moi truong `DEFAULT_EMPLOYEE_PASSWORD` va `status = PENDING_ACTIVATION`.
-- Phase 2 con thieu: flow login cho account `PENDING_ACTIVATION` tra ve trang thai can OTP, gui/verify/resend OTP qua email, bat buoc doi mat khau sau OTP/reset, chan refresh/me cho account chua kich hoat, revoke refresh token khi reset mat khau, va test day du cho OTP/force password change.
-- Phase 3: Da bat dau phan account creation API bang endpoint `POST /api/manager/accounts`. Cac API admin core khac chua lam.
+- Phase 2: Auth/JWT/refresh cookie da merge. Da bo public self-registration `/api/auth/register`, them `spring-boot-starter-mail`, them config SMTP/Gmail qua env, them role `ADMIN`, them endpoint `POST /api/manager/accounts` de `MANAGER`/`ADMIN` tao account nhan vien voi password mac dinh lay tu bien moi truong `DEFAULT_EMPLOYEE_PASSWORD` va `status = PENDING_ACTIVATION`. Da hoan tat login lifecycle cho `PENDING_ACTIVATION`, gui/verify/resend OTP qua email, bat buoc doi mat khau sau OTP/reset, chan refresh/me cho account chua kich hoat, revoke refresh token khi reset mat khau, va test auth/OTP/force password change.
+- Phase 3: Da implement employee admin APIs cho list/search/detail/update/lock/unlock nhan vien, manager account APIs cho create/resend/reset, va admin account APIs cho list/lock/unlock tai khoan nhan vien. Cac API admin core tiep theo chua lam: shift type va scheduling rules.
 
-## Commit Da Push - `feature/account-lifecycle`
+## Branch Dang Lam
 
-- `614d56e feat: add account lifecycle status`
-- `01df1d8 chore: configure spring mail sender`
-- `671577c fix: remove public self registration`
-- `d671d05 docs: design manager-created employee accounts`
-- `ccee8fa docs: plan manager-created employee accounts`
-- `568ea99 feat: add admin account role`
-- `410271c feat: add manager employee account service`
-- `7f92ea8 feat: expose manager employee account endpoint`
+- `phase3/admin-account-apis`: admin account list/lock/unlock APIs.
 
 ## Verification Gan Nhat
 
 - Backend command: `./mvnw.cmd clean test`
-- Ket qua gan nhat tren branch `feature/account-lifecycle`: `44` tests, `0` failures, `0` errors.
+- Ket qua gan nhat tren branch `phase3/admin-account-apis`: `108` tests, `0` failures, `0` errors.
