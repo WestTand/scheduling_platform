@@ -104,14 +104,14 @@
 - [x] API cap nhat nhan vien
 - [x] API khoa/mo khoa nhan vien
 - [x] API tim kiem nhan vien
-- API danh sach tai khoan
+- [x] API danh sach tai khoan
 - [x] API quan ly tao account nhan vien voi email
 - [x] API gui lai OTP kich hoat cho nhan vien
 - [x] API reset mat khau tam cho nhan vien
 - [x] API set account ve trang thai can kich hoat/doi mat khau lai sau reset
 - [x] API revoke refresh tokens cua nhan vien sau reset/khoa account
-- API khoa account nhan vien
-- API mo khoa account nhan vien
+- [x] API khoa account nhan vien
+- [x] API mo khoa account nhan vien
 - API quan ly loai ca truc
 - API them loai ca
 - API cap nhat loai ca
@@ -120,8 +120,8 @@
 - API cau hinh dinh muc ca/tuan
 - API cau hinh trong so soft constraints
 - [x] Test admin employee APIs
-- Test admin account creation APIs
-- Test admin password reset/reactivation APIs
+- [x] Test admin account creation APIs
+- [x] Test admin password reset/reactivation APIs
 - Test shift type APIs
 - Test scheduling rule APIs
 
