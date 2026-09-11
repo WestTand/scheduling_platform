@@ -1,5 +1,6 @@
 package scheduling.scheduling.admin;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -15,6 +16,7 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -95,6 +97,36 @@ class AdminShiftTypeControllerTest {
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(10));
+
+        ArgumentCaptor<CreateShiftTypeRequest> requestCaptor = ArgumentCaptor.forClass(CreateShiftTypeRequest.class);
+        verify(adminShiftTypeService).createShiftType(requestCaptor.capture());
+        CreateShiftTypeRequest request = requestCaptor.getValue();
+        assertThat(request.shiftName()).isEqualTo("Ngoai gio");
+        assertThat(request.startTime()).isEqualTo(LocalTime.of(8, 0));
+        assertThat(request.endTime()).isEqualTo(LocalTime.of(12, 0));
+        assertThat(request.durationHours()).isEqualByComparingTo(BigDecimal.valueOf(4.0));
+        assertThat(request.minStaff()).isEqualTo(1);
+        assertThat(request.maxStaff()).isEqualTo(3);
+    }
+
+    @Test
+    void createShiftTypeRejectsInvalidBody() throws Exception {
+        givenToken("manager-token", manager());
+
+        mockMvc.perform(post("/api/admin/shift-types")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer manager-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "shiftName": " ",
+                                  "startTime": "08:00:00",
+                                  "durationHours": 0,
+                                  "minStaff": 0
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(adminShiftTypeService);
     }
 
     @Test
@@ -120,6 +152,44 @@ class AdminShiftTypeControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.shiftName").value("Ngoai gio"));
+
+        ArgumentCaptor<Long> idCaptor = ArgumentCaptor.forClass(Long.class);
+        ArgumentCaptor<UpdateShiftTypeRequest> requestCaptor = ArgumentCaptor.forClass(UpdateShiftTypeRequest.class);
+        verify(adminShiftTypeService).updateShiftType(idCaptor.capture(), requestCaptor.capture());
+        UpdateShiftTypeRequest request = requestCaptor.getValue();
+        assertThat(idCaptor.getValue()).isEqualTo(10L);
+        assertThat(request.shiftName()).isEqualTo("Ngoai gio");
+        assertThat(request.startTime()).isEqualTo(LocalTime.of(8, 0));
+        assertThat(request.endTime()).isEqualTo(LocalTime.of(12, 0));
+        assertThat(request.durationHours()).isEqualByComparingTo(BigDecimal.valueOf(4.0));
+        assertThat(request.overnight()).isFalse();
+        assertThat(request.heavy()).isFalse();
+        assertThat(request.minStaff()).isEqualTo(1);
+        assertThat(request.maxStaff()).isEqualTo(3);
+        assertThat(request.status()).isEqualTo("ACTIVE");
+    }
+
+    @Test
+    void updateShiftTypeRejectsInvalidBody() throws Exception {
+        givenToken("manager-token", manager());
+
+        mockMvc.perform(put("/api/admin/shift-types/10")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer manager-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "shiftName": " ",
+                                  "startTime": "08:00:00",
+                                  "durationHours": 0,
+                                  "overnight": null,
+                                  "heavy": null,
+                                  "minStaff": 0,
+                                  "status": " "
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(adminShiftTypeService);
     }
 
     @Test
