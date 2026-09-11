@@ -17,6 +17,19 @@ All endpoints are available to `MANAGER` and `ADMIN`. `EMPLOYEE` must receive `4
 
 This slice does not include department-specific rules, schedule-period snapshots, invoking the AI service, creating work shifts, or frontend screens.
 
+## Project Requirements Alignment
+
+This design follows the project description and scheduling use case:
+
+- The system uses Google OR-Tools CP-SAT as the optimization engine.
+- Scheduling rules must be configured before automatic schedule generation.
+- Hard constraints must not be violated by the solver.
+- Soft constraints become weighted objective penalties.
+- Required quotas include 1 overtime shift per week, 2 bathing shifts per week, and 1 on-call shift every 6 days when applicable.
+- Required hard rules include no overlapping shifts, at least 12 hours of rest between shifts, at most 12 work hours per day, no assignments during approved leave, preserving locked assignments, active employees only, and active shift types only.
+- This API stores only the configurable rule values and soft weights. Constraints that depend on real schedule data, such as overlap checks, approved leave, locked assignments, active employees, and active shift types, are enforced later by manual scheduling and AI scheduling flows using those data sources.
+- LLM usage is optional support for explanations and suggestions. It must not replace OR-Tools for final assignment decisions.
+
 ## Configuration Model
 
 Use one global rule set for MVP. The API response groups database rows into these sections:
