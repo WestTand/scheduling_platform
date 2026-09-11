@@ -1,0 +1,114 @@
+package scheduling.scheduling.admin;
+
+import java.util.List;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+import org.springframework.web.server.ResponseStatusException;
+import scheduling.scheduling.admin.dto.AdminShiftTypeResponse;
+import scheduling.scheduling.admin.dto.CreateShiftTypeRequest;
+import scheduling.scheduling.admin.dto.UpdateShiftTypeRequest;
+import scheduling.scheduling.auth.DuplicateResourceException;
+import scheduling.scheduling.entity.ShiftType;
+import scheduling.scheduling.repository.ShiftTypeRepository;
+
+@Service
+public class AdminShiftTypeService {
+
+    private static final String ACTIVE = "ACTIVE";
+    private static final String INACTIVE = "INACTIVE";
+
+    private final ShiftTypeRepository shiftTypeRepository;
+
+    public AdminShiftTypeService(ShiftTypeRepository shiftTypeRepository) {
+        this.shiftTypeRepository = shiftTypeRepository;
+    }
+
+    @Transactional(readOnly = true)
+    public List<AdminShiftTypeResponse> listShiftTypes(String query, String status) {
+        String normalizedQuery = StringUtils.hasText(query) ? query.trim() : null;
+        String normalizedStatus = StringUtils.hasText(status) ? validateStatus(status.trim()) : null;
+        return shiftTypeRepository.search(normalizedQuery, normalizedStatus).stream()
+                .map(AdminShiftTypeResponse::from)
+                .toList();
+    }
+
+    @Transactional
+    public AdminShiftTypeResponse createShiftType(CreateShiftTypeRequest request) {
+        validateStaffRange(request.minStaff(), request.maxStaff());
+        if (shiftTypeRepository.existsByShiftName(request.shiftName())) {
+            throw new DuplicateResourceException("Shift type name already exists");
+        }
+
+        ShiftType shiftType = ShiftType.builder()
+                .shiftName(request.shiftName())
+                .startTime(request.startTime())
+                .endTime(request.endTime())
+                .durationHours(request.durationHours())
+                .overnight(Boolean.TRUE.equals(request.overnight()))
+                .heavy(Boolean.TRUE.equals(request.heavy()))
+                .minStaff(request.minStaff())
+                .maxStaff(request.maxStaff())
+                .status(ACTIVE)
+                .build();
+        return AdminShiftTypeResponse.from(shiftTypeRepository.save(shiftType));
+    }
+
+    @Transactional
+    public AdminShiftTypeResponse updateShiftType(Long shiftTypeId, UpdateShiftTypeRequest request) {
+        ShiftType shiftType = findShiftType(shiftTypeId);
+        validateStaffRange(request.minStaff(), request.maxStaff());
+        String status = validateStatus(request.status().trim());
+        if (shiftTypeRepository.existsByShiftNameAndIdNot(request.shiftName(), shiftTypeId)) {
+            throw new DuplicateResourceException("Shift type name already exists");
+        }
+
+        shiftType.setShiftName(request.shiftName());
+        shiftType.setStartTime(request.startTime());
+        shiftType.setEndTime(request.endTime());
+        shiftType.setDurationHours(request.durationHours());
+        shiftType.setOvernight(request.overnight());
+        shiftType.setHeavy(request.heavy());
+        shiftType.setMinStaff(request.minStaff());
+        shiftType.setMaxStaff(request.maxStaff());
+        shiftType.setStatus(status);
+        return AdminShiftTypeResponse.from(shiftTypeRepository.save(shiftType));
+    }
+
+    @Transactional
+    public void lockShiftType(Long shiftTypeId) {
+        ShiftType shiftType = findShiftType(shiftTypeId);
+        shiftType.setStatus(INACTIVE);
+        shiftTypeRepository.save(shiftType);
+    }
+
+    @Transactional
+    public void unlockShiftType(Long shiftTypeId) {
+        ShiftType shiftType = findShiftType(shiftTypeId);
+        shiftType.setStatus(ACTIVE);
+        shiftTypeRepository.save(shiftType);
+    }
+
+    private ShiftType findShiftType(Long shiftTypeId) {
+        return shiftTypeRepository.findById(shiftTypeId)
+                .orElseThrow(ShiftTypeNotFoundException::new);
+    }
+
+    private static void validateStaffRange(Integer minStaff, Integer maxStaff) {
+        if (minStaff != null && maxStaff != null && maxStaff < minStaff) {
+            throw invalidRequest();
+        }
+    }
+
+    private static String validateStatus(String status) {
+        if (!ACTIVE.equals(status) && !INACTIVE.equals(status)) {
+            throw invalidRequest();
+        }
+        return status;
+    }
+
+    private static ResponseStatusException invalidRequest() {
+        return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid shift type request");
+    }
+}

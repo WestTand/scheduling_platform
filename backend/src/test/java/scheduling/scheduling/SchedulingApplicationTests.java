@@ -12,6 +12,7 @@ import scheduling.scheduling.repository.RefreshTokenRepository;
 import scheduling.scheduling.repository.AccountActivationOtpRepository;
 import scheduling.scheduling.repository.AccountRepository;
 import scheduling.scheduling.repository.EmployeeRepository;
+import scheduling.scheduling.repository.ShiftTypeRepository;
 
 @SpringBootTest(properties = {
 		"spring.autoconfigure.exclude=org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration,org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration",
@@ -28,6 +29,9 @@ class SchedulingApplicationTests {
 
 	@MockitoBean
 	private EmployeeRepository employeeRepository;
+
+	@MockitoBean
+	private ShiftTypeRepository shiftTypeRepository;
 
 	@MockitoBean
 	private AccountActivationOtpRepository accountActivationOtpRepository;
