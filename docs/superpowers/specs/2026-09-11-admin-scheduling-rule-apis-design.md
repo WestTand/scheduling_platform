@@ -81,7 +81,6 @@ Response fields:
 - `hardRules`
 - `quotas`
 - `softWeights`
-- `updatedAt`: latest update timestamp across rule rows, nullable if no row has an update timestamp.
 
 ### Update Scheduling Rules
 
