@@ -3,14 +3,18 @@ package scheduling.scheduling.admin;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import scheduling.scheduling.admin.dto.AdminAccountResponse;
 import scheduling.scheduling.auth.AccountNotFoundException;
+import scheduling.scheduling.auth.InvalidAccountStateException;
 import scheduling.scheduling.auth.RefreshTokenService;
 import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
@@ -51,6 +55,24 @@ class AdminAccountServiceTest {
     }
 
     @Test
+    void listAccountsRejectsInvalidRole() {
+        assertThatThrownBy(() -> service.listAccounts(null, "OWNER", null))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Invalid account filter")
+                .satisfies(exception -> assertThat(((ResponseStatusException) exception).getStatusCode())
+                        .isEqualTo(HttpStatus.BAD_REQUEST));
+    }
+
+    @Test
+    void listAccountsRejectsInvalidStatus() {
+        assertThatThrownBy(() -> service.listAccounts(null, null, "DELETED"))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Invalid account filter")
+                .satisfies(exception -> assertThat(((ResponseStatusException) exception).getStatusCode())
+                        .isEqualTo(HttpStatus.BAD_REQUEST));
+    }
+
+    @Test
     void lockActiveAccountMarksInactiveAndRevokesTokens() {
         Account account = account(20L, "employee01", AccountRole.EMPLOYEE, AccountStatus.ACTIVE, true, null);
         when(accountRepository.findById(20L)).thenReturn(Optional.of(account));
@@ -61,6 +83,21 @@ class AdminAccountServiceTest {
         assertThat(account.getStatus()).isEqualTo(AccountStatus.INACTIVE);
         verify(accountRepository).save(account);
         verify(refreshTokenService).revokeAllForAccount(20L);
+    }
+
+    @Test
+    void lockManagerAccountThrowsInvalidAccountStateAndDoesNotPersistOrRevokeTokens() {
+        Account account = account(20L, "manager01", AccountRole.MANAGER, AccountStatus.ACTIVE, true, null);
+        when(accountRepository.findById(20L)).thenReturn(Optional.of(account));
+
+        assertThatThrownBy(() -> service.lockAccount(20L))
+                .isInstanceOf(InvalidAccountStateException.class)
+                .hasMessage("Invalid account state");
+
+        assertThat(account.getIsActive()).isTrue();
+        assertThat(account.getStatus()).isEqualTo(AccountStatus.ACTIVE);
+        verify(accountRepository, never()).save(account);
+        verify(refreshTokenService, never()).revokeAllForAccount(20L);
     }
 
     @Test
@@ -96,6 +133,20 @@ class AdminAccountServiceTest {
 
         assertThat(account.getIsActive()).isTrue();
         assertThat(account.getStatus()).isEqualTo(AccountStatus.FORCE_PASSWORD_CHANGE);
+    }
+
+    @Test
+    void unlockAdminAccountThrowsInvalidAccountStateAndDoesNotPersist() {
+        Account account = account(20L, "admin01", AccountRole.ADMIN, AccountStatus.INACTIVE, false, null);
+        when(accountRepository.findById(20L)).thenReturn(Optional.of(account));
+
+        assertThatThrownBy(() -> service.unlockAccount(20L))
+                .isInstanceOf(InvalidAccountStateException.class)
+                .hasMessage("Invalid account state");
+
+        assertThat(account.getIsActive()).isFalse();
+        assertThat(account.getStatus()).isEqualTo(AccountStatus.INACTIVE);
+        verify(accountRepository, never()).save(account);
     }
 
     @Test
