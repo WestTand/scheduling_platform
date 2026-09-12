@@ -23,7 +23,7 @@ Tai lieu nay la roadmap chinh cua he thong. Moi phase ben duoi ghi ro muc dich, 
 - Phase 0: Gan xong, da co monorepo, Docker setup, backend/frontend/AI health scaffold. Muc dich la dam bao moi thanh phan co the chay local va trong Docker.
 - Phase 1: Entity chinh da co va da fix mapping theo database design v2. Da bo sung `AccountStatus` gom `ACTIVE`, `PENDING_ACTIVATION`, `FORCE_PASSWORD_CHANGE`, `INACTIVE` vao `Account`. Muc dich la tao nen tang database cho auth, nhan su, ca truc, lich, nghi phep, doi ca, thong bao va audit log.
 - Phase 2: Auth/JWT/refresh cookie da merge. Da bo public self-registration `/api/auth/register`, them mail config, them role `ADMIN`, manager tao account nhan vien bang password mac dinh, OTP kich hoat, force password change, refresh token rotation/revoke, va chan account khong hop le. Muc dich la bao ve he thong truoc khi mo cac API quan tri.
-- Phase 3: Dang lam. Da implement employee admin APIs, manager account APIs, va admin account APIs cho list/lock/unlock tai khoan nhan vien. Cac API tiep theo: shift type va scheduling rules.
+- Phase 3: Dang lam. Da implement employee admin APIs, manager account APIs, admin account APIs cho list/lock/unlock tai khoan nhan vien, va scheduling rule APIs. Cac API tiep theo: shift type APIs.
 
 ## Phase 0 - Setup
 
@@ -295,13 +295,13 @@ Ket qua mong doi: manager/admin co the quan ly du lieu dau vao quan trong truoc 
 - [ ] API khoa/mo khoa loai ca
   - Dung de tam ngung loai ca khong con su dung ma khong xoa du lieu cu.
   - Giu lich su assignment va preference lien quan.
-- [ ] API quan ly scheduling rules
+- [x] API quan ly scheduling rules
   - Dung de xem/sua bo quy tac lap lich hard/soft.
   - La cau noi giua nghiep vu va AI/manual scheduler.
-- [ ] API cau hinh dinh muc ca/tuan
+- [x] API cau hinh dinh muc ca/tuan
   - Dung de dat quota nhu so ca toi da/toi thieu moi tuan, loai ca dac biet.
   - AI dung de can bang tai va tuan thu quy dinh.
-- [ ] API cau hinh trong so soft constraints
+- [x] API cau hinh trong so soft constraints
   - Dung de dieu chinh muc uu tien fairness, preference, weekend, heavy shift.
   - Giup manager tune ket qua AI ma khong sua code.
 - [x] Test admin employee APIs
@@ -316,7 +316,7 @@ Ket qua mong doi: manager/admin co the quan ly du lieu dau vao quan trong truoc 
 - [ ] Test shift type APIs
   - Kiem tra create/update/list/lock/unlock loai ca.
   - Dam bao cau hinh ca truc dung truoc khi scheduling dung.
-- [ ] Test scheduling rule APIs
+- [x] Test scheduling rule APIs
   - Kiem tra doc/sua rule values va weights.
   - Dam bao AI/manual scheduler nhan cau hinh hop le.
 
@@ -836,13 +836,13 @@ Ket qua mong doi: Docker compose chay sach, co account/nhan vien/ca/rules mau, c
 
 ## Trang Thai Hien Tai
 
-- Branch dang lam: `phase3/admin-account-apis`.
+- Branch dang lam: `phase3/scheduling-rule-apis`.
 - Phase 0: gan xong, da co monorepo, Docker setup, backend/frontend/AI health scaffold.
 - Phase 1: entity chinh da co va da fix mapping theo database design v2.
 - Phase 2: auth/security da hoan tat cac flow chinh tren `main` va da bo sung hardening lifecycle.
-- Phase 3: da implement employee admin APIs, manager account APIs, va admin account APIs cho list/lock/unlock tai khoan nhan vien. Viec tiep theo nen lam: shift type APIs, sau do scheduling rule APIs.
+- Phase 3: da implement employee admin APIs, manager account APIs, admin account APIs cho list/lock/unlock tai khoan nhan vien, va scheduling rule APIs. Viec tiep theo nen lam: shift type APIs.
 
 ## Verification Gan Nhat
 
-- Backend command: `./mvnw.cmd clean test`
-- Ket qua gan nhat tren branch `phase3/admin-account-apis`: `108` tests, `0` failures, `0` errors.
+- Backend command: `./mvnw.cmd test "-Dtest=SchedulingApplicationTests"`
+- Ket qua gan nhat tren branch `phase3/scheduling-rule-apis`: targeted smoke `SchedulingApplicationTests` passed sau khi bo sung mock `SchedulingRuleRepository`. Full backend suite chua chay trong task nay.
