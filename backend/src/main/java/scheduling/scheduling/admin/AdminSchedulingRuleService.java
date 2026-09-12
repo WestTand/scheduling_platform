@@ -12,7 +12,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import scheduling.scheduling.admin.dto.AdminSchedulingRulesResponse;
 import scheduling.scheduling.admin.dto.SchedulingHardRulesRequest;
@@ -36,12 +35,10 @@ public class AdminSchedulingRuleService {
         this.schedulingRuleRepository = schedulingRuleRepository;
     }
 
-    @Transactional
     public AdminSchedulingRulesResponse getRules() {
         return toResponse(loadOrCreateRules());
     }
 
-    @Transactional
     public AdminSchedulingRulesResponse updateRules(UpdateSchedulingRulesRequest request) {
         validate(request);
         Map<String, SchedulingRule> rules = loadOrCreateRules().stream()
