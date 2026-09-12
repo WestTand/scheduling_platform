@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -12,6 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import scheduling.scheduling.admin.dto.AdminSchedulingRulesResponse;
@@ -54,6 +56,19 @@ class AdminSchedulingRuleServiceTest {
 
         assertThat(response.softWeights().heavyShift()).isEqualByComparingTo("8.00");
         verify(schedulingRuleRepository).findByRuleCodeIn(anyCollection());
+        verify(schedulingRuleRepository, never()).saveAll(anyCollection());
+    }
+
+    @Test
+    void getRulesRecoversWhenMissingDefaultInsertLosesRace() {
+        when(schedulingRuleRepository.findByRuleCodeIn(anyCollection())).thenReturn(List.of(), defaultRows());
+        when(schedulingRuleRepository.saveAll(anyCollection()))
+                .thenThrow(new DataIntegrityViolationException("duplicate rule code"));
+
+        AdminSchedulingRulesResponse response = service.getRules();
+
+        assertThat(response.hardRules().minRestHoursBetweenShifts()).isEqualTo(12);
+        assertThat(response.softWeights().fairness()).isEqualByComparingTo("10.00");
     }
 
     @Test
@@ -102,6 +117,47 @@ class AdminSchedulingRuleServiceTest {
         List<SchedulingRule> rows = new ArrayList<>(defaultRows());
         rows.removeIf(rule -> rule.getRuleCode().equals("MIN_REST_HOURS_BETWEEN_SHIFTS"));
         rows.add(broken);
+        when(schedulingRuleRepository.findByRuleCodeIn(anyCollection())).thenReturn(rows);
+
+        assertThatThrownBy(service::getRules)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Invalid scheduling rule JSON");
+    }
+
+    @Test
+    void getRulesFailsFastForHardRuleJsonMissingNumericValue() {
+        SchedulingRule missingValue = hardRule("MIN_REST_HOURS_BETWEEN_SHIFTS", "Minimum rest hours between shifts", "{}");
+        List<SchedulingRule> rows = new ArrayList<>(defaultRows());
+        rows.removeIf(rule -> rule.getRuleCode().equals("MIN_REST_HOURS_BETWEEN_SHIFTS"));
+        rows.add(missingValue);
+        when(schedulingRuleRepository.findByRuleCodeIn(anyCollection())).thenReturn(rows);
+
+        assertThatThrownBy(service::getRules)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Invalid scheduling rule JSON");
+    }
+
+    @Test
+    void getRulesFailsFastForHardRuleJsonWithNonNumericValue() {
+        SchedulingRule nonNumeric = hardRule(
+                "MIN_REST_HOURS_BETWEEN_SHIFTS", "Minimum rest hours between shifts", "{\"value\":\"abc\"}");
+        List<SchedulingRule> rows = new ArrayList<>(defaultRows());
+        rows.removeIf(rule -> rule.getRuleCode().equals("MIN_REST_HOURS_BETWEEN_SHIFTS"));
+        rows.add(nonNumeric);
+        when(schedulingRuleRepository.findByRuleCodeIn(anyCollection())).thenReturn(rows);
+
+        assertThatThrownBy(service::getRules)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Invalid scheduling rule JSON");
+    }
+
+    @Test
+    void getRulesFailsFastForHardRuleJsonWithoutValueField() {
+        SchedulingRule enabledOnly = hardRule(
+                "MIN_REST_HOURS_BETWEEN_SHIFTS", "Minimum rest hours between shifts", "{\"enabled\":true}");
+        List<SchedulingRule> rows = new ArrayList<>(defaultRows());
+        rows.removeIf(rule -> rule.getRuleCode().equals("MIN_REST_HOURS_BETWEEN_SHIFTS"));
+        rows.add(enabledOnly);
         when(schedulingRuleRepository.findByRuleCodeIn(anyCollection())).thenReturn(rows);
 
         assertThatThrownBy(service::getRules)

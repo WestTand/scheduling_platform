@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -72,7 +73,17 @@ public class AdminSchedulingRuleService {
                 .map(entry -> entry.getValue().newRule(entry.getKey()))
                 .toList();
         if (!missing.isEmpty()) {
-            schedulingRuleRepository.saveAll(missing).forEach(rule -> existing.put(rule.getRuleCode(), rule));
+            try {
+                schedulingRuleRepository.saveAll(missing).forEach(rule -> existing.put(rule.getRuleCode(), rule));
+            } catch (DataIntegrityViolationException exception) {
+                Map<String, SchedulingRule> reloaded = schedulingRuleRepository.findByRuleCodeIn(definitions.keySet()).stream()
+                        .collect(Collectors.toMap(SchedulingRule::getRuleCode, Function.identity()));
+                if (!reloaded.keySet().containsAll(definitions.keySet())) {
+                    throw exception;
+                }
+                existing.clear();
+                existing.putAll(reloaded);
+            }
         }
         return definitions.keySet().stream().map(existing::get).toList();
     }
@@ -126,7 +137,11 @@ public class AdminSchedulingRuleService {
 
     private Integer readValue(Map<String, SchedulingRule> rules, String code) {
         JsonNode root = readRuleJson(rules, code);
-        return root.path("value").asInt();
+        JsonNode value = root.get("value");
+        if (value == null || !value.isNumber()) {
+            throw new IllegalStateException("Invalid scheduling rule JSON for " + code);
+        }
+        return value.asInt();
     }
 
     private void validateRuleJson(Map<String, SchedulingRule> rules, String code) {
