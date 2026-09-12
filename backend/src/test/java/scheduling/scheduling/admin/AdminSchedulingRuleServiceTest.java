@@ -13,7 +13,6 @@ import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import scheduling.scheduling.admin.dto.AdminSchedulingRulesResponse;
@@ -57,18 +56,6 @@ class AdminSchedulingRuleServiceTest {
         assertThat(response.softWeights().heavyShift()).isEqualByComparingTo("8.00");
         verify(schedulingRuleRepository).findByRuleCodeIn(anyCollection());
         verify(schedulingRuleRepository, never()).saveAll(anyCollection());
-    }
-
-    @Test
-    void getRulesRecoversWhenMissingDefaultInsertLosesRace() {
-        when(schedulingRuleRepository.findByRuleCodeIn(anyCollection())).thenReturn(List.of(), defaultRows());
-        when(schedulingRuleRepository.saveAll(anyCollection()))
-                .thenThrow(new DataIntegrityViolationException("duplicate rule code"));
-
-        AdminSchedulingRulesResponse response = service.getRules();
-
-        assertThat(response.hardRules().minRestHoursBetweenShifts()).isEqualTo(12);
-        assertThat(response.softWeights().fairness()).isEqualByComparingTo("10.00");
     }
 
     @Test
@@ -144,6 +131,20 @@ class AdminSchedulingRuleServiceTest {
         List<SchedulingRule> rows = new ArrayList<>(defaultRows());
         rows.removeIf(rule -> rule.getRuleCode().equals("MIN_REST_HOURS_BETWEEN_SHIFTS"));
         rows.add(nonNumeric);
+        when(schedulingRuleRepository.findByRuleCodeIn(anyCollection())).thenReturn(rows);
+
+        assertThatThrownBy(service::getRules)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Invalid scheduling rule JSON");
+    }
+
+    @Test
+    void getRulesFailsFastForHardRuleJsonWithFractionalValue() {
+        SchedulingRule fractional = hardRule(
+                "MIN_REST_HOURS_BETWEEN_SHIFTS", "Minimum rest hours between shifts", "{\"value\":1.5}");
+        List<SchedulingRule> rows = new ArrayList<>(defaultRows());
+        rows.removeIf(rule -> rule.getRuleCode().equals("MIN_REST_HOURS_BETWEEN_SHIFTS"));
+        rows.add(fractional);
         when(schedulingRuleRepository.findByRuleCodeIn(anyCollection())).thenReturn(rows);
 
         assertThatThrownBy(service::getRules)

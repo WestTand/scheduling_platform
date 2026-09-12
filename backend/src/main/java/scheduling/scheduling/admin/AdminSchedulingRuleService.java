@@ -10,7 +10,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -64,7 +63,7 @@ public class AdminSchedulingRuleService {
         return toResponse(saved);
     }
 
-    private List<SchedulingRule> loadOrCreateRules() {
+    private synchronized List<SchedulingRule> loadOrCreateRules() {
         Map<String, RuleDefinition> definitions = definitions();
         Map<String, SchedulingRule> existing = schedulingRuleRepository.findByRuleCodeIn(definitions.keySet()).stream()
                 .collect(Collectors.toMap(SchedulingRule::getRuleCode, Function.identity()));
@@ -73,17 +72,7 @@ public class AdminSchedulingRuleService {
                 .map(entry -> entry.getValue().newRule(entry.getKey()))
                 .toList();
         if (!missing.isEmpty()) {
-            try {
-                schedulingRuleRepository.saveAll(missing).forEach(rule -> existing.put(rule.getRuleCode(), rule));
-            } catch (DataIntegrityViolationException exception) {
-                Map<String, SchedulingRule> reloaded = schedulingRuleRepository.findByRuleCodeIn(definitions.keySet()).stream()
-                        .collect(Collectors.toMap(SchedulingRule::getRuleCode, Function.identity()));
-                if (!reloaded.keySet().containsAll(definitions.keySet())) {
-                    throw exception;
-                }
-                existing.clear();
-                existing.putAll(reloaded);
-            }
+            schedulingRuleRepository.saveAll(missing).forEach(rule -> existing.put(rule.getRuleCode(), rule));
         }
         return definitions.keySet().stream().map(existing::get).toList();
     }
@@ -138,7 +127,7 @@ public class AdminSchedulingRuleService {
     private Integer readValue(Map<String, SchedulingRule> rules, String code) {
         JsonNode root = readRuleJson(rules, code);
         JsonNode value = root.get("value");
-        if (value == null || !value.isNumber()) {
+        if (value == null || !value.isIntegralNumber()) {
             throw new IllegalStateException("Invalid scheduling rule JSON for " + code);
         }
         return value.asInt();
