@@ -19,5 +19,6 @@ public record UpdateShiftTypeRequest(
         @NotNull Boolean heavy,
         @NotNull @Min(1) Integer minStaff,
         @NotNull @Min(1) Integer maxStaff,
-        @NotBlank @Size(max = 20) @Pattern(regexp = "ACTIVE|INACTIVE") String status) {
+        @NotBlank @Size(max = 20) @Pattern(regexp = "ACTIVE|INACTIVE") String status,
+        @NotBlank @Size(max = 20) String quotaCategory) {
 }

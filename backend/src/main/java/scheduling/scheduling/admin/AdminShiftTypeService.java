@@ -18,6 +18,10 @@ public class AdminShiftTypeService {
 
     private static final String ACTIVE = "ACTIVE";
     private static final String INACTIVE = "INACTIVE";
+    private static final String REGULAR = "REGULAR";
+    private static final String OVERTIME = "OVERTIME";
+    private static final String BATHING = "BATHING";
+    private static final String ON_CALL = "ON_CALL";
 
     private final ShiftTypeRepository shiftTypeRepository;
 
@@ -37,6 +41,7 @@ public class AdminShiftTypeService {
     @Transactional
     public AdminShiftTypeResponse createShiftType(CreateShiftTypeRequest request) {
         validateStaffRange(request.minStaff(), request.maxStaff());
+        String quotaCategory = validateQuotaCategory(request.quotaCategory(), false);
         if (shiftTypeRepository.existsByShiftName(request.shiftName())) {
             throw new DuplicateResourceException("Shift type name already exists");
         }
@@ -50,6 +55,7 @@ public class AdminShiftTypeService {
                 .heavy(Boolean.TRUE.equals(request.heavy()))
                 .minStaff(request.minStaff())
                 .maxStaff(request.maxStaff())
+                .quotaCategory(quotaCategory)
                 .status(ACTIVE)
                 .build();
         return AdminShiftTypeResponse.from(shiftTypeRepository.save(shiftType));
@@ -60,6 +66,7 @@ public class AdminShiftTypeService {
         ShiftType shiftType = findShiftType(shiftTypeId);
         validateStaffRange(request.minStaff(), request.maxStaff());
         String status = validateStatus(request.status().trim());
+        String quotaCategory = validateQuotaCategory(request.quotaCategory(), true);
         if (shiftTypeRepository.existsByShiftNameAndIdNot(request.shiftName(), shiftTypeId)) {
             throw new DuplicateResourceException("Shift type name already exists");
         }
@@ -72,6 +79,7 @@ public class AdminShiftTypeService {
         shiftType.setHeavy(request.heavy());
         shiftType.setMinStaff(request.minStaff());
         shiftType.setMaxStaff(request.maxStaff());
+        shiftType.setQuotaCategory(quotaCategory);
         shiftType.setStatus(status);
         return AdminShiftTypeResponse.from(shiftTypeRepository.save(shiftType));
     }
@@ -106,6 +114,21 @@ public class AdminShiftTypeService {
             throw invalidRequest();
         }
         return status;
+    }
+
+    private static String validateQuotaCategory(String quotaCategory, boolean required) {
+        if (!StringUtils.hasText(quotaCategory)) {
+            if (required) {
+                throw invalidRequest();
+            }
+            return REGULAR;
+        }
+        String normalized = quotaCategory.trim();
+        if (!REGULAR.equals(normalized) && !OVERTIME.equals(normalized)
+                && !BATHING.equals(normalized) && !ON_CALL.equals(normalized)) {
+            throw invalidRequest();
+        }
+        return normalized;
     }
 
     private static ResponseStatusException invalidRequest() {

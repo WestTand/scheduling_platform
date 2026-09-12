@@ -14,6 +14,7 @@ public record AdminShiftTypeResponse(
         Boolean heavy,
         Integer minStaff,
         Integer maxStaff,
+        String quotaCategory,
         String status) {
 
     public static AdminShiftTypeResponse from(ShiftType shiftType) {
@@ -27,6 +28,7 @@ public record AdminShiftTypeResponse(
                 shiftType.getHeavy(),
                 shiftType.getMinStaff(),
                 shiftType.getMaxStaff(),
+                shiftType.getQuotaCategory(),
                 shiftType.getStatus());
     }
 }
