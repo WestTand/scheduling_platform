@@ -844,5 +844,5 @@ Ket qua mong doi: Docker compose chay sach, co account/nhan vien/ca/rules mau, c
 
 ## Verification Gan Nhat
 
-- Backend command: `./mvnw.cmd test "-Dtest=SchedulingApplicationTests"`
-- Ket qua gan nhat tren branch `phase3/scheduling-rule-apis`: targeted smoke `SchedulingApplicationTests` passed sau khi bo sung mock `SchedulingRuleRepository`. Full backend suite chua chay trong task nay.
+- Backend command: `./mvnw.cmd clean test`
+- Ket qua gan nhat tren branch `phase3/scheduling-rule-apis`: `122` tests, `0` failures, `0` errors.
