@@ -12,6 +12,7 @@ import scheduling.scheduling.repository.RefreshTokenRepository;
 import scheduling.scheduling.repository.AccountActivationOtpRepository;
 import scheduling.scheduling.repository.AccountRepository;
 import scheduling.scheduling.repository.EmployeeRepository;
+import scheduling.scheduling.repository.SchedulingRuleRepository;
 import scheduling.scheduling.repository.ShiftTypeRepository;
 
 @SpringBootTest(properties = {
@@ -35,6 +36,9 @@ class SchedulingApplicationTests {
 
 	@MockitoBean
 	private AccountActivationOtpRepository accountActivationOtpRepository;
+
+	@MockitoBean
+	private SchedulingRuleRepository schedulingRuleRepository;
 
 	@Autowired
 	private JavaMailSender mailSender;
