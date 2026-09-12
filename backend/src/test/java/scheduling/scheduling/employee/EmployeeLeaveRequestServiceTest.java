@@ -66,7 +66,7 @@ class EmployeeLeaveRequestServiceTest {
         Employee employee = employee(7L, "ACTIVE");
         CreateLeaveRequestRequest request = new CreateLeaveRequestRequest(
                 LocalDate.of(2026, 9, 14), LocalDate.of(2026, 9, 15), "   ");
-        when(accountRepository.findById(2L)).thenReturn(Optional.of(account(principal, employee)));
+        when(accountRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(account(principal, employee)));
         when(leaveRequestRepository.existsOverlappingActiveRequest(7L, request.startDate(), request.endDate()))
                 .thenReturn(false);
         when(leaveRequestRepository.save(any(LeaveRequest.class))).thenAnswer(invocation -> {
@@ -82,13 +82,14 @@ class EmployeeLeaveRequestServiceTest {
         assertThat(response.endDate()).isEqualTo(request.endDate());
         assertThat(response.reason()).isNull();
         assertThat(response.status()).isEqualTo("PENDING");
+        verify(accountRepository).findByIdForUpdate(2L);
     }
 
     @Test
     void createLeaveRequestRejectsInvalidDateRange() {
         CurrentAccountPrincipal principal = employeePrincipal();
         Employee employee = employee(7L, "ACTIVE");
-        when(accountRepository.findById(2L)).thenReturn(Optional.of(account(principal, employee)));
+        when(accountRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(account(principal, employee)));
 
         assertThatThrownBy(() -> service.createLeaveRequest(
                 principal,
@@ -105,7 +106,7 @@ class EmployeeLeaveRequestServiceTest {
         CurrentAccountPrincipal principal = employeePrincipal();
         Employee employee = employee(7L, "ACTIVE");
         CreateLeaveRequestRequest request = createRequest(LocalDate.of(2026, 9, 14), LocalDate.of(2026, 9, 15));
-        when(accountRepository.findById(2L)).thenReturn(Optional.of(account(principal, employee)));
+        when(accountRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(account(principal, employee)));
         when(leaveRequestRepository.existsOverlappingActiveRequest(7L, request.startDate(), request.endDate()))
                 .thenReturn(true);
 

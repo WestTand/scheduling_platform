@@ -21,6 +21,16 @@ public class EmployeeAccess {
     public Employee requireActiveEmployee(CurrentAccountPrincipal principal) {
         Account account = accountRepository.findById(principal.accountId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "Employee access required"));
+        return requireActiveEmployee(account);
+    }
+
+    public Employee requireActiveEmployeeForUpdate(CurrentAccountPrincipal principal) {
+        Account account = accountRepository.findByIdForUpdate(principal.accountId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "Employee access required"));
+        return requireActiveEmployee(account);
+    }
+
+    private static Employee requireActiveEmployee(Account account) {
         if (account.getRole() != AccountRole.EMPLOYEE) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Employee access required");
         }

@@ -42,7 +42,7 @@ public class EmployeeLeaveRequestService {
 
     @Transactional
     public EmployeeLeaveRequestResponse createLeaveRequest(CurrentAccountPrincipal principal, CreateLeaveRequestRequest request) {
-        Employee employee = employeeAccess.requireActiveEmployee(principal);
+        Employee employee = employeeAccess.requireActiveEmployeeForUpdate(principal);
         validateDateRange(request.startDate(), request.endDate());
         if (leaveRequestRepository.existsOverlappingActiveRequest(employee.getId(), request.startDate(), request.endDate())) {
             throw invalidRequest();
