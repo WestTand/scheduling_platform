@@ -6,6 +6,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import scheduling.scheduling.admin.EmployeeNotFoundException;
+import scheduling.scheduling.admin.ShiftTypeNotFoundException;
 
 @RestControllerAdvice
 public class AuthExceptionHandler {
@@ -26,6 +27,12 @@ public class AuthExceptionHandler {
     ResponseEntity<ErrorResponse> handleEmployeeNotFound(EmployeeNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(new ErrorResponse("EMPLOYEE_NOT_FOUND", ex.getMessage()));
+    }
+
+    @ExceptionHandler(ShiftTypeNotFoundException.class)
+    ResponseEntity<ErrorResponse> handleShiftTypeNotFound(ShiftTypeNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ErrorResponse("SHIFT_TYPE_NOT_FOUND", ex.getMessage()));
     }
 
     @ExceptionHandler(InvalidAccountStateException.class)

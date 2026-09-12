@@ -23,7 +23,7 @@ Tai lieu nay la roadmap chinh cua he thong. Moi phase ben duoi ghi ro muc dich, 
 - Phase 0: Gan xong, da co monorepo, Docker setup, backend/frontend/AI health scaffold. Muc dich la dam bao moi thanh phan co the chay local va trong Docker.
 - Phase 1: Entity chinh da co va da fix mapping theo database design v2. Da bo sung `AccountStatus` gom `ACTIVE`, `PENDING_ACTIVATION`, `FORCE_PASSWORD_CHANGE`, `INACTIVE` vao `Account`. Muc dich la tao nen tang database cho auth, nhan su, ca truc, lich, nghi phep, doi ca, thong bao va audit log.
 - Phase 2: Auth/JWT/refresh cookie da merge. Da bo public self-registration `/api/auth/register`, them mail config, them role `ADMIN`, manager tao account nhan vien bang password mac dinh, OTP kich hoat, force password change, refresh token rotation/revoke, va chan account khong hop le. Muc dich la bao ve he thong truoc khi mo cac API quan tri.
-- Phase 3: Dang lam. Da implement employee admin APIs, manager account APIs, admin account APIs cho list/lock/unlock tai khoan nhan vien, va scheduling rule APIs. Cac API tiep theo: shift type APIs.
+- Phase 3: Hoan tat backend admin core. Da implement employee admin APIs, manager account APIs, admin account APIs cho list/lock/unlock tai khoan nhan vien, shift type APIs, va scheduling rule APIs. Viec tiep theo nen lam: Phase 4 employee core hoac backend-AI scheduling contract.
 
 ## Phase 0 - Setup
 
@@ -283,16 +283,16 @@ Ket qua mong doi: manager/admin co the quan ly du lieu dau vao quan trong truoc 
 - [x] API mo khoa account nhan vien
   - Dung de mo lai account nhan vien da bi khoa.
   - Giu lifecycle status nhu `PENDING_ACTIVATION` hoac `FORCE_PASSWORD_CHANGE` neu account chua hoan tat quy trinh.
-- [ ] API quan ly loai ca truc
+- [x] API quan ly loai ca truc
   - Dung de xem danh sach cau hinh ca truc hien co.
   - La du lieu dau vao cho work shifts, manual scheduling va AI scheduling.
-- [ ] API them loai ca
+- [x] API them loai ca
   - Dung de tao ca moi nhu ngoai gio, thong tam, truc.
   - Cho phep manager cau hinh gio bat dau/ket thuc, duration, min/max staff.
-- [ ] API cap nhat loai ca
+- [x] API cap nhat loai ca
   - Dung de sua thong tin ca khi quy dinh van hanh thay doi.
   - Anh huong cac work shifts/AI sau nay nen can validate ky.
-- [ ] API khoa/mo khoa loai ca
+- [x] API khoa/mo khoa loai ca
   - Dung de tam ngung loai ca khong con su dung ma khong xoa du lieu cu.
   - Giu lich su assignment va preference lien quan.
 - [x] API quan ly scheduling rules
@@ -313,7 +313,7 @@ Ket qua mong doi: manager/admin co the quan ly du lieu dau vao quan trong truoc 
 - [x] Test admin password reset/reactivation APIs
   - Kiem tra resend OTP, reset password va revoke token.
   - Dam bao reset khong tao lo hong auth.
-- [ ] Test shift type APIs
+- [x] Test shift type APIs
   - Kiem tra create/update/list/lock/unlock loai ca.
   - Dam bao cau hinh ca truc dung truoc khi scheduling dung.
 - [x] Test scheduling rule APIs
@@ -840,9 +840,9 @@ Ket qua mong doi: Docker compose chay sach, co account/nhan vien/ca/rules mau, c
 - Phase 0: gan xong, da co monorepo, Docker setup, backend/frontend/AI health scaffold.
 - Phase 1: entity chinh da co va da fix mapping theo database design v2.
 - Phase 2: auth/security da hoan tat cac flow chinh tren `main` va da bo sung hardening lifecycle.
-- Phase 3: da implement employee admin APIs, manager account APIs, admin account APIs cho list/lock/unlock tai khoan nhan vien, va scheduling rule APIs. Viec tiep theo nen lam: shift type APIs.
+- Phase 3: da implement employee admin APIs, manager account APIs, admin account APIs cho list/lock/unlock tai khoan nhan vien, shift type APIs, va scheduling rule APIs. Viec tiep theo nen lam: Phase 4 employee core hoac backend-AI scheduling contract.
 
 ## Verification Gan Nhat
 
 - Backend command: `./mvnw.cmd clean test`
-- Ket qua gan nhat tren branch `phase3/scheduling-rule-apis`: `122` tests, `0` failures, `0` errors.
+- Ket qua gan nhat tren branch `phase3/scheduling-rule-apis`: `139` tests, `0` failures, `0` errors sau khi merge `origin/main` va resolve conflict.
