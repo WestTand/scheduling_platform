@@ -44,6 +44,10 @@ public class ShiftType extends BaseEntity {
     @Column(name = "max_staff", nullable = false)
     private Integer maxStaff;
 
+    @Column(name = "quota_category", nullable = false, length = 20, columnDefinition = "varchar(20) default 'REGULAR'")
+    @Builder.Default
+    private String quotaCategory = "REGULAR";
+
     @Column(name = "status", nullable = false, length = 20)
     @Builder.Default
     private String status = "ACTIVE";

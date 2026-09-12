@@ -114,6 +114,7 @@ class EntityMappingTest {
         assertThat(Employee.builder().build().getStatus()).isEqualTo("ACTIVE");
         assertThat(ShiftType.builder().build().getOvernight()).isFalse();
         assertThat(ShiftType.builder().build().getHeavy()).isFalse();
+        assertThat(ShiftType.builder().build().getQuotaCategory()).isEqualTo("REGULAR");
         assertThat(ShiftType.builder().build().getStatus()).isEqualTo("ACTIVE");
         assertThat(SchedulePeriod.builder().build().getVersionNo()).isEqualTo(1);
         assertThat(SchedulePeriod.builder().build().getStatus()).isEqualTo("DRAFT");

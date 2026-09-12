@@ -17,5 +17,6 @@ public record CreateShiftTypeRequest(
         Boolean overnight,
         Boolean heavy,
         @NotNull @Min(1) Integer minStaff,
-        @NotNull @Min(1) Integer maxStaff) {
+        @NotNull @Min(1) Integer maxStaff,
+        @Size(max = 20) String quotaCategory) {
 }

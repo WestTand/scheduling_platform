@@ -74,7 +74,8 @@ class AdminShiftTypeControllerTest {
                         .header(HttpHeaders.AUTHORIZATION, "Bearer manager-token"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(10))
-                .andExpect(jsonPath("$[0].shiftName").value("Ngoai gio"));
+                .andExpect(jsonPath("$[0].shiftName").value("Ngoai gio"))
+                .andExpect(jsonPath("$[0].quotaCategory").value("OVERTIME"));
     }
 
     @Test
@@ -96,7 +97,8 @@ class AdminShiftTypeControllerTest {
                                 }
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").value(10));
+                .andExpect(jsonPath("$.id").value(10))
+                .andExpect(jsonPath("$.quotaCategory").value("OVERTIME"));
 
         ArgumentCaptor<CreateShiftTypeRequest> requestCaptor = ArgumentCaptor.forClass(CreateShiftTypeRequest.class);
         verify(adminShiftTypeService).createShiftType(requestCaptor.capture());
@@ -147,11 +149,13 @@ class AdminShiftTypeControllerTest {
                                   "heavy": false,
                                   "minStaff": 1,
                                   "maxStaff": 3,
-                                  "status": "ACTIVE"
+                                  "status": "ACTIVE",
+                                  "quotaCategory": "OVERTIME"
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.shiftName").value("Ngoai gio"));
+                .andExpect(jsonPath("$.shiftName").value("Ngoai gio"))
+                .andExpect(jsonPath("$.quotaCategory").value("OVERTIME"));
 
         ArgumentCaptor<Long> idCaptor = ArgumentCaptor.forClass(Long.class);
         ArgumentCaptor<UpdateShiftTypeRequest> requestCaptor = ArgumentCaptor.forClass(UpdateShiftTypeRequest.class);
@@ -167,6 +171,7 @@ class AdminShiftTypeControllerTest {
         assertThat(request.minStaff()).isEqualTo(1);
         assertThat(request.maxStaff()).isEqualTo(3);
         assertThat(request.status()).isEqualTo("ACTIVE");
+        assertThat(request.quotaCategory()).isEqualTo("OVERTIME");
     }
 
     @Test
@@ -184,7 +189,8 @@ class AdminShiftTypeControllerTest {
                                   "overnight": null,
                                   "heavy": null,
                                   "minStaff": 0,
-                                  "status": " "
+                                  "status": " ",
+                                  "quotaCategory": " "
                                 }
                                 """))
                 .andExpect(status().isBadRequest());
@@ -254,6 +260,7 @@ class AdminShiftTypeControllerTest {
                 false,
                 1,
                 3,
+                "OVERTIME",
                 "ACTIVE");
     }
 }
