@@ -5,6 +5,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +33,7 @@ public class AdminLeaveRequestService {
     private final AccountRepository accountRepository;
     private final Clock clock;
 
+    @Autowired
     public AdminLeaveRequestService(LeaveRequestRepository leaveRequestRepository, AccountRepository accountRepository) {
         this(leaveRequestRepository, accountRepository, Clock.systemDefaultZone());
     }
@@ -81,11 +83,10 @@ public class AdminLeaveRequestService {
 
     private void serializeEmployeeReview(Employee employee) {
         Account employeeAccount = employee.getAccount();
-        if (employeeAccount != null
-                && accountRepository.findByIdForUpdate(employeeAccount.getId()).isPresent()) {
-            return;
+        if (employeeAccount == null
+                || accountRepository.findByIdForUpdate(employeeAccount.getId()).isEmpty()) {
+            throw invalidRequest();
         }
-        leaveRequestRepository.lockEmployeeLeaveRequestsForUpdate(employee.getId());
     }
 
     private Account requireManager(CurrentAccountPrincipal principal) {

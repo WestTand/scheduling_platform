@@ -139,23 +139,19 @@ class AdminLeaveRequestServiceTest {
     }
 
     @Test
-    void approveLeaveRequestFallsBackToEmployeeLeaveLockWhenEmployeeHasNoAccount() {
+    void approveLeaveRequestRejectsEmployeeWithNoAccount() {
         CurrentAccountPrincipal principal = managerPrincipal();
         LeaveRequest leaveRequest = leaveRequest(10L, employee(7L), "PENDING");
         when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
         when(leaveRequestRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(leaveRequest));
-        when(leaveRequestRepository.existsApprovedOverlapExcludingId(
-                7L, LocalDate.of(2026, 9, 14), LocalDate.of(2026, 9, 15), 10L))
-                .thenReturn(false);
-        when(leaveRequestRepository.save(leaveRequest)).thenReturn(leaveRequest);
 
-        service.approveLeaveRequest(principal, 10L, new ReviewLeaveRequestRequest(null));
+        assertThatThrownBy(() -> service.approveLeaveRequest(principal, 10L, new ReviewLeaveRequestRequest(null)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
 
-        InOrder inOrder = inOrder(leaveRequestRepository);
-        inOrder.verify(leaveRequestRepository).findByIdForUpdate(10L);
-        inOrder.verify(leaveRequestRepository).lockEmployeeLeaveRequestsForUpdate(7L);
-        inOrder.verify(leaveRequestRepository).existsApprovedOverlapExcludingId(
-                7L, LocalDate.of(2026, 9, 14), LocalDate.of(2026, 9, 15), 10L);
+        verify(leaveRequestRepository, never()).existsApprovedOverlapExcludingId(any(), any(), any(), any());
+        verify(leaveRequestRepository, never()).save(any());
     }
 
     @Test
