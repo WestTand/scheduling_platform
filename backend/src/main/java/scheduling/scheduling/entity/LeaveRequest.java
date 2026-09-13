@@ -32,6 +32,9 @@ public class LeaveRequest extends BaseEntity {
     @Column(name = "reason", columnDefinition = "TEXT")
     private String reason;
 
+    @Column(name = "review_note", columnDefinition = "TEXT")
+    private String reviewNote;
+
     @Column(name = "status", nullable = false, length = 20)
     @Builder.Default
     private String status = "PENDING"; // could be enum

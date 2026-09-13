@@ -49,4 +49,41 @@ public interface LeaveRequestRepository extends JpaRepository<LeaveRequest, Long
     Optional<LeaveRequest> findByIdAndEmployeeIdForUpdate(
             @Param("id") Long id,
             @Param("employeeId") Long employeeId);
+
+    @Query("""
+            select l from LeaveRequest l
+            join fetch l.employee e
+            left join fetch l.reviewedBy r
+            where (:employeeId is null or e.id = :employeeId)
+            and (:status is null or l.status = :status)
+            and (:from is null or l.endDate >= :from)
+            and (:to is null or l.startDate <= :to)
+            order by l.id desc
+            """)
+    List<LeaveRequest> searchForAdmin(
+            @Param("employeeId") Long employeeId,
+            @Param("status") String status,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select l from LeaveRequest l
+            where l.id = :id
+            """)
+    Optional<LeaveRequest> findByIdForUpdate(@Param("id") Long id);
+
+    @Query("""
+            select count(l) > 0 from LeaveRequest l
+            where l.employee.id = :employeeId
+            and l.status = 'APPROVED'
+            and l.startDate <= :endDate
+            and l.endDate >= :startDate
+            and l.id <> :excludedLeaveRequestId
+            """)
+    boolean existsApprovedOverlapExcludingId(
+            @Param("employeeId") Long employeeId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate,
+            @Param("excludedLeaveRequestId") Long excludedLeaveRequestId);
 }
