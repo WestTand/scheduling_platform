@@ -23,7 +23,8 @@ Tai lieu nay la roadmap chinh cua he thong. Moi phase ben duoi ghi ro muc dich, 
 - Phase 0: Gan xong, da co monorepo, Docker setup, backend/frontend/AI health scaffold. Muc dich la dam bao moi thanh phan co the chay local va trong Docker.
 - Phase 1: Entity chinh da co va da fix mapping theo database design v2. Da bo sung `AccountStatus` gom `ACTIVE`, `PENDING_ACTIVATION`, `FORCE_PASSWORD_CHANGE`, `INACTIVE` vao `Account`. Muc dich la tao nen tang database cho auth, nhan su, ca truc, lich, nghi phep, doi ca, thong bao va audit log.
 - Phase 2: Auth/JWT/refresh cookie da merge. Da bo public self-registration `/api/auth/register`, them mail config, them role `ADMIN`, manager tao account nhan vien bang password mac dinh, OTP kich hoat, force password change, refresh token rotation/revoke, va chan account khong hop le. Muc dich la bao ve he thong truoc khi mo cac API quan tri.
-- Phase 3: Hoan tat backend admin core. Da implement employee admin APIs, manager account APIs, admin account APIs cho list/lock/unlock tai khoan nhan vien, shift type APIs, va scheduling rule APIs. Viec tiep theo nen lam: Phase 4 employee core hoac backend-AI scheduling contract.
+- Phase 3: Hoan tat backend admin core. Da implement employee admin APIs, manager account APIs, admin account APIs cho list/lock/unlock tai khoan nhan vien, shift type APIs, va scheduling rule APIs.
+- Phase 4: Dang lam employee core tren branch `phase4/admin-leave-review`. Da co employee leave/preference APIs va manager review leave requests. Viec tiep theo nen lam: swap request flow hoac backend-AI scheduling contract.
 
 ## Phase 0 - Setup
 
@@ -839,13 +840,14 @@ Ket qua mong doi: Docker compose chay sach, co account/nhan vien/ca/rules mau, c
 
 ## Trang Thai Hien Tai
 
-- Branch dang lam: `phase3/scheduling-rule-apis`.
+- Branch dang lam: `phase4/admin-leave-review`.
 - Phase 0: gan xong, da co monorepo, Docker setup, backend/frontend/AI health scaffold.
 - Phase 1: entity chinh da co va da fix mapping theo database design v2.
 - Phase 2: auth/security da hoan tat cac flow chinh tren `main` va da bo sung hardening lifecycle.
-- Phase 3: da implement employee admin APIs, manager account APIs, admin account APIs cho list/lock/unlock tai khoan nhan vien, shift type APIs, va scheduling rule APIs. Viec tiep theo nen lam: Phase 4 employee core hoac backend-AI scheduling contract.
+- Phase 3: da implement employee admin APIs, manager account APIs, admin account APIs cho list/lock/unlock tai khoan nhan vien, shift type APIs, va scheduling rule APIs.
+- Phase 4: dang lam employee core; da co employee leave/preference APIs va manager review leave requests. Viec tiep theo nen lam: swap request flow hoac backend-AI scheduling contract.
 
 ## Verification Gan Nhat
 
 - Backend command: `./mvnw.cmd clean test`
-- Ket qua gan nhat tren branch `phase3/scheduling-rule-apis`: `139` tests, `0` failures, `0` errors sau khi merge `origin/main` va resolve conflict.
+- Ket qua gan nhat tren branch `phase4/admin-leave-review`: `208` tests, `0` failures, `0` errors.

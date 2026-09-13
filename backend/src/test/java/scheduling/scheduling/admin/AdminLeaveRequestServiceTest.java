@@ -139,19 +139,26 @@ class AdminLeaveRequestServiceTest {
     }
 
     @Test
-    void approveLeaveRequestRejectsEmployeeWithNoAccount() {
+    void approveLeaveRequestApprovesEmployeeWithNoAccount() {
         CurrentAccountPrincipal principal = managerPrincipal();
+        Account manager = account(principal);
         LeaveRequest leaveRequest = leaveRequest(10L, employee(7L), "PENDING");
-        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
         when(leaveRequestRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(leaveRequest));
+        when(leaveRequestRepository.existsApprovedOverlapExcludingId(
+                7L, LocalDate.of(2026, 9, 14), LocalDate.of(2026, 9, 15), 10L))
+                .thenReturn(false);
+        when(leaveRequestRepository.save(leaveRequest)).thenReturn(leaveRequest);
 
-        assertThatThrownBy(() -> service.approveLeaveRequest(principal, 10L, new ReviewLeaveRequestRequest(null)))
-                .isInstanceOf(ResponseStatusException.class)
-                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
-                .isEqualTo(HttpStatus.BAD_REQUEST);
+        AdminLeaveRequestResponse response = service.approveLeaveRequest(
+                principal, 10L, new ReviewLeaveRequestRequest(null));
 
-        verify(leaveRequestRepository, never()).existsApprovedOverlapExcludingId(any(), any(), any(), any());
-        verify(leaveRequestRepository, never()).save(any());
+        assertThat(response.status()).isEqualTo("APPROVED");
+        assertThat(response.reviewedByAccountId()).isEqualTo(1L);
+        verify(accountRepository, never()).findByIdForUpdate(any());
+        verify(leaveRequestRepository).existsApprovedOverlapExcludingId(
+                7L, LocalDate.of(2026, 9, 14), LocalDate.of(2026, 9, 15), 10L);
+        verify(leaveRequestRepository).save(leaveRequest);
     }
 
     @Test

@@ -83,8 +83,7 @@ public class AdminLeaveRequestService {
 
     private void serializeEmployeeReview(Employee employee) {
         Account employeeAccount = employee.getAccount();
-        if (employeeAccount == null
-                || accountRepository.findByIdForUpdate(employeeAccount.getId()).isEmpty()) {
+        if (employeeAccount != null && accountRepository.findByIdForUpdate(employeeAccount.getId()).isEmpty()) {
             throw invalidRequest();
         }
     }
