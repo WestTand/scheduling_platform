@@ -19,7 +19,6 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
     @Query("""
             select a
             from Account a
-            left join fetch a.employee
             where a.id = :id
             """)
     Optional<Account> findByIdForUpdate(@Param("id") Long id);

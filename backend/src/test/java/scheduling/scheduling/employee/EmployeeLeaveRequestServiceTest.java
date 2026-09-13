@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.web.server.ResponseStatusException;
 import scheduling.scheduling.auth.CurrentAccountPrincipal;
 import scheduling.scheduling.employee.dto.CreateLeaveRequestRequest;
@@ -175,6 +176,13 @@ class EmployeeLeaveRequestServiceTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
                 .isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void accountUpdateLockDoesNotUseFetchJoin() throws Exception {
+        Query query = AccountRepository.class.getMethod("findByIdForUpdate", Long.class).getAnnotation(Query.class);
+
+        assertThat(query.value().toLowerCase()).doesNotContain("fetch");
     }
 
     private static CreateLeaveRequestRequest createRequest(LocalDate startDate, LocalDate endDate) {
