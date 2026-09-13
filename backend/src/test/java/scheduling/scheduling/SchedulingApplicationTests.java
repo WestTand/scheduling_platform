@@ -13,6 +13,7 @@ import scheduling.scheduling.repository.AccountActivationOtpRepository;
 import scheduling.scheduling.repository.AccountRepository;
 import scheduling.scheduling.repository.EmployeeRepository;
 import scheduling.scheduling.repository.LeaveRequestRepository;
+import scheduling.scheduling.repository.PreferenceRepository;
 import scheduling.scheduling.repository.SchedulingRuleRepository;
 import scheduling.scheduling.repository.ShiftTypeRepository;
 
@@ -43,6 +44,9 @@ class SchedulingApplicationTests {
 
 	@MockitoBean
 	private LeaveRequestRepository leaveRequestRepository;
+
+	@MockitoBean
+	private PreferenceRepository preferenceRepository;
 
 	@Autowired
 	private JavaMailSender mailSender;
