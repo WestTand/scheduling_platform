@@ -332,22 +332,22 @@ Ket qua mong doi: nhan vien co the tu gui nhu cau/lien quan lich; manager va AI 
 - [ ] API nhan vien xem lich cua minh
   - Dung de nhan vien biet ca duoc phan cong.
   - La chuc nang cot loi sau khi lich duoc tao/cong bo.
-- [ ] API dang ky ngay nghi
+- [x] API dang ky ngay nghi
   - Dung de nhan vien gui don xin nghi theo ngay/khoang ngay.
   - Don duoc manager duyet va AI khong phan ca vao ngay nghi da duyet.
-- [ ] API xem danh sach ngay nghi da gui
+- [x] API xem danh sach ngay nghi da gui
   - Dung de nhan vien theo doi trang thai pending/approved/rejected.
   - Giam viec hoi quan ly thu cong.
-- [ ] API huy yeu cau nghi neu con pending
+- [x] API huy yeu cau nghi neu con pending
   - Dung de nhan vien thu hoi don truoc khi quan ly xu ly.
   - Giu du lieu sach, khong can manager tu choi don sai.
-- [ ] API dang ky nguyen vong muon lam/khong muon lam
+- [x] API dang ky nguyen vong muon lam/khong muon lam
   - Dung de nhan vien gui preference theo ngay/loai ca.
   - AI dung nhu soft constraint de lich cong bang va hop ly hon.
-- [ ] API xem danh sach nguyen vong
+- [x] API xem danh sach nguyen vong
   - Dung de nhan vien xem cac preference da gui.
   - Ho tro sua/huy khi con pending.
-- [ ] API cap nhat nguyen vong pending
+- [x] API cap nhat nguyen vong pending
   - Dung de sua preference truoc khi lich duoc tao/duyet.
   - Giam data sai dua vao AI.
 - [ ] API gui yeu cau doi ca
