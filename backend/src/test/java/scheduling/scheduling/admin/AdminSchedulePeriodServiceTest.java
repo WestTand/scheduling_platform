@@ -171,6 +171,26 @@ class AdminSchedulePeriodServiceTest {
     }
 
     @Test
+    void listSchedulePeriodsRejectsNonManagerAccount() {
+        CurrentAccountPrincipal principal = new CurrentAccountPrincipal(2L, "employee01", AccountRole.EMPLOYEE);
+        when(accountRepository.findById(2L)).thenReturn(Optional.of(account(principal)));
+
+        assertForbidden(() -> service.listSchedulePeriods(principal, null, null, null));
+
+        verify(schedulePeriodRepository, never()).searchForAdmin(any(), any(), any());
+    }
+
+    @Test
+    void listSchedulePeriodsRejectsMissingManagerAccount() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        when(accountRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertForbidden(() -> service.listSchedulePeriods(principal, null, null, null));
+
+        verify(schedulePeriodRepository, never()).searchForAdmin(any(), any(), any());
+    }
+
+    @Test
     void getSchedulePeriodReturnsMappedDetail() {
         CurrentAccountPrincipal principal = managerPrincipal();
         SchedulePeriod period = draftPeriod(20L, account(principal));
@@ -201,6 +221,26 @@ class AdminSchedulePeriodServiceTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
                 .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void getSchedulePeriodRejectsNonManagerAccount() {
+        CurrentAccountPrincipal principal = new CurrentAccountPrincipal(2L, "employee01", AccountRole.EMPLOYEE);
+        when(accountRepository.findById(2L)).thenReturn(Optional.of(account(principal)));
+
+        assertForbidden(() -> service.getSchedulePeriod(principal, 20L));
+
+        verify(schedulePeriodRepository, never()).findDetailById(any());
+    }
+
+    @Test
+    void getSchedulePeriodRejectsMissingManagerAccount() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        when(accountRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertForbidden(() -> service.getSchedulePeriod(principal, 20L));
+
+        verify(schedulePeriodRepository, never()).findDetailById(any());
     }
 
     @Test
@@ -247,6 +287,22 @@ class AdminSchedulePeriodServiceTest {
                 "Week 40", LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 7), null));
 
         assertThat(response.versionNo()).isEqualTo(1);
+    }
+
+    @Test
+    void updateSchedulePeriodRejectsInvalidDateRange() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        SchedulePeriod period = draftPeriod(20L, account(principal));
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(period));
+
+        assertThatThrownBy(() -> service.updateSchedulePeriod(principal, 20L, new SchedulePeriodRequest(
+                "Week 40", LocalDate.of(2026, 10, 7), LocalDate.of(2026, 10, 1), 2)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(schedulePeriodRepository, never()).save(any());
     }
 
     @Test
@@ -298,6 +354,30 @@ class AdminSchedulePeriodServiceTest {
     }
 
     @Test
+    void updateSchedulePeriodRejectsNonManagerAccount() {
+        CurrentAccountPrincipal principal = new CurrentAccountPrincipal(2L, "employee01", AccountRole.EMPLOYEE);
+        when(accountRepository.findById(2L)).thenReturn(Optional.of(account(principal)));
+
+        assertForbidden(() -> service.updateSchedulePeriod(principal, 20L, new SchedulePeriodRequest(
+                "Week 40", LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 7), 2)));
+
+        verify(schedulePeriodRepository, never()).findDetailById(any());
+        verify(schedulePeriodRepository, never()).save(any());
+    }
+
+    @Test
+    void updateSchedulePeriodRejectsMissingManagerAccount() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        when(accountRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertForbidden(() -> service.updateSchedulePeriod(principal, 20L, new SchedulePeriodRequest(
+                "Week 40", LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 7), 2)));
+
+        verify(schedulePeriodRepository, never()).findDetailById(any());
+        verify(schedulePeriodRepository, never()).save(any());
+    }
+
+    @Test
     void createSchedulePeriodRejectsNonManagerAccount() {
         CurrentAccountPrincipal principal = new CurrentAccountPrincipal(2L, "employee01", AccountRole.EMPLOYEE);
         when(accountRepository.findById(2L)).thenReturn(Optional.of(account(principal)));
@@ -319,6 +399,18 @@ class AdminSchedulePeriodServiceTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
                 .isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    private static void assertForbidden(ThrowingServiceCall call) {
+        assertThatThrownBy(call::execute)
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @FunctionalInterface
+    private interface ThrowingServiceCall {
+        void execute();
     }
 
     private static CurrentAccountPrincipal managerPrincipal() {
