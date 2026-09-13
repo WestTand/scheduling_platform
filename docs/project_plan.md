@@ -341,6 +341,9 @@ Ket qua mong doi: nhan vien co the tu gui nhu cau/lien quan lich; manager va AI 
 - [x] API huy yeu cau nghi neu con pending
   - Dung de nhan vien thu hoi don truoc khi quan ly xu ly.
   - Giu du lieu sach, khong can manager tu choi don sai.
+- [x] API manager xem/duyet leave requests
+  - Dung de manager xem danh sach, duyet hoac tu choi don nghi cua nhan vien.
+  - Dam bao don nghi duoc xu ly truoc khi scheduling dung lam input.
 - [x] API dang ky nguyen vong muon lam/khong muon lam
   - Dung de nhan vien gui preference theo ngay/loai ca.
   - AI dung nhu soft constraint de lich cong bang va hop ly hon.
