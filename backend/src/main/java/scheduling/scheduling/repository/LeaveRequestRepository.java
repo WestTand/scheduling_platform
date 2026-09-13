@@ -3,7 +3,9 @@ package scheduling.scheduling.repository;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import scheduling.scheduling.entity.LeaveRequest;
@@ -37,4 +39,14 @@ public interface LeaveRequestRepository extends JpaRepository<LeaveRequest, Long
             @Param("endDate") LocalDate endDate);
 
     Optional<LeaveRequest> findByIdAndEmployeeId(Long id, Long employeeId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select l from LeaveRequest l
+            where l.id = :id
+            and l.employee.id = :employeeId
+            """)
+    Optional<LeaveRequest> findByIdAndEmployeeIdForUpdate(
+            @Param("id") Long id,
+            @Param("employeeId") Long employeeId);
 }

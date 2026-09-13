@@ -35,6 +35,7 @@ public class EmployeeLeaveRequestService {
             CurrentAccountPrincipal principal, String status, LocalDate from, LocalDate to) {
         Employee employee = employeeAccess.requireActiveEmployee(principal);
         String normalizedStatus = normalizeStatus(status);
+        validateDateFilter(from, to);
         return leaveRequestRepository.searchForEmployee(employee.getId(), normalizedStatus, from, to).stream()
                 .map(EmployeeLeaveRequestResponse::from)
                 .toList();
@@ -60,7 +61,7 @@ public class EmployeeLeaveRequestService {
     @Transactional
     public void cancelLeaveRequest(CurrentAccountPrincipal principal, Long leaveRequestId) {
         Employee employee = employeeAccess.requireActiveEmployee(principal);
-        LeaveRequest leaveRequest = leaveRequestRepository.findByIdAndEmployeeId(leaveRequestId, employee.getId())
+        LeaveRequest leaveRequest = leaveRequestRepository.findByIdAndEmployeeIdForUpdate(leaveRequestId, employee.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Leave request not found"));
         if (!PENDING.equals(leaveRequest.getStatus())) {
             throw invalidRequest();
@@ -71,6 +72,12 @@ public class EmployeeLeaveRequestService {
 
     private static void validateDateRange(LocalDate startDate, LocalDate endDate) {
         if (endDate.isBefore(startDate)) {
+            throw invalidRequest();
+        }
+    }
+
+    private static void validateDateFilter(LocalDate from, LocalDate to) {
+        if (from != null && to != null && from.isAfter(to)) {
             throw invalidRequest();
         }
     }

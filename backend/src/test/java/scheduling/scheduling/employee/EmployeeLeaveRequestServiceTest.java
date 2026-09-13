@@ -62,6 +62,19 @@ class EmployeeLeaveRequestServiceTest {
     }
 
     @Test
+    void listLeaveRequestsRejectsInvertedDateFilter() {
+        CurrentAccountPrincipal principal = employeePrincipal();
+        Employee employee = employee(7L, "ACTIVE");
+        when(accountRepository.findById(2L)).thenReturn(Optional.of(account(principal, employee)));
+
+        assertThatThrownBy(() -> service.listLeaveRequests(
+                principal, null, LocalDate.of(2026, 9, 30), LocalDate.of(2026, 9, 1)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
     void createLeaveRequestDefaultsPendingAndTrimsBlankReasonToNull() {
         CurrentAccountPrincipal principal = employeePrincipal();
         Employee employee = employee(7L, "ACTIVE");
@@ -123,11 +136,12 @@ class EmployeeLeaveRequestServiceTest {
         Employee employee = employee(7L, "ACTIVE");
         LeaveRequest leaveRequest = leaveRequest(10L, employee, "PENDING");
         when(accountRepository.findById(2L)).thenReturn(Optional.of(account(principal, employee)));
-        when(leaveRequestRepository.findByIdAndEmployeeId(10L, 7L)).thenReturn(Optional.of(leaveRequest));
+        when(leaveRequestRepository.findByIdAndEmployeeIdForUpdate(10L, 7L)).thenReturn(Optional.of(leaveRequest));
 
         service.cancelLeaveRequest(principal, 10L);
 
         assertThat(leaveRequest.getStatus()).isEqualTo("CANCELLED");
+        verify(leaveRequestRepository).findByIdAndEmployeeIdForUpdate(10L, 7L);
         verify(leaveRequestRepository).save(leaveRequest);
     }
 
@@ -137,7 +151,7 @@ class EmployeeLeaveRequestServiceTest {
         Employee employee = employee(7L, "ACTIVE");
         LeaveRequest leaveRequest = leaveRequest(10L, employee, "APPROVED");
         when(accountRepository.findById(2L)).thenReturn(Optional.of(account(principal, employee)));
-        when(leaveRequestRepository.findByIdAndEmployeeId(10L, 7L)).thenReturn(Optional.of(leaveRequest));
+        when(leaveRequestRepository.findByIdAndEmployeeIdForUpdate(10L, 7L)).thenReturn(Optional.of(leaveRequest));
 
         assertThatThrownBy(() -> service.cancelLeaveRequest(principal, 10L))
                 .isInstanceOf(ResponseStatusException.class)
