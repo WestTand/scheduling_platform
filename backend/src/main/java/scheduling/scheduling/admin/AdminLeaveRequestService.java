@@ -15,6 +15,7 @@ import scheduling.scheduling.admin.dto.ReviewLeaveRequestRequest;
 import scheduling.scheduling.auth.CurrentAccountPrincipal;
 import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
+import scheduling.scheduling.entity.Employee;
 import scheduling.scheduling.entity.LeaveRequest;
 import scheduling.scheduling.repository.AccountRepository;
 import scheduling.scheduling.repository.LeaveRequestRepository;
@@ -42,7 +43,9 @@ public class AdminLeaveRequestService {
     }
 
     @Transactional(readOnly = true)
-    public List<AdminLeaveRequestResponse> listLeaveRequests(Long employeeId, String status, LocalDate from, LocalDate to) {
+    public List<AdminLeaveRequestResponse> listLeaveRequests(
+            CurrentAccountPrincipal principal, Long employeeId, String status, LocalDate from, LocalDate to) {
+        requireManager(principal);
         String normalizedStatus = normalizeStatus(status);
         validateDateFilter(from, to);
         return leaveRequestRepository.searchForAdmin(employeeId, normalizedStatus, from, to).stream()
@@ -57,6 +60,7 @@ public class AdminLeaveRequestService {
         LeaveRequest leaveRequest = findForUpdate(leaveRequestId);
         requirePending(leaveRequest);
         Long employeeId = leaveRequest.getEmployee().getId();
+        serializeEmployeeReview(leaveRequest.getEmployee());
         if (leaveRequestRepository.existsApprovedOverlapExcludingId(
                 employeeId, leaveRequest.getStartDate(), leaveRequest.getEndDate(), leaveRequest.getId())) {
             throw invalidRequest();
@@ -73,6 +77,15 @@ public class AdminLeaveRequestService {
         requirePending(leaveRequest);
         applyReview(leaveRequest, manager, REJECTED, request.reviewNote());
         return AdminLeaveRequestResponse.from(leaveRequestRepository.save(leaveRequest));
+    }
+
+    private void serializeEmployeeReview(Employee employee) {
+        Account employeeAccount = employee.getAccount();
+        if (employeeAccount != null
+                && accountRepository.findByIdForUpdate(employeeAccount.getId()).isPresent()) {
+            return;
+        }
+        leaveRequestRepository.lockEmployeeLeaveRequestsForUpdate(employee.getId());
     }
 
     private Account requireManager(CurrentAccountPrincipal principal) {

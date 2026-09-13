@@ -3,6 +3,7 @@ package scheduling.scheduling.admin;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -15,6 +16,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
+import org.mockito.InOrder;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
@@ -41,12 +43,14 @@ class AdminLeaveRequestServiceTest {
 
     @Test
     void listLeaveRequestsNormalizesFiltersAndMapsEmployeeSummary() {
+        CurrentAccountPrincipal principal = managerPrincipal();
         LeaveRequest leaveRequest = leaveRequest(10L, employee(7L), "PENDING");
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
         when(leaveRequestRepository.searchForAdmin(7L, "PENDING", LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30)))
                 .thenReturn(List.of(leaveRequest));
 
         List<AdminLeaveRequestResponse> response = service.listLeaveRequests(
-                7L, " pending ", LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30));
+                principal, 7L, " pending ", LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30));
 
         assertThat(response).extracting(AdminLeaveRequestResponse::id).containsExactly(10L);
         assertThat(response.get(0).employeeId()).isEqualTo(7L);
@@ -57,7 +61,10 @@ class AdminLeaveRequestServiceTest {
 
     @Test
     void listLeaveRequestsRejectsInvalidStatus() {
-        assertThatThrownBy(() -> service.listLeaveRequests(null, "WAITING", null, null))
+        CurrentAccountPrincipal principal = managerPrincipal();
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+
+        assertThatThrownBy(() -> service.listLeaveRequests(principal, null, "WAITING", null, null))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
                 .isEqualTo(HttpStatus.BAD_REQUEST);
@@ -65,8 +72,11 @@ class AdminLeaveRequestServiceTest {
 
     @Test
     void listLeaveRequestsAcceptsAllReviewStatuses() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+
         for (String status : List.of("PENDING", "APPROVED", "REJECTED", "CANCELLED")) {
-            service.listLeaveRequests(null, status, null, null);
+            service.listLeaveRequests(principal, null, status, null, null);
 
             verify(leaveRequestRepository).searchForAdmin(null, status, null, null);
         }
@@ -74,19 +84,37 @@ class AdminLeaveRequestServiceTest {
 
     @Test
     void listLeaveRequestsRejectsInvertedDateFilter() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+
         assertThatThrownBy(() -> service.listLeaveRequests(
-                null, null, LocalDate.of(2026, 9, 30), LocalDate.of(2026, 9, 1)))
+                principal, null, null, LocalDate.of(2026, 9, 30), LocalDate.of(2026, 9, 1)))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
                 .isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
     @Test
+    void listLeaveRequestsRejectsNonManagerAccount() {
+        CurrentAccountPrincipal principal = new CurrentAccountPrincipal(2L, "employee01", AccountRole.EMPLOYEE);
+        when(accountRepository.findById(2L)).thenReturn(Optional.of(account(principal)));
+
+        assertThatThrownBy(() -> service.listLeaveRequests(principal, null, null, null, null))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+
+        verify(leaveRequestRepository, never()).searchForAdmin(any(), any(), any(), any());
+    }
+
+    @Test
     void approveLeaveRequestSetsReviewMetadata() {
         CurrentAccountPrincipal principal = managerPrincipal();
         Account manager = account(principal);
-        LeaveRequest leaveRequest = leaveRequest(10L, employee(7L), "PENDING");
+        Account employeeAccount = account(new CurrentAccountPrincipal(2L, "employee01", AccountRole.EMPLOYEE));
+        LeaveRequest leaveRequest = leaveRequest(10L, employee(7L, employeeAccount), "PENDING");
         when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
+        when(accountRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(employeeAccount));
         when(leaveRequestRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(leaveRequest));
         when(leaveRequestRepository.existsApprovedOverlapExcludingId(
                 7L, LocalDate.of(2026, 9, 14), LocalDate.of(2026, 9, 15), 10L))
@@ -102,6 +130,32 @@ class AdminLeaveRequestServiceTest {
         assertThat(response.reviewedByUsername()).isEqualTo("manager01");
         assertThat(response.reviewedAt()).isEqualTo(REVIEWED_AT);
         verify(leaveRequestRepository).save(leaveRequest);
+
+        InOrder inOrder = inOrder(accountRepository, leaveRequestRepository);
+        inOrder.verify(leaveRequestRepository).findByIdForUpdate(10L);
+        inOrder.verify(accountRepository).findByIdForUpdate(2L);
+        inOrder.verify(leaveRequestRepository).existsApprovedOverlapExcludingId(
+                7L, LocalDate.of(2026, 9, 14), LocalDate.of(2026, 9, 15), 10L);
+    }
+
+    @Test
+    void approveLeaveRequestFallsBackToEmployeeLeaveLockWhenEmployeeHasNoAccount() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        LeaveRequest leaveRequest = leaveRequest(10L, employee(7L), "PENDING");
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(leaveRequestRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(leaveRequest));
+        when(leaveRequestRepository.existsApprovedOverlapExcludingId(
+                7L, LocalDate.of(2026, 9, 14), LocalDate.of(2026, 9, 15), 10L))
+                .thenReturn(false);
+        when(leaveRequestRepository.save(leaveRequest)).thenReturn(leaveRequest);
+
+        service.approveLeaveRequest(principal, 10L, new ReviewLeaveRequestRequest(null));
+
+        InOrder inOrder = inOrder(leaveRequestRepository);
+        inOrder.verify(leaveRequestRepository).findByIdForUpdate(10L);
+        inOrder.verify(leaveRequestRepository).lockEmployeeLeaveRequestsForUpdate(7L);
+        inOrder.verify(leaveRequestRepository).existsApprovedOverlapExcludingId(
+                7L, LocalDate.of(2026, 9, 14), LocalDate.of(2026, 9, 15), 10L);
     }
 
     @Test
@@ -226,6 +280,13 @@ class AdminLeaveRequestServiceTest {
                 .status("ACTIVE")
                 .build();
         employee.setId(id);
+        return employee;
+    }
+
+    private static Employee employee(Long id, Account account) {
+        Employee employee = employee(id);
+        employee.setAccount(account);
+        account.setEmployee(employee);
         return employee;
     }
 

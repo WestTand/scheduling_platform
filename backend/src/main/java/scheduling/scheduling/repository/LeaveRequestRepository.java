@@ -73,6 +73,13 @@ public interface LeaveRequestRepository extends JpaRepository<LeaveRequest, Long
             """)
     Optional<LeaveRequest> findByIdForUpdate(@Param("id") Long id);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select l from LeaveRequest l
+            where l.employee.id = :employeeId
+            """)
+    List<LeaveRequest> lockEmployeeLeaveRequestsForUpdate(@Param("employeeId") Long employeeId);
+
     @Query("""
             select count(l) > 0 from LeaveRequest l
             where l.employee.id = :employeeId
