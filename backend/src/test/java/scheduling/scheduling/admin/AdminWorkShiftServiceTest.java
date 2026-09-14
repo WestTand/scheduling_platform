@@ -224,18 +224,104 @@ class AdminWorkShiftServiceTest {
     }
 
     @Test
-    void serviceMethodsRejectNonManager() {
+    void createWorkShiftRejectsNullPrincipal() {
+        assertForbidden(() -> service.createWorkShift(null, 20L, createRequest()));
+
+        verify(workShiftRepository, never()).save(any());
+    }
+
+    @Test
+    void createWorkShiftRejectsMissingManagerAccount() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        when(accountRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertForbidden(() -> service.createWorkShift(principal, 20L, createRequest()));
+
+        verify(workShiftRepository, never()).save(any());
+    }
+
+    @Test
+    void createWorkShiftRejectsNonManagerAccount() {
         CurrentAccountPrincipal principal = new CurrentAccountPrincipal(2L, "employee01", AccountRole.EMPLOYEE);
         when(accountRepository.findById(2L)).thenReturn(Optional.of(account(principal)));
 
-        assertThatThrownBy(() -> service.getWorkShift(principal, 200L))
+        assertForbidden(() -> service.createWorkShift(principal, 20L, createRequest()));
+
+        verify(workShiftRepository, never()).save(any());
+    }
+
+    @Test
+    void listWorkShiftsRejectsNullPrincipal() {
+        assertForbidden(() -> service.listWorkShifts(null, 20L, LocalDate.of(2026, 9, 14), 100L));
+
+        verify(workShiftRepository, never()).searchForPeriod(any(), any(), any());
+    }
+
+    @Test
+    void listWorkShiftsRejectsMissingManagerAccount() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        when(accountRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertForbidden(() -> service.listWorkShifts(principal, 20L, LocalDate.of(2026, 9, 14), 100L));
+
+        verify(workShiftRepository, never()).searchForPeriod(any(), any(), any());
+    }
+
+    @Test
+    void listWorkShiftsRejectsNonManagerAccount() {
+        CurrentAccountPrincipal principal = new CurrentAccountPrincipal(2L, "employee01", AccountRole.EMPLOYEE);
+        when(accountRepository.findById(2L)).thenReturn(Optional.of(account(principal)));
+
+        assertForbidden(() -> service.listWorkShifts(principal, 20L, LocalDate.of(2026, 9, 14), 100L));
+
+        verify(workShiftRepository, never()).searchForPeriod(any(), any(), any());
+    }
+
+    @Test
+    void getWorkShiftRejectsNullPrincipal() {
+        assertForbidden(() -> service.getWorkShift(null, 200L));
+
+        verify(workShiftRepository, never()).findDetailById(any());
+    }
+
+    @Test
+    void getWorkShiftRejectsMissingManagerAccount() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        when(accountRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertForbidden(() -> service.getWorkShift(principal, 200L));
+
+        verify(workShiftRepository, never()).findDetailById(any());
+    }
+
+    @Test
+    void getWorkShiftRejectsNonManagerAccount() {
+        CurrentAccountPrincipal principal = new CurrentAccountPrincipal(2L, "employee01", AccountRole.EMPLOYEE);
+        when(accountRepository.findById(2L)).thenReturn(Optional.of(account(principal)));
+
+        assertForbidden(() -> service.getWorkShift(principal, 200L));
+
+        verify(workShiftRepository, never()).findDetailById(any());
+    }
+
+    private static void assertForbidden(ThrowingServiceCall call) {
+        assertThatThrownBy(call::execute)
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
                 .isEqualTo(HttpStatus.FORBIDDEN);
     }
 
+    @FunctionalInterface
+    private interface ThrowingServiceCall {
+        void execute();
+    }
+
     private static CurrentAccountPrincipal managerPrincipal() {
         return new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
+    }
+
+    private static CreateWorkShiftRequest createRequest() {
+        return new CreateWorkShiftRequest(100L, LocalDate.of(2026, 9, 14), 1, null);
     }
 
     private static Account account(CurrentAccountPrincipal principal) {
