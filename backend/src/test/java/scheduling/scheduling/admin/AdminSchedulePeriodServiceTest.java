@@ -40,7 +40,7 @@ class AdminSchedulePeriodServiceTest {
         when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
         when(schedulePeriodRepository.existsByStartDateAndEndDateAndVersionNo(
                 LocalDate.of(2026, 9, 14), LocalDate.of(2026, 9, 20), 1)).thenReturn(false);
-        when(schedulePeriodRepository.save(any(SchedulePeriod.class))).thenAnswer(invocation -> {
+        when(schedulePeriodRepository.saveAndFlush(any(SchedulePeriod.class))).thenAnswer(invocation -> {
             SchedulePeriod period = invocation.getArgument(0);
             period.setId(20L);
             return period;
@@ -68,7 +68,7 @@ class AdminSchedulePeriodServiceTest {
                 .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
                 .isEqualTo(HttpStatus.BAD_REQUEST);
 
-        verify(schedulePeriodRepository, never()).save(any());
+        verify(schedulePeriodRepository, never()).saveAndFlush(any());
     }
 
     @Test
@@ -82,7 +82,7 @@ class AdminSchedulePeriodServiceTest {
                 .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
                 .isEqualTo(HttpStatus.BAD_REQUEST);
 
-        verify(schedulePeriodRepository, never()).save(any());
+        verify(schedulePeriodRepository, never()).saveAndFlush(any());
     }
 
     @Test
@@ -97,7 +97,7 @@ class AdminSchedulePeriodServiceTest {
                 .isEqualTo(HttpStatus.BAD_REQUEST);
 
         verify(schedulePeriodRepository, never()).existsByStartDateAndEndDateAndVersionNo(any(), any(), any());
-        verify(schedulePeriodRepository, never()).save(any());
+        verify(schedulePeriodRepository, never()).saveAndFlush(any());
     }
 
     @Test
@@ -112,7 +112,7 @@ class AdminSchedulePeriodServiceTest {
                 .isEqualTo(HttpStatus.BAD_REQUEST);
 
         verify(schedulePeriodRepository, never()).existsByStartDateAndEndDateAndVersionNo(any(), any(), any());
-        verify(schedulePeriodRepository, never()).save(any());
+        verify(schedulePeriodRepository, never()).saveAndFlush(any());
     }
 
     @Test
@@ -135,7 +135,7 @@ class AdminSchedulePeriodServiceTest {
         when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
         when(schedulePeriodRepository.existsByStartDateAndEndDateAndVersionNo(
                 LocalDate.of(2026, 9, 14), LocalDate.of(2026, 9, 20), 1)).thenReturn(false);
-        when(schedulePeriodRepository.save(any(SchedulePeriod.class)))
+        when(schedulePeriodRepository.saveAndFlush(any(SchedulePeriod.class)))
                 .thenThrow(new DataIntegrityViolationException("duplicate schedule period"));
 
         assertThatThrownBy(() -> service.createSchedulePeriod(principal, new SchedulePeriodRequest(
@@ -303,7 +303,7 @@ class AdminSchedulePeriodServiceTest {
         when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(period));
         when(schedulePeriodRepository.existsByStartDateAndEndDateAndVersionNoAndIdNot(
                 LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 7), 2, 20L)).thenReturn(false);
-        when(schedulePeriodRepository.save(period)).thenReturn(period);
+        when(schedulePeriodRepository.saveAndFlush(period)).thenReturn(period);
 
         AdminSchedulePeriodResponse response = service.updateSchedulePeriod(principal, 20L, new SchedulePeriodRequest(
                 " Week 40 ", LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 7), 2));
@@ -317,7 +317,7 @@ class AdminSchedulePeriodServiceTest {
         assertThat(response.approvedByAccountId()).isEqualTo(3L);
         assertThat(response.publishedAt()).isEqualTo(LocalDateTime.of(2026, 9, 21, 9, 0));
         assertThat(response.totalPenalty()).isEqualByComparingTo("12.50");
-        verify(schedulePeriodRepository).save(period);
+        verify(schedulePeriodRepository).saveAndFlush(period);
     }
 
     @Test
@@ -328,7 +328,7 @@ class AdminSchedulePeriodServiceTest {
         when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(period));
         when(schedulePeriodRepository.existsByStartDateAndEndDateAndVersionNoAndIdNot(
                 LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 7), 1, 20L)).thenReturn(false);
-        when(schedulePeriodRepository.save(period)).thenReturn(period);
+        when(schedulePeriodRepository.saveAndFlush(period)).thenReturn(period);
 
         AdminSchedulePeriodResponse response = service.updateSchedulePeriod(principal, 20L, new SchedulePeriodRequest(
                 "Week 40", LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 7), null));
@@ -349,7 +349,7 @@ class AdminSchedulePeriodServiceTest {
                 .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
                 .isEqualTo(HttpStatus.BAD_REQUEST);
 
-        verify(schedulePeriodRepository, never()).save(any());
+        verify(schedulePeriodRepository, never()).saveAndFlush(any());
     }
 
     @Test
@@ -366,7 +366,7 @@ class AdminSchedulePeriodServiceTest {
                 .isEqualTo(HttpStatus.BAD_REQUEST);
 
         verify(schedulePeriodRepository, never()).existsByStartDateAndEndDateAndVersionNoAndIdNot(any(), any(), any(), any());
-        verify(schedulePeriodRepository, never()).save(any());
+        verify(schedulePeriodRepository, never()).saveAndFlush(any());
     }
 
     @Test
@@ -383,7 +383,7 @@ class AdminSchedulePeriodServiceTest {
                 .isEqualTo(HttpStatus.BAD_REQUEST);
 
         verify(schedulePeriodRepository, never()).existsByStartDateAndEndDateAndVersionNoAndIdNot(any(), any(), any(), any());
-        verify(schedulePeriodRepository, never()).save(any());
+        verify(schedulePeriodRepository, never()).saveAndFlush(any());
     }
 
     @Test
@@ -413,7 +413,7 @@ class AdminSchedulePeriodServiceTest {
                 .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
                 .isEqualTo(HttpStatus.BAD_REQUEST);
 
-        verify(schedulePeriodRepository, never()).save(any());
+        verify(schedulePeriodRepository, never()).saveAndFlush(any());
     }
 
     @Test
@@ -431,7 +431,7 @@ class AdminSchedulePeriodServiceTest {
                 .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
                 .isEqualTo(HttpStatus.BAD_REQUEST);
 
-        verify(schedulePeriodRepository, never()).save(any());
+        verify(schedulePeriodRepository, never()).saveAndFlush(any());
     }
 
     @Test
@@ -442,7 +442,7 @@ class AdminSchedulePeriodServiceTest {
         when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(period));
         when(schedulePeriodRepository.existsByStartDateAndEndDateAndVersionNoAndIdNot(
                 LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 7), 2, 20L)).thenReturn(false);
-        when(schedulePeriodRepository.save(period))
+        when(schedulePeriodRepository.saveAndFlush(period))
                 .thenThrow(new DataIntegrityViolationException("duplicate schedule period"));
 
         assertThatThrownBy(() -> service.updateSchedulePeriod(principal, 20L, new SchedulePeriodRequest(
@@ -461,7 +461,7 @@ class AdminSchedulePeriodServiceTest {
                 "Week 40", LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 7), 2)));
 
         verify(schedulePeriodRepository, never()).findDetailById(any());
-        verify(schedulePeriodRepository, never()).save(any());
+        verify(schedulePeriodRepository, never()).saveAndFlush(any());
     }
 
     @Test
@@ -473,7 +473,7 @@ class AdminSchedulePeriodServiceTest {
                 "Week 40", LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 7), 2)));
 
         verify(schedulePeriodRepository, never()).findDetailById(any());
-        verify(schedulePeriodRepository, never()).save(any());
+        verify(schedulePeriodRepository, never()).saveAndFlush(any());
     }
 
     @Test

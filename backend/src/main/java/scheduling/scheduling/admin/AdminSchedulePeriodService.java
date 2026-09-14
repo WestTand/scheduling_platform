@@ -112,7 +112,7 @@ public class AdminSchedulePeriodService {
 
     private SchedulePeriod savePeriod(SchedulePeriod period) {
         try {
-            return schedulePeriodRepository.save(period);
+            return schedulePeriodRepository.saveAndFlush(period);
         } catch (DataIntegrityViolationException ex) {
             throw invalidRequest();
         }
