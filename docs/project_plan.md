@@ -24,7 +24,7 @@ Tai lieu nay la roadmap chinh cua he thong. Moi phase ben duoi ghi ro muc dich, 
 - Phase 1: Entity chinh da co va da fix mapping theo database design v2. Da bo sung `AccountStatus` gom `ACTIVE`, `PENDING_ACTIVATION`, `FORCE_PASSWORD_CHANGE`, `INACTIVE` vao `Account`. Muc dich la tao nen tang database cho auth, nhan su, ca truc, lich, nghi phep, doi ca, thong bao va audit log.
 - Phase 2: Auth/JWT/refresh cookie da merge. Da bo public self-registration `/api/auth/register`, them mail config, them role `ADMIN`, manager tao account nhan vien bang password mac dinh, OTP kich hoat, force password change, refresh token rotation/revoke, va chan account khong hop le. Muc dich la bao ve he thong truoc khi mo cac API quan tri.
 - Phase 3: Hoan tat backend admin core. Da implement employee admin APIs, manager account APIs, admin account APIs cho list/lock/unlock tai khoan nhan vien, shift type APIs, va scheduling rule APIs.
-- Phase 5: Da bat dau tren branch `phase5/schedule-period-apis`. SchedulePeriod APIs cho manager da hoan tat o pham vi `DRAFT`.
+- Phase 5: Da bat dau tren branch `phase5/work-shift-apis`. SchedulePeriod APIs cho manager da hoan tat o pham vi `DRAFT`; WorkShift APIs da co manual create/list/detail.
 
 ## Phase 0 - Setup
 
@@ -379,7 +379,7 @@ Ket qua mong doi: manager co the tao lich, gan nhan vien, kiem tra xung dot, duy
 - [x] API tao ky lap lich `SchedulePeriod`
   - Dung de tao khoang ngay can lap lich, vi du tuan/thang.
   - Gom cac work shifts va assignments vao cung mot dot quan ly.
-- [ ] API tao work shifts theo ky
+- [x] API tao work shifts theo ky
   - Dung de sinh cac ca lam cu the dua tren shift types va ngay trong ky.
   - Tao danh sach slot can phan cong nhan vien.
 - [ ] API xem lich theo ky
@@ -840,13 +840,13 @@ Ket qua mong doi: Docker compose chay sach, co account/nhan vien/ca/rules mau, c
 
 ## Trang Thai Hien Tai
 
-- Branch dang lam: `phase5/schedule-period-apis`.
+- Branch dang lam: `phase5/work-shift-apis`.
 - Phase 0: gan xong, da co monorepo, Docker setup, backend/frontend/AI health scaffold.
 - Phase 1: entity chinh da co va da fix mapping theo database design v2.
 - Phase 2: auth/security da hoan tat cac flow chinh tren `main` va da bo sung hardening lifecycle.
 - Phase 3: da implement employee admin APIs, manager account APIs, admin account APIs cho list/lock/unlock tai khoan nhan vien, shift type APIs, va scheduling rule APIs.
 - Phase 4: da co employee leave/preference APIs va manager review leave requests.
-- Phase 5: da bat dau; SchedulePeriod APIs cho manager da hoan tat o pham vi `DRAFT`.
+- Phase 5: da bat dau; SchedulePeriod APIs cho manager da hoan tat o pham vi `DRAFT`; WorkShift APIs da co manual create/list/detail.
 
 ## Verification Gan Nhat
 
