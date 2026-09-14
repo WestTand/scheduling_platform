@@ -91,6 +91,34 @@ class AdminSchedulePeriodControllerTest {
     }
 
     @Test
+    void managerCreatesSchedulePeriodWhenTrimmedPeriodNameIsAtMaxLength() throws Exception {
+        givenToken("manager-token", manager());
+        when(adminSchedulePeriodService.createSchedulePeriod(
+                any(CurrentAccountPrincipal.class), any(SchedulePeriodRequest.class)))
+                .thenReturn(response());
+        String periodName = " " + "A".repeat(100) + " ";
+
+        mockMvc.perform(post("/api/admin/schedule-periods")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer manager-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "periodName": "%s",
+                                  "startDate": "2026-09-14",
+                                  "endDate": "2026-09-20",
+                                  "versionNo": 1
+                                }
+                                """.formatted(periodName)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(20));
+
+        ArgumentCaptor<SchedulePeriodRequest> requestCaptor = ArgumentCaptor.forClass(SchedulePeriodRequest.class);
+        verify(adminSchedulePeriodService).createSchedulePeriod(
+                any(CurrentAccountPrincipal.class), requestCaptor.capture());
+        assertThat(requestCaptor.getValue().periodName()).isEqualTo(periodName);
+    }
+
+    @Test
     void managerListsSchedulePeriodsWithFilters() throws Exception {
         givenToken("manager-token", manager());
         when(adminSchedulePeriodService.listSchedulePeriods(
