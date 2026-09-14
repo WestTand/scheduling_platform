@@ -3,6 +3,7 @@ package scheduling.scheduling.admin;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,7 +36,7 @@ public class AdminSchedulePeriodService {
         Account manager = requireManager(principal);
         String periodName = normalizePeriodName(request.periodName());
         int versionNo = normalizeVersionNo(request.versionNo());
-        validateRange(request.startDate(), request.endDate());
+        validatePeriodRange(request.startDate(), request.endDate());
         if (schedulePeriodRepository.existsByStartDateAndEndDateAndVersionNo(
                 request.startDate(), request.endDate(), versionNo)) {
             throw invalidRequest();
@@ -49,7 +50,7 @@ public class AdminSchedulePeriodService {
                 .status(DRAFT)
                 .createdBy(manager)
                 .build();
-        return AdminSchedulePeriodResponse.from(schedulePeriodRepository.save(period));
+        return AdminSchedulePeriodResponse.from(savePeriod(period));
     }
 
     @Transactional(readOnly = true)
@@ -79,7 +80,7 @@ public class AdminSchedulePeriodService {
         }
         String periodName = normalizePeriodName(request.periodName());
         int versionNo = normalizeVersionNo(request.versionNo());
-        validateRange(request.startDate(), request.endDate());
+        validatePeriodRange(request.startDate(), request.endDate());
         if (schedulePeriodRepository.existsByStartDateAndEndDateAndVersionNoAndIdNot(
                 request.startDate(), request.endDate(), versionNo, periodId)) {
             throw invalidRequest();
@@ -89,7 +90,7 @@ public class AdminSchedulePeriodService {
         period.setStartDate(request.startDate());
         period.setEndDate(request.endDate());
         period.setVersionNo(versionNo);
-        return AdminSchedulePeriodResponse.from(schedulePeriodRepository.save(period));
+        return AdminSchedulePeriodResponse.from(savePeriod(period));
     }
 
     private Account requireManager(CurrentAccountPrincipal principal) {
@@ -107,6 +108,14 @@ public class AdminSchedulePeriodService {
     private SchedulePeriod findDetail(Long periodId) {
         return schedulePeriodRepository.findDetailById(periodId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Schedule period not found"));
+    }
+
+    private SchedulePeriod savePeriod(SchedulePeriod period) {
+        try {
+            return schedulePeriodRepository.save(period);
+        } catch (DataIntegrityViolationException ex) {
+            throw invalidRequest();
+        }
     }
 
     private static String normalizePeriodName(String periodName) {
@@ -137,6 +146,13 @@ public class AdminSchedulePeriodService {
             throw invalidRequest();
         }
         return normalized;
+    }
+
+    private static void validatePeriodRange(LocalDate startDate, LocalDate endDate) {
+        if (startDate == null || endDate == null) {
+            throw invalidRequest();
+        }
+        validateRange(startDate, endDate);
     }
 
     private static void validateRange(LocalDate from, LocalDate to) {

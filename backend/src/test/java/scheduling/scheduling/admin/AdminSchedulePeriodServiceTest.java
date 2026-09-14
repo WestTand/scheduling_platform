@@ -14,6 +14,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import scheduling.scheduling.admin.dto.AdminSchedulePeriodResponse;
@@ -85,11 +86,57 @@ class AdminSchedulePeriodServiceTest {
     }
 
     @Test
+    void createSchedulePeriodRejectsNullStartDate() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+
+        assertThatThrownBy(() -> service.createSchedulePeriod(principal, new SchedulePeriodRequest(
+                "Week 38", null, LocalDate.of(2026, 9, 20), 1)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(schedulePeriodRepository, never()).existsByStartDateAndEndDateAndVersionNo(any(), any(), any());
+        verify(schedulePeriodRepository, never()).save(any());
+    }
+
+    @Test
+    void createSchedulePeriodRejectsNullEndDate() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+
+        assertThatThrownBy(() -> service.createSchedulePeriod(principal, new SchedulePeriodRequest(
+                "Week 38", LocalDate.of(2026, 9, 14), null, 1)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(schedulePeriodRepository, never()).existsByStartDateAndEndDateAndVersionNo(any(), any(), any());
+        verify(schedulePeriodRepository, never()).save(any());
+    }
+
+    @Test
     void createSchedulePeriodRejectsDuplicateDateRangeAndVersion() {
         CurrentAccountPrincipal principal = managerPrincipal();
         when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
         when(schedulePeriodRepository.existsByStartDateAndEndDateAndVersionNo(
                 LocalDate.of(2026, 9, 14), LocalDate.of(2026, 9, 20), 1)).thenReturn(true);
+
+        assertThatThrownBy(() -> service.createSchedulePeriod(principal, new SchedulePeriodRequest(
+                "Week 38", LocalDate.of(2026, 9, 14), LocalDate.of(2026, 9, 20), 1)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void createSchedulePeriodTranslatesDuplicatePersistenceConflict() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(schedulePeriodRepository.existsByStartDateAndEndDateAndVersionNo(
+                LocalDate.of(2026, 9, 14), LocalDate.of(2026, 9, 20), 1)).thenReturn(false);
+        when(schedulePeriodRepository.save(any(SchedulePeriod.class)))
+                .thenThrow(new DataIntegrityViolationException("duplicate schedule period"));
 
         assertThatThrownBy(() -> service.createSchedulePeriod(principal, new SchedulePeriodRequest(
                 "Week 38", LocalDate.of(2026, 9, 14), LocalDate.of(2026, 9, 20), 1)))
@@ -306,6 +353,40 @@ class AdminSchedulePeriodServiceTest {
     }
 
     @Test
+    void updateSchedulePeriodRejectsNullStartDate() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        SchedulePeriod period = draftPeriod(20L, account(principal));
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(period));
+
+        assertThatThrownBy(() -> service.updateSchedulePeriod(principal, 20L, new SchedulePeriodRequest(
+                "Week 40", null, LocalDate.of(2026, 10, 7), 2)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(schedulePeriodRepository, never()).existsByStartDateAndEndDateAndVersionNoAndIdNot(any(), any(), any(), any());
+        verify(schedulePeriodRepository, never()).save(any());
+    }
+
+    @Test
+    void updateSchedulePeriodRejectsNullEndDate() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        SchedulePeriod period = draftPeriod(20L, account(principal));
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(period));
+
+        assertThatThrownBy(() -> service.updateSchedulePeriod(principal, 20L, new SchedulePeriodRequest(
+                "Week 40", LocalDate.of(2026, 10, 1), null, 2)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(schedulePeriodRepository, never()).existsByStartDateAndEndDateAndVersionNoAndIdNot(any(), any(), any(), any());
+        verify(schedulePeriodRepository, never()).save(any());
+    }
+
+    @Test
     void updateSchedulePeriodRejectsMissingPeriod() {
         CurrentAccountPrincipal principal = managerPrincipal();
         when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
@@ -351,6 +432,24 @@ class AdminSchedulePeriodServiceTest {
                 .isEqualTo(HttpStatus.BAD_REQUEST);
 
         verify(schedulePeriodRepository, never()).save(any());
+    }
+
+    @Test
+    void updateSchedulePeriodTranslatesDuplicatePersistenceConflict() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        SchedulePeriod period = draftPeriod(20L, account(principal));
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(period));
+        when(schedulePeriodRepository.existsByStartDateAndEndDateAndVersionNoAndIdNot(
+                LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 7), 2, 20L)).thenReturn(false);
+        when(schedulePeriodRepository.save(period))
+                .thenThrow(new DataIntegrityViolationException("duplicate schedule period"));
+
+        assertThatThrownBy(() -> service.updateSchedulePeriod(principal, 20L, new SchedulePeriodRequest(
+                "Week 40", LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 7), 2)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
     @Test

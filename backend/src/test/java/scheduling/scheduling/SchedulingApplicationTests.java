@@ -15,6 +15,7 @@ import scheduling.scheduling.repository.EmployeeRepository;
 import scheduling.scheduling.repository.LeaveRequestRepository;
 import scheduling.scheduling.repository.PreferenceRepository;
 import scheduling.scheduling.repository.SchedulingRuleRepository;
+import scheduling.scheduling.repository.SchedulePeriodRepository;
 import scheduling.scheduling.repository.ShiftTypeRepository;
 
 @SpringBootTest(properties = {
@@ -44,6 +45,9 @@ class SchedulingApplicationTests {
 
 	@MockitoBean
 	private LeaveRequestRepository leaveRequestRepository;
+
+	@MockitoBean
+	private SchedulePeriodRepository schedulePeriodRepository;
 
 	@MockitoBean
 	private PreferenceRepository preferenceRepository;
