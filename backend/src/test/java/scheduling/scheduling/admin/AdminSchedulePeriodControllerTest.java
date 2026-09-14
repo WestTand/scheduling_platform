@@ -79,7 +79,7 @@ class AdminSchedulePeriodControllerTest {
                                   "versionNo": 1
                                 }
                                 """))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(20))
                 .andExpect(jsonPath("$.status").value("DRAFT"));
 
@@ -109,6 +109,22 @@ class AdminSchedulePeriodControllerTest {
         verify(adminSchedulePeriodService).listSchedulePeriods(
                 any(CurrentAccountPrincipal.class), eq("DRAFT"),
                 eq(LocalDate.of(2026, 9, 1)), eq(LocalDate.of(2026, 9, 30)));
+    }
+
+    @Test
+    void managerListsSchedulePeriodsWithoutStatusAsDraft() throws Exception {
+        givenToken("manager-token", manager());
+        when(adminSchedulePeriodService.listSchedulePeriods(
+                any(CurrentAccountPrincipal.class), eq("DRAFT"), eq(null), eq(null)))
+                .thenReturn(List.of(response()));
+
+        mockMvc.perform(get("/api/admin/schedule-periods")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer manager-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(20));
+
+        verify(adminSchedulePeriodService).listSchedulePeriods(
+                any(CurrentAccountPrincipal.class), eq("DRAFT"), eq(null), eq(null));
     }
 
     @Test

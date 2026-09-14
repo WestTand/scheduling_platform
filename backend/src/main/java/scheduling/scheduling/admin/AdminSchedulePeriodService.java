@@ -139,7 +139,7 @@ public class AdminSchedulePeriodService {
 
     private static String normalizeStatus(String status) {
         if (!StringUtils.hasText(status)) {
-            return null;
+            return DRAFT;
         }
         String normalized = status.trim().toUpperCase(Locale.ROOT);
         if (!DRAFT.equals(normalized)) {

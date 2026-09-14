@@ -185,13 +185,23 @@ class AdminSchedulePeriodServiceTest {
     }
 
     @Test
-    void listSchedulePeriodsTreatsBlankStatusAsNoFilter() {
+    void listSchedulePeriodsDefaultsBlankStatusToDraft() {
         CurrentAccountPrincipal principal = managerPrincipal();
         when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
 
         service.listSchedulePeriods(principal, "   ", null, null);
 
-        verify(schedulePeriodRepository).searchForAdmin(null, null, null);
+        verify(schedulePeriodRepository).searchForAdmin("DRAFT", null, null);
+    }
+
+    @Test
+    void listSchedulePeriodsDefaultsMissingStatusToDraft() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+
+        service.listSchedulePeriods(principal, null, null, null);
+
+        verify(schedulePeriodRepository).searchForAdmin("DRAFT", null, null);
     }
 
     @Test
