@@ -1,0 +1,36 @@
+package scheduling.scheduling.repository;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import scheduling.scheduling.entity.WorkShift;
+
+public interface WorkShiftRepository extends JpaRepository<WorkShift, Long> {
+
+    @Query("""
+            select ws
+            from WorkShift ws
+            join fetch ws.schedulePeriod sp
+            join fetch ws.shiftType st
+            where sp.id = :periodId
+              and (:date is null or ws.workDate = :date)
+              and (:shiftTypeId is null or st.id = :shiftTypeId)
+            order by ws.workDate asc, st.startTime asc, ws.id asc
+            """)
+    List<WorkShift> searchForPeriod(
+            @Param("periodId") Long periodId,
+            @Param("date") LocalDate date,
+            @Param("shiftTypeId") Long shiftTypeId);
+
+    @Query("""
+            select ws
+            from WorkShift ws
+            join fetch ws.schedulePeriod sp
+            join fetch ws.shiftType st
+            where ws.id = :id
+            """)
+    Optional<WorkShift> findDetailById(@Param("id") Long id);
+}

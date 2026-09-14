@@ -17,6 +17,7 @@ import scheduling.scheduling.repository.PreferenceRepository;
 import scheduling.scheduling.repository.SchedulingRuleRepository;
 import scheduling.scheduling.repository.SchedulePeriodRepository;
 import scheduling.scheduling.repository.ShiftTypeRepository;
+import scheduling.scheduling.repository.WorkShiftRepository;
 
 @SpringBootTest(properties = {
 		"spring.autoconfigure.exclude=org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration,org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration",
@@ -51,6 +52,9 @@ class SchedulingApplicationTests {
 
 	@MockitoBean
 	private PreferenceRepository preferenceRepository;
+
+	@MockitoBean
+	private WorkShiftRepository workShiftRepository;
 
 	@Autowired
 	private JavaMailSender mailSender;
