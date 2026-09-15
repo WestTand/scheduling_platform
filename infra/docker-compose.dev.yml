@@ -36,6 +36,9 @@ services:
     restart: unless-stopped
     environment:
       WATCHFILES_FORCE_POLLING: "true"
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash-lite}
+      GEMINI_TIMEOUT_SECONDS: ${GEMINI_TIMEOUT_SECONDS:-15}
     ports:
       - "${AI_SERVICE_PORT:-8001}:8001"
     volumes:

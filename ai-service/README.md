@@ -26,6 +26,24 @@ timestamps must include a UTC offset. Special quotas use the stable
 `quotaCategory` values `OVERTIME`, `BATHING`, and `ON_CALL`; they must not be
 inferred from a display name.
 
+## LLM Explanation API
+
+`POST /api/v1/scheduling/explain` receives the solver result (`status`,
+`solverStatus`, diagnostics, statistics, period, and rules) and returns a
+Vietnamese explanation plus suggested manager actions. It is an optional layer
+and never makes assignment decisions or changes the CP-SAT result.
+
+Configure Gemini through environment variables:
+
+```bash
+export GEMINI_API_KEY="..."
+export GEMINI_MODEL="gemini-3.5-flash-lite"
+export GEMINI_TIMEOUT_SECONDS="15" # optional
+```
+
+If no API key is configured, the endpoint returns a deterministic Vietnamese
+explanation based only on the supplied diagnostics, with `fallback: true`.
+
 The solver currently enforces:
 
 - exact `requiredStaff` coverage;
