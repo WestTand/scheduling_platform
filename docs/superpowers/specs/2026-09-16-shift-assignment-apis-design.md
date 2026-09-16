@@ -134,7 +134,11 @@ Period schedule:
       "workDate": "2026-09-14",
       "shiftTypeId": 100,
       "shiftName": "Morning",
+      "shiftStartTime": "08:00:00",
+      "shiftEndTime": "16:00:00",
+      "overnight": false,
       "requiredStaff": 2,
+      "maxStaff": 3,
       "assignments": [
         {
           "id": 500,
@@ -178,8 +182,10 @@ Service tests cover:
 - assign rejects missing work shift, missing employee, inactive employee, and non-draft period;
 - assign rejects duplicates with `409`;
 - assign rejects full shifts at `maxStaff`;
+- assign allows overstaffing above `requiredStaff` while still below `maxStaff`;
 - assign rejects approved leave covering the shift date;
 - assign rejects overlapping shifts including overnight intervals, while back-to-back touching intervals pass;
+- assign rejects overlap with an assignment from another schedule period inside the date window;
 - delete removes an assignment in a draft period, including locked ones;
 - delete rejects non-draft periods and missing assignments;
 - lock/unlock flip the flag, are idempotent, and reject non-draft periods;
