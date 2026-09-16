@@ -46,7 +46,7 @@ Rules:
 
 ### Date Handling
 
-"Today" for the default range is `LocalDate.now(clock)` from a constructor-injected `java.time.Clock`. In production Spring wires the existing `TimeConfig` clock bean (`Clock.systemUTC()`), so the default window is UTC-date based; tests pass `Clock.fixed(...)` directly to assert the exact default window of today through today plus 30 days. Controllers pass raw nullable `from`/`to` through; services normalize the range.
+"Today" for the default range is `LocalDate.now(clock)` from a constructor-injected `java.time.Clock`. In production Spring wires the existing `TimeConfig` clock bean (`Clock.systemUTC()`), so the default window is UTC-date based; tests pass `Clock.fixed(...)` directly to assert the exact default window of today through today plus 30 days. When only one bound is provided, the missing `from` defaults to today and the missing `to` defaults to `from` plus 30 days. Controllers pass raw nullable `from`/`to` through; services normalize the range.
 
 ## Response Shape
 

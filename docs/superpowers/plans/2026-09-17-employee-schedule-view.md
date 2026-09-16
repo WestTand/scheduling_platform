@@ -24,9 +24,9 @@
 - Create: `backend/src/test/java/scheduling/scheduling/employee/EmployeeScheduleServiceTest.java` — service tests with fixed clock.
 - Create: `backend/src/test/java/scheduling/scheduling/employee/EmployeeScheduleControllerTest.java` — MockMvc tests.
 - Modify: `backend/src/main/java/scheduling/scheduling/repository/ShiftAssignmentRepository.java` — extend `findForEmployeeInWindow` with schedule-period fetch and ordering.
-- Modify: `backend/src/main/java/scheduling/scheduling/admin/AdminShiftAssignmentService.java` — Clock field with `@Autowired` delegating constructor + package-private Clock constructor (copy the `AdminLeaveRequestService` pattern exactly), plus `getEmployeeSchedule`.
+- Modify: `backend/src/main/java/scheduling/scheduling/admin/AdminShiftAssignmentService.java` — single public 7-arg constructor including `Clock` (Spring injects the `TimeConfig` bean), plus `getEmployeeSchedule`.
 - Modify: `backend/src/main/java/scheduling/scheduling/admin/AdminShiftAssignmentController.java` — `GET /employees/{employeeId}/schedule`.
-- Modify: `backend/src/test/java/scheduling/scheduling/admin/AdminShiftAssignmentServiceTest.java` — manager view tests using the package-private Clock constructor.
+- Modify: `backend/src/test/java/scheduling/scheduling/admin/AdminShiftAssignmentServiceTest.java` — manager view tests; existing setup updated to the 7-arg construction with `FIXED_CLOCK`.
 - Modify: `backend/src/test/java/scheduling/scheduling/admin/AdminShiftAssignmentControllerTest.java` — endpoint + security tests.
 - Modify: `docs/project_plan.md` — mark the two schedule-view items done after green verification.
 
@@ -78,6 +78,15 @@ class ScheduleWindowsTest {
 
         assertThat(window.from()).isEqualTo(LocalDate.of(2026, 9, 20));
         assertThat(window.to()).isEqualTo(LocalDate.of(2026, 10, 20));
+    }
+
+    @Test
+    void defaultsMissingFromToToday() {
+        ScheduleWindows.Window window =
+                ScheduleWindows.resolve(FIXED_CLOCK, null, LocalDate.of(2026, 10, 1));
+
+        assertThat(window.from()).isEqualTo(LocalDate.of(2026, 9, 17));
+        assertThat(window.to()).isEqualTo(LocalDate.of(2026, 10, 1));
     }
 
     @Test
@@ -197,10 +206,13 @@ In `backend/src/main/java/scheduling/scheduling/repository/ShiftAssignmentReposi
             @Param("to") LocalDate to);
 ```
 
-- [ ] **Step 4: Run the helper tests to verify they pass**
+- [ ] **Step 4: Run the helper tests plus the existing assignment tests**
 
 Run: `.\backend\mvnw.cmd -f backend/pom.xml -q test "-Dtest=ScheduleWindowsTest" "-Dsurefire.failIfNoSpecifiedTests=true"`
-Expected: all tests PASS.
+Expected: all helper tests PASS.
+
+Run: `.\backend\mvnw.cmd -f backend/pom.xml -q test "-Dtest=AdminShiftAssignmentServiceTest" "-Dsurefire.failIfNoSpecifiedTests=true"`
+Expected: all tests PASS — the extended `findForEmployeeInWindow` query must not break the overlap-check path in `createAssignment` (mocks do not execute JPQL, but this confirms compilation and existing behavior).
 
 - [ ] **Step 5: Commit**
 
@@ -730,15 +742,17 @@ git commit -m "feat: add employee own schedule endpoint"
 
 - [ ] **Step 1: Write failing manager view tests**
 
-The existing test class already mocks all six repositories and builds `service` with the 6-arg constructor. Add a second service instance with a fixed clock using the package-private 7-arg constructor (same package, so accessible):
+The service uses a single public 7-arg constructor including `Clock`; Spring injects the existing `TimeConfig` clock bean (`Clock.systemUTC()`), matching the spec. Update the existing test setup to pass the fixed clock (only this test class instantiates the service directly; the controller uses DI and is unaffected):
 
 ```java
     private static final Clock FIXED_CLOCK =
             Clock.fixed(Instant.parse("2026-09-17T00:00:00Z"), ZoneOffset.UTC);
-    private final AdminShiftAssignmentService clockedService = new AdminShiftAssignmentService(
+    private final AdminShiftAssignmentService service = new AdminShiftAssignmentService(
             shiftAssignmentRepository, workShiftRepository, schedulePeriodRepository,
             employeeRepository, leaveRequestRepository, accountRepository, FIXED_CLOCK);
 ```
+
+This replaces the existing 6-arg `service` construction at the top of the class. All new tests below call `service` (not a second instance).
 
 Add imports: `java.time.Clock`, `java.time.Instant`, `java.time.ZoneOffset`, `scheduling.scheduling.employee.dto.EmployeeScheduleItemResponse`.
 
@@ -749,8 +763,8 @@ Add tests:
     void managerViewsEmployeeScheduleInAllStatuses() {
         CurrentAccountPrincipal principal = managerPrincipal();
         Employee employee = employee(7L, "NV007", "Nguyen Van A");
-        ShiftAssignment published = assignment(300L, publishedShift(200L), employee);
-        ShiftAssignment draft = assignment(301L, draftShift(201L), employee);
+        ShiftAssignment published = assignment(300L, publishedShift(200L), employee, false);
+        ShiftAssignment draft = assignment(301L, draftShift(201L), employee, false);
         when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
         when(employeeRepository.findById(7L)).thenReturn(Optional.of(employee));
         when(shiftAssignmentRepository.findForEmployeeInWindow(
@@ -758,7 +772,7 @@ Add tests:
                 .thenReturn(List.of(published, draft));
 
         List<EmployeeScheduleItemResponse> response =
-                clockedService.getEmployeeSchedule(principal, 7L, null, null);
+                service.getEmployeeSchedule(principal, 7L, null, null);
 
         assertThat(response).extracting(EmployeeScheduleItemResponse::assignmentId)
                 .containsExactly(300L, 301L);
@@ -776,7 +790,7 @@ Add tests:
                         7L, LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30)))
                 .thenReturn(List.of());
 
-        List<EmployeeScheduleItemResponse> response = clockedService.getEmployeeSchedule(
+        List<EmployeeScheduleItemResponse> response = service.getEmployeeSchedule(
                 principal, 7L, LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30));
 
         assertThat(response).isEmpty();
@@ -791,7 +805,7 @@ Add tests:
         when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
         when(employeeRepository.findById(7L)).thenReturn(Optional.of(employee));
 
-        assertThatThrownBy(() -> clockedService.getEmployeeSchedule(
+        assertThatThrownBy(() -> service.getEmployeeSchedule(
                         principal, 7L, LocalDate.of(2026, 9, 30), LocalDate.of(2026, 9, 1)))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
@@ -806,7 +820,7 @@ Add tests:
         when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
         when(employeeRepository.findById(7L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> clockedService.getEmployeeSchedule(principal, 7L, null, null))
+        assertThatThrownBy(() -> service.getEmployeeSchedule(principal, 7L, null, null))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
                 .isEqualTo(HttpStatus.NOT_FOUND);
@@ -819,7 +833,7 @@ Add tests:
         CurrentAccountPrincipal principal = new CurrentAccountPrincipal(2L, "employee01", AccountRole.EMPLOYEE);
         when(accountRepository.findById(2L)).thenReturn(Optional.of(account(principal)));
 
-        assertThatThrownBy(() -> clockedService.getEmployeeSchedule(principal, 7L, null, null))
+        assertThatThrownBy(() -> service.getEmployeeSchedule(principal, 7L, null, null))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
                 .isEqualTo(HttpStatus.FORBIDDEN);
@@ -873,7 +887,7 @@ Expected: FAIL — compilation error, `getEmployeeSchedule` does not exist (and 
 
 - [ ] **Step 3: Implement the Clock overload and manager view method**
 
-In `backend/src/main/java/scheduling/scheduling/admin/AdminShiftAssignmentService.java`, copy the `AdminLeaveRequestService` Clock pattern exactly:
+In `backend/src/main/java/scheduling/scheduling/admin/AdminShiftAssignmentService.java`, add a `Clock` field and change the constructor to a single public 7-arg constructor. Spring injects the existing `TimeConfig` clock bean automatically (single constructor, no `@Autowired` needed). Do NOT default to `Clock.systemDefaultZone()` — the spec requires the `TimeConfig` bean (`Clock.systemUTC()`):
 
 ```java
 import java.time.Clock;
@@ -883,25 +897,7 @@ import java.time.LocalDate;
 ```java
     private final Clock clock;
 
-    @Autowired
     public AdminShiftAssignmentService(
-            ShiftAssignmentRepository shiftAssignmentRepository,
-            WorkShiftRepository workShiftRepository,
-            SchedulePeriodRepository schedulePeriodRepository,
-            EmployeeRepository employeeRepository,
-            LeaveRequestRepository leaveRequestRepository,
-            AccountRepository accountRepository) {
-        this(
-                shiftAssignmentRepository,
-                workShiftRepository,
-                schedulePeriodRepository,
-                employeeRepository,
-                leaveRequestRepository,
-                accountRepository,
-                Clock.systemDefaultZone());
-    }
-
-    AdminShiftAssignmentService(
             ShiftAssignmentRepository shiftAssignmentRepository,
             WorkShiftRepository workShiftRepository,
             SchedulePeriodRepository schedulePeriodRepository,
@@ -918,8 +914,6 @@ import java.time.LocalDate;
         this.clock = clock;
     }
 ```
-
-Add import `org.springframework.beans.factory.annotation.Autowired;` (check whether the file already imports it; add only if missing, in alphabetical order).
 
 Add the manager view method after `getSchedule`:
 
@@ -947,7 +941,7 @@ import scheduling.scheduling.employee.dto.EmployeeScheduleItemResponse;
 - [ ] **Step 4: Run the admin assignment service tests**
 
 Run: `.\backend\mvnw.cmd -f backend/pom.xml -q test "-Dtest=AdminShiftAssignmentServiceTest" "-Dsurefire.failIfNoSpecifiedTests=true"`
-Expected: all tests PASS (existing 6-arg construction keeps working via the delegating constructor).
+Expected: all tests PASS (the whole class now uses the updated 7-arg construction with `FIXED_CLOCK`; the clock is only consumed by the new method).
 
 - [ ] **Step 5: Commit**
 
