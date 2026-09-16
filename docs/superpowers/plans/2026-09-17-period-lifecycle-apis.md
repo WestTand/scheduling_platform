@@ -8,6 +8,8 @@
 
 **Tech Stack:** Java 17, Spring Boot (WebMVC, Data JPA), JUnit 5, AssertJ, Mockito, MockMvc.
 
+**Working directory:** All commands run from the repo root (`scheduling_platform/`). Maven commands use `.\backend\mvnw.cmd` because the wrapper lives in `backend/`.
+
 **Spec:** `docs/superpowers/specs/2026-09-17-period-lifecycle-apis-design.md`
 
 ---
@@ -87,7 +89,7 @@ import scheduling.scheduling.repository.ShiftAssignmentRepository;
 
 - [ ] **Step 3: Compile main and test sources**
 
-Run: `.\mvnw.cmd -q -DskipTests compile test-compile`
+Run: `.\backend\mvnw.cmd -q -DskipTests compile test-compile`
 Expected: BUILD SUCCESS (exit code 0, quiet output).
 
 - [ ] **Step 4: Commit**
@@ -143,7 +145,7 @@ In `AdminSchedulePeriodServiceTest.java`, replace `"PUBLISHED"` with `"ARCHIVED"
 
 - [ ] **Step 3: Run the new test to verify it fails**
 
-Run: `.\mvnw.cmd -q test -Dtest=AdminSchedulePeriodServiceTest#listSchedulePeriodsAcceptsLifecycleStatuses -Dsurefire.failIfNoSpecifiedTests=true`
+Run: `.\backend\mvnw.cmd -q test -Dtest=AdminSchedulePeriodServiceTest#listSchedulePeriodsAcceptsLifecycleStatuses -Dsurefire.failIfNoSpecifiedTests=true`
 Expected: FAIL — `searchForAdmin("APPROVED", ...)` never invoked (normalizeStatus throws 400 for non-DRAFT).
 
 - [ ] **Step 4: Implement the extended normalizeStatus**
@@ -173,7 +175,7 @@ In `AdminSchedulePeriodService.java`, add constants and replace `normalizeStatus
 
 - [ ] **Step 5: Run the service test class**
 
-Run: `.\mvnw.cmd -q test -Dtest=AdminSchedulePeriodServiceTest -Dsurefire.failIfNoSpecifiedTests=true`
+Run: `.\backend\mvnw.cmd -q test -Dtest=AdminSchedulePeriodServiceTest -Dsurefire.failIfNoSpecifiedTests=true`
 Expected: all tests PASS.
 
 - [ ] **Step 6: Commit**
@@ -348,10 +350,13 @@ import scheduling.scheduling.entity.WorkShift;
     void reapproveSchedulePeriodValidatesStaffingAgain() {
         CurrentAccountPrincipal principal = managerPrincipal();
         Account manager = account(principal);
+        Account originalApprover = account(new CurrentAccountPrincipal(3L, "approver01", AccountRole.MANAGER));
         SchedulePeriod passing = draftPeriod(20L, manager);
         passing.setStatus("APPROVED");
+        passing.setApprovedBy(originalApprover);
         SchedulePeriod failing = draftPeriod(21L, manager);
         failing.setStatus("APPROVED");
+        failing.setApprovedBy(originalApprover);
         WorkShift shift = staffedShift(200L, 2);
         Employee first = activeEmployee(10L, "EMP010", "Employee Ten");
         Employee second = activeEmployee(11L, "EMP011", "Employee Eleven");
@@ -364,11 +369,13 @@ import scheduling.scheduling.entity.WorkShift;
                 .thenReturn(List.of(shiftAssignment(300L, shift, first), shiftAssignment(301L, shift, second)));
         when(shiftAssignmentRepository.listForPeriod(21L))
                 .thenReturn(List.of(shiftAssignment(300L, shift, first)));
-        when(schedulePeriodRepository.saveAndFlush(passing)).thenReturn(passing);
 
         AdminSchedulePeriodResponse response = service.approveSchedulePeriod(principal, 20L);
 
         assertThat(response.status()).isEqualTo("APPROVED");
+        assertThat(response.approvedByAccountId()).isEqualTo(3L);
+        assertThat(response.approvedByUsername()).isEqualTo("approver01");
+        verify(schedulePeriodRepository, never()).saveAndFlush(any());
         assertThatThrownBy(() -> service.approveSchedulePeriod(principal, 21L))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
@@ -378,7 +385,7 @@ import scheduling.scheduling.entity.WorkShift;
 
 - [ ] **Step 3: Run the new approve tests to verify they fail**
 
-Run: `.\mvnw.cmd -q test -Dtest='AdminSchedulePeriodServiceTest#approveSchedulePeriod*+reapproveSchedulePeriodValidatesStaffingAgain' -Dsurefire.failIfNoSpecifiedTests=true`
+Run: `.\backend\mvnw.cmd -q test -Dtest='AdminSchedulePeriodServiceTest#approveSchedulePeriod*+reapproveSchedulePeriodValidatesStaffingAgain' -Dsurefire.failIfNoSpecifiedTests=true`
 Expected: FAIL — compilation error, `approveSchedulePeriod` does not exist.
 
 - [ ] **Step 4: Implement approve in the service**
@@ -394,6 +401,9 @@ Add to `AdminSchedulePeriodService.java` (after `updateSchedulePeriod`):
             throw invalidRequest();
         }
         validateStaffing(periodId);
+        if (APPROVED.equals(period.getStatus())) {
+            return AdminSchedulePeriodResponse.from(period);
+        }
         period.setStatus(APPROVED);
         period.setApprovedBy(manager);
         return AdminSchedulePeriodResponse.from(savePeriod(period));
@@ -423,7 +433,7 @@ import scheduling.scheduling.entity.WorkShift;
 
 - [ ] **Step 5: Run the service test class**
 
-Run: `.\mvnw.cmd -q test -Dtest=AdminSchedulePeriodServiceTest -Dsurefire.failIfNoSpecifiedTests=true`
+Run: `.\backend\mvnw.cmd -q test -Dtest=AdminSchedulePeriodServiceTest -Dsurefire.failIfNoSpecifiedTests=true`
 Expected: all tests PASS.
 
 - [ ] **Step 6: Commit**
@@ -525,7 +535,7 @@ git commit -m "feat: add approve schedule period with staffing validation"
 
 - [ ] **Step 2: Run the new publish tests to verify they fail**
 
-Run: `.\mvnw.cmd -q test -Dtest='AdminSchedulePeriodServiceTest#publishSchedulePeriod*+republishSchedulePeriodKeepsOriginalPublishedAt' -Dsurefire.failIfNoSpecifiedTests=true`
+Run: `.\backend\mvnw.cmd -q test -Dtest='AdminSchedulePeriodServiceTest#publishSchedulePeriod*+republishSchedulePeriodKeepsOriginalPublishedAt' -Dsurefire.failIfNoSpecifiedTests=true`
 Expected: FAIL — compilation error, `publishSchedulePeriod` does not exist.
 
 - [ ] **Step 3: Implement publish in the service**
@@ -551,7 +561,7 @@ Add after `approveSchedulePeriod`:
 
 - [ ] **Step 4: Run the service test class**
 
-Run: `.\mvnw.cmd -q test -Dtest=AdminSchedulePeriodServiceTest -Dsurefire.failIfNoSpecifiedTests=true`
+Run: `.\backend\mvnw.cmd -q test -Dtest=AdminSchedulePeriodServiceTest -Dsurefire.failIfNoSpecifiedTests=true`
 Expected: all tests PASS.
 
 - [ ] **Step 5: Commit**
@@ -657,7 +667,7 @@ git commit -m "feat: add publish schedule period endpoint logic"
 
 - [ ] **Step 2: Run the new cancel tests to verify they fail**
 
-Run: `.\mvnw.cmd -q test -Dtest='AdminSchedulePeriodServiceTest#cancelSchedulePeriod*+recancelSchedulePeriodIsIdempotent' -Dsurefire.failIfNoSpecifiedTests=true`
+Run: `.\backend\mvnw.cmd -q test -Dtest='AdminSchedulePeriodServiceTest#cancelSchedulePeriod*+recancelSchedulePeriodIsIdempotent' -Dsurefire.failIfNoSpecifiedTests=true`
 Expected: FAIL — compilation error, `cancelSchedulePeriod` does not exist.
 
 - [ ] **Step 3: Implement cancel in the service**
@@ -682,7 +692,7 @@ Add after `publishSchedulePeriod`:
 
 - [ ] **Step 4: Run the service test class**
 
-Run: `.\mvnw.cmd -q test -Dtest=AdminSchedulePeriodServiceTest -Dsurefire.failIfNoSpecifiedTests=true`
+Run: `.\backend\mvnw.cmd -q test -Dtest=AdminSchedulePeriodServiceTest -Dsurefire.failIfNoSpecifiedTests=true`
 Expected: all tests PASS.
 
 - [ ] **Step 5: Commit**
@@ -772,11 +782,49 @@ Add tests:
 
         verifyNoInteractions(adminSchedulePeriodService);
     }
+
+    @Test
+    void nonManagerCannotPublishSchedulePeriod() throws Exception {
+        givenToken("employee-token", employee());
+
+        mockMvc.perform(patch("/api/admin/schedule-periods/20/publish")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer employee-token"))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(adminSchedulePeriodService);
+    }
+
+    @Test
+    void anonymousCannotPublishSchedulePeriod() throws Exception {
+        mockMvc.perform(patch("/api/admin/schedule-periods/20/publish"))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(adminSchedulePeriodService);
+    }
+
+    @Test
+    void nonManagerCannotCancelSchedulePeriod() throws Exception {
+        givenToken("employee-token", employee());
+
+        mockMvc.perform(patch("/api/admin/schedule-periods/20/cancel")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer employee-token"))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(adminSchedulePeriodService);
+    }
+
+    @Test
+    void anonymousCannotCancelSchedulePeriod() throws Exception {
+        mockMvc.perform(patch("/api/admin/schedule-periods/20/cancel"))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(adminSchedulePeriodService);
+    }
 ```
 
 - [ ] **Step 2: Run the new controller tests to verify they fail**
 
-Run: `.\mvnw.cmd -q test -Dtest='AdminSchedulePeriodControllerTest#managerApprovesSchedulePeriod+managerPublishesSchedulePeriod+managerCancelsSchedulePeriod+nonManagerCannotApproveSchedulePeriod+anonymousCannotApproveSchedulePeriod' -Dsurefire.failIfNoSpecifiedTests=true`
+Run: `.\backend\mvnw.cmd -q test -Dtest='AdminSchedulePeriodControllerTest#managerApprovesSchedulePeriod+managerPublishesSchedulePeriod+managerCancelsSchedulePeriod+nonManagerCannotApproveSchedulePeriod+anonymousCannotApproveSchedulePeriod+nonManagerCannotPublishSchedulePeriod+anonymousCannotPublishSchedulePeriod+nonManagerCannotCancelSchedulePeriod+anonymousCannotCancelSchedulePeriod' -Dsurefire.failIfNoSpecifiedTests=true`
 Expected: FAIL — 404 for the PATCH paths (no handler methods yet).
 
 - [ ] **Step 3: Implement the three controller endpoints**
@@ -814,7 +862,7 @@ Add methods after `updateSchedulePeriod`:
 
 - [ ] **Step 4: Run the controller test class**
 
-Run: `.\mvnw.cmd -q test -Dtest=AdminSchedulePeriodControllerTest -Dsurefire.failIfNoSpecifiedTests=true`
+Run: `.\backend\mvnw.cmd -q test -Dtest=AdminSchedulePeriodControllerTest -Dsurefire.failIfNoSpecifiedTests=true`
 Expected: all tests PASS.
 
 - [ ] **Step 5: Commit**
@@ -834,7 +882,7 @@ git commit -m "feat: add approve publish cancel period endpoints"
 
 - [ ] **Step 1: Run the full backend suite**
 
-Run: `.\mvnw.cmd clean test`
+Run: `.\backend\mvnw.cmd clean test`
 Expected: all tests pass, 0 failures/errors.
 
 - [ ] **Step 2: Check the working tree is diff-clean**
@@ -858,7 +906,7 @@ git commit -m "docs: update phase 5 lifecycle status"
 ## Spec Coverage
 
 - `DRAFT -> APPROVED -> PUBLISHED`, `DRAFT/APPROVED -> CANCELLED`, no backward moves: Tasks 3, 4, 5.
-- Idempotent repeats (approve re-validates, publish keeps `publishedAt`, cancel no-op): Tasks 3, 4, 5.
+- Idempotent repeats (re-approve re-validates without touching `approvedBy` or saving, publish keeps `publishedAt`, cancel no-op): Tasks 3, 4, 5.
 - Approve staffing gate (non-empty period, every shift meets `requiredStaff`): Task 3.
 - `approvedBy` on approve, `publishedAt` on publish: Tasks 3, 4.
 - Freeze effects: automatic via existing `DRAFT` guards — no code change, covered by existing tests.
