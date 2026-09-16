@@ -96,16 +96,20 @@ All three endpoints return the existing `AdminSchedulePeriodResponse`, which mus
   "endDate": "2026-09-20",
   "versionNo": 1,
   "status": "APPROVED",
-  "approvedBy": "manager01",
-  "publishedAt": null
+  "createdByAccountId": 1,
+  "createdByUsername": "manager01",
+  "approvedByAccountId": 1,
+  "approvedByUsername": "manager01",
+  "publishedAt": null,
+  "totalPenalty": null
 }
 ```
 
-If the current response DTO lacks `approvedBy`/`publishedAt`, extend it in this slice with null-safe mapping (null account or timestamp maps to null).
+The current response DTO already exposes these lifecycle fields with null-safe mapping (null account or timestamp maps to null), so no DTO shape change is required.
 
 ## Validation And Errors
 
-- `400 BAD_REQUEST`: wrong-state transition (e.g. publish from `DRAFT`, approve from `PUBLISHED`/`CANCELLED`, any transition from `CANCELLED`), empty period on approve, understaffed shift on approve, invalid list status filter.
+- `400 BAD_REQUEST`: wrong-state transition (e.g. publish from `DRAFT`, approve from `PUBLISHED`/`CANCELLED`, approve/publish/cancel targeting a different terminal state from `CANCELLED`), empty period on approve, understaffed shift on approve, invalid list status filter. Repeating the same state (approve on `APPROVED`, publish on `PUBLISHED`, cancel on `CANCELLED`) is idempotent `200 OK`, not an error.
 - `403 FORBIDDEN`: authenticated principal is missing, account is missing, or account role is not `MANAGER`.
 - `404 NOT_FOUND`: schedule period does not exist.
 
@@ -123,7 +127,8 @@ Service tests cover:
 - manager approves a fully staffed draft period, sets `APPROVED` and `approvedBy`;
 - approve rejects missing/non-manager account;
 - approve rejects missing period (`404`);
-- approve rejects wrong-state periods (`PUBLISHED`, `CANCELLED`, and re-approve still validates);
+- approve rejects `PUBLISHED` and `CANCELLED` periods;
+- re-approve on an already `APPROVED` period re-validates staffing: returns `200` when staffing still passes, `400` otherwise;
 - approve rejects empty periods (no work shifts);
 - approve rejects periods with any understaffed shift, and saves nothing;
 - approve is idempotent for already-approved periods when staffing still passes;
@@ -131,7 +136,8 @@ Service tests cover:
 - publish rejects `DRAFT`, `CANCELLED`, and missing periods;
 - repeated publish keeps the original `publishedAt`;
 - manager cancels from `DRAFT` and from `APPROVED`;
-- cancel rejects `PUBLISHED`, `CANCELLED`, and missing periods;
+- cancel rejects `PUBLISHED` and missing periods;
+- cancel on an already `CANCELLED` period is idempotent and returns `200`;
 - list accepts the new status filters and still defaults to `DRAFT`.
 
 Controller tests cover:
