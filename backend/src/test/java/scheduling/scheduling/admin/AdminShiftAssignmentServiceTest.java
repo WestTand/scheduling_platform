@@ -97,6 +97,11 @@ class AdminShiftAssignmentServiceTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
                 .isEqualTo(HttpStatus.CONFLICT);
+        assertThatThrownBy(() -> service.createAssignment(
+                principal, 200L, new CreateShiftAssignmentRequest(7L)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getReason())
+                .isEqualTo("Employee already assigned to this shift");
 
         verify(shiftAssignmentRepository, never()).save(any());
     }
@@ -145,6 +150,11 @@ class AdminShiftAssignmentServiceTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
                 .isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThatThrownBy(() -> service.createAssignment(
+                principal, 200L, new CreateShiftAssignmentRequest(8L)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getReason())
+                .isEqualTo("Work shift is already at maximum staff");
 
         verify(shiftAssignmentRepository, never()).save(any());
     }
@@ -193,6 +203,11 @@ class AdminShiftAssignmentServiceTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
                 .isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThatThrownBy(() -> service.createAssignment(
+                principal, 200L, new CreateShiftAssignmentRequest(7L)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getReason())
+                .isEqualTo("Employee has an overlapping assignment");
 
         verify(shiftAssignmentRepository, never()).save(any());
     }

@@ -64,7 +64,7 @@ public class AdminShiftAssignmentService {
             CurrentAccountPrincipal principal, Long workShiftId, CreateShiftAssignmentRequest request) {
         requireManager(principal);
         if (request == null || request.employeeId() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid shift assignment request");
+            throw invalidAssignment("Employee id is required");
         }
         WorkShift shift = workShiftRepository.findDetailById(workShiftId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Work shift not found"));
@@ -72,18 +72,18 @@ public class AdminShiftAssignmentService {
         Employee employee = employeeRepository.findById(request.employeeId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Employee not found"));
         if (!ACTIVE.equals(employee.getStatus())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid shift assignment request");
+            throw invalidAssignment("Employee is not active");
         }
         if (shiftAssignmentRepository.existsByWorkShiftIdAndEmployeeId(workShiftId, employee.getId())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Employee already assigned to this shift");
         }
         if (shiftAssignmentRepository.countByWorkShiftId(workShiftId) >= shift.getShiftType().getMaxStaff()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid shift assignment request");
+            throw invalidAssignment("Work shift is already at maximum staff");
         }
         List<LeaveRequest> leaves = leaveRequestRepository.searchForEmployee(
                 employee.getId(), APPROVED, shift.getWorkDate(), shift.getWorkDate());
         if (!leaves.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid shift assignment request");
+            throw invalidAssignment("Employee has approved leave on the shift date");
         }
         LocalDateTime[] target = interval(shift);
         List<ShiftAssignment> nearby = shiftAssignmentRepository.findForEmployeeInWindow(
@@ -95,7 +95,7 @@ public class AdminShiftAssignmentService {
             }
             LocalDateTime[] other = interval(candidate.getWorkShift());
             if (target[0].isBefore(other[1]) && other[0].isBefore(target[1])) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid shift assignment request");
+                throw invalidAssignment("Employee has an overlapping assignment");
             }
         }
         ShiftAssignment assignment = ShiftAssignment.builder()
@@ -145,6 +145,7 @@ public class AdminShiftAssignmentService {
     @Transactional
     public void deleteAssignment(CurrentAccountPrincipal principal, Long assignmentId) {
         requireManager(principal);
+        // Intentional: locked assignments in DRAFT can still be deleted; locked only protects against future AI overwrite.
         ShiftAssignment assignment = shiftAssignmentRepository.findDetailById(assignmentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Assignment not found"));
         requireDraft(assignment.getWorkShift().getSchedulePeriod());
@@ -194,7 +195,11 @@ public class AdminShiftAssignmentService {
 
     private static void requireDraft(SchedulePeriod period) {
         if (period == null || !DRAFT.equals(period.getStatus())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid shift assignment request");
+            throw invalidAssignment("Schedule period is not draft");
         }
+    }
+
+    private static ResponseStatusException invalidAssignment(String reason) {
+        return new ResponseStatusException(HttpStatus.BAD_REQUEST, reason);
     }
 }
