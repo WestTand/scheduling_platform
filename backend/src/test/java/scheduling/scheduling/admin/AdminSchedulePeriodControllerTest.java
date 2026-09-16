@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -192,6 +193,105 @@ class AdminSchedulePeriodControllerTest {
 
         verify(adminSchedulePeriodService).updateSchedulePeriod(
                 any(CurrentAccountPrincipal.class), eq(20L), any(SchedulePeriodRequest.class));
+    }
+
+    @Test
+    void managerApprovesSchedulePeriod() throws Exception {
+        givenToken("manager-token", manager());
+        when(adminSchedulePeriodService.approveSchedulePeriod(any(CurrentAccountPrincipal.class), eq(20L)))
+                .thenReturn(response());
+
+        mockMvc.perform(patch("/api/admin/schedule-periods/20/approve")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer manager-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(20));
+
+        verify(adminSchedulePeriodService).approveSchedulePeriod(any(CurrentAccountPrincipal.class), eq(20L));
+    }
+
+    @Test
+    void managerPublishesSchedulePeriod() throws Exception {
+        givenToken("manager-token", manager());
+        when(adminSchedulePeriodService.publishSchedulePeriod(any(CurrentAccountPrincipal.class), eq(20L)))
+                .thenReturn(response());
+
+        mockMvc.perform(patch("/api/admin/schedule-periods/20/publish")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer manager-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(20));
+
+        verify(adminSchedulePeriodService).publishSchedulePeriod(any(CurrentAccountPrincipal.class), eq(20L));
+    }
+
+    @Test
+    void managerCancelsSchedulePeriod() throws Exception {
+        givenToken("manager-token", manager());
+        when(adminSchedulePeriodService.cancelSchedulePeriod(any(CurrentAccountPrincipal.class), eq(20L)))
+                .thenReturn(response());
+
+        mockMvc.perform(patch("/api/admin/schedule-periods/20/cancel")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer manager-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(20));
+
+        verify(adminSchedulePeriodService).cancelSchedulePeriod(any(CurrentAccountPrincipal.class), eq(20L));
+    }
+
+    @Test
+    void nonManagerCannotApproveSchedulePeriod() throws Exception {
+        givenToken("employee-token", employee());
+
+        mockMvc.perform(patch("/api/admin/schedule-periods/20/approve")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer employee-token"))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(adminSchedulePeriodService);
+    }
+
+    @Test
+    void anonymousCannotApproveSchedulePeriod() throws Exception {
+        mockMvc.perform(patch("/api/admin/schedule-periods/20/approve"))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(adminSchedulePeriodService);
+    }
+
+    @Test
+    void nonManagerCannotPublishSchedulePeriod() throws Exception {
+        givenToken("employee-token", employee());
+
+        mockMvc.perform(patch("/api/admin/schedule-periods/20/publish")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer employee-token"))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(adminSchedulePeriodService);
+    }
+
+    @Test
+    void anonymousCannotPublishSchedulePeriod() throws Exception {
+        mockMvc.perform(patch("/api/admin/schedule-periods/20/publish"))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(adminSchedulePeriodService);
+    }
+
+    @Test
+    void nonManagerCannotCancelSchedulePeriod() throws Exception {
+        givenToken("employee-token", employee());
+
+        mockMvc.perform(patch("/api/admin/schedule-periods/20/cancel")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer employee-token"))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(adminSchedulePeriodService);
+    }
+
+    @Test
+    void anonymousCannotCancelSchedulePeriod() throws Exception {
+        mockMvc.perform(patch("/api/admin/schedule-periods/20/cancel"))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(adminSchedulePeriodService);
     }
 
     @Test
