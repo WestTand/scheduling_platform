@@ -156,8 +156,14 @@ In `AdminSchedulePeriodService.java`, add constants and replace `normalizeStatus
     private static final String APPROVED = "APPROVED";
     private static final String PUBLISHED = "PUBLISHED";
     private static final String CANCELLED = "CANCELLED";
-    private static final java.util.Set<String> LISTABLE_STATUSES =
-            java.util.Set.of(DRAFT, APPROVED, PUBLISHED, CANCELLED);
+    private static final Set<String> LISTABLE_STATUSES =
+            Set.of(DRAFT, APPROVED, PUBLISHED, CANCELLED);
+```
+
+Add import:
+
+```java
+import java.util.Set;
 ```
 
 ```java
@@ -414,9 +420,9 @@ Add to `AdminSchedulePeriodService.java` (after `updateSchedulePeriod`):
         if (shifts.isEmpty()) {
             throw invalidRequest();
         }
-        java.util.Map<Long, Long> assignmentCounts = shiftAssignmentRepository.listForPeriod(periodId).stream()
-                .collect(java.util.stream.Collectors.groupingBy(
-                        assignment -> assignment.getWorkShift().getId(), java.util.stream.Collectors.counting()));
+        Map<Long, Long> assignmentCounts = shiftAssignmentRepository.listForPeriod(periodId).stream()
+                .collect(Collectors.groupingBy(
+                        assignment -> assignment.getWorkShift().getId(), Collectors.counting()));
         for (WorkShift shift : shifts) {
             if (assignmentCounts.getOrDefault(shift.getId(), 0L) < shift.getRequiredStaff()) {
                 throw invalidRequest();
@@ -428,6 +434,8 @@ Add to `AdminSchedulePeriodService.java` (after `updateSchedulePeriod`):
 Add imports:
 
 ```java
+import java.util.Map;
+import java.util.stream.Collectors;
 import scheduling.scheduling.entity.WorkShift;
 ```
 
@@ -554,9 +562,15 @@ Add after `approveSchedulePeriod`:
             throw invalidRequest();
         }
         period.setStatus(PUBLISHED);
-        period.setPublishedAt(java.time.LocalDateTime.now());
+        period.setPublishedAt(LocalDateTime.now());
         return AdminSchedulePeriodResponse.from(savePeriod(period));
     }
+```
+
+Add import:
+
+```java
+import java.time.LocalDateTime;
 ```
 
 - [ ] **Step 4: Run the service test class**
