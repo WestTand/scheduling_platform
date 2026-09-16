@@ -29,9 +29,12 @@ public interface ShiftAssignmentRepository extends JpaRepository<ShiftAssignment
             select sa
             from ShiftAssignment sa
             join fetch sa.workShift ws
+            join fetch ws.schedulePeriod sp
             join fetch ws.shiftType st
+            join fetch sa.employee e
             where sa.employee.id = :employeeId
               and ws.workDate between :from and :to
+            order by ws.workDate asc, st.startTime asc, sa.id asc
             """)
     List<ShiftAssignment> findForEmployeeInWindow(
             @Param("employeeId") Long employeeId,
