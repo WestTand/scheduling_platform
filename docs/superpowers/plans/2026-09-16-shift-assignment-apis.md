@@ -1105,6 +1105,7 @@ git commit -m "feat: add shift assignment service"
 ```java
 package scheduling.scheduling.admin;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -1319,12 +1320,6 @@ class AdminShiftAssignmentControllerTest {
                 500L, 200L, 20L, 7L, "NV007", "Nguyen Van A", "ASSIGNED", "MANUAL", locked);
     }
 }
-```
-
-The test class above uses `assertThat`, so add this import alongside the other static imports:
-
-```java
-import static org.assertj.core.api.Assertions.assertThat;
 ```
 
 - [ ] **Step 2: Run the controller test to verify it fails (no controller yet)**
