@@ -212,7 +212,7 @@ Run: `.\backend\mvnw.cmd -f backend/pom.xml -q test "-Dtest=ScheduleWindowsTest"
 Expected: all helper tests PASS.
 
 Run: `.\backend\mvnw.cmd -f backend/pom.xml -q test "-Dtest=AdminShiftAssignmentServiceTest" "-Dsurefire.failIfNoSpecifiedTests=true"`
-Expected: all tests PASS — the extended `findForEmployeeInWindow` query must not break the overlap-check path in `createAssignment` (mocks do not execute JPQL, but this confirms compilation and existing behavior).
+Expected: all tests PASS — compile/regression guard after touching the shared repository file (Mockito tests do not execute JPQL, so this confirms compilation and unchanged mock behavior, not the new query semantics).
 
 - [ ] **Step 5: Commit**
 
@@ -877,7 +877,7 @@ Helpers use the existing test file's `managerPrincipal()`, `account(principal)`,
 Before writing, READ the existing helper methods `draftPeriod()`, `shiftType(...)`, `assignment(...)`, `account(...)`, `managerPrincipal()` in `AdminShiftAssignmentServiceTest.java` and match their exact signatures:
 - `draftPeriod()` takes no args and returns a DRAFT period (id 20).
 - `shiftType(LocalTime start, LocalTime end, int maxStaff)` — verify exact parameter list from the file.
-- `assignment(Long id, WorkShift shift, Employee employee, boolean locked)` — verify exact parameter list from the file; the new tests above call `assignment(300L, publishedShift(200L), employee)` so ADAPT the call to include the `locked` argument as the existing helper requires (e.g. `assignment(300L, publishedShift(200L), employee, false)`).
+- `assignment(Long id, WorkShift shift, Employee employee, boolean locked)` — verify exact parameter list from the file; the new tests above already include the `locked` argument (`..., false`). If the signature differs, adapt the calls to match.
 - `account(CurrentAccountPrincipal principal)` and `managerPrincipal()` exist — reuse as-is.
 
 - [ ] **Step 2: Run the new tests to verify they fail**
