@@ -672,6 +672,83 @@ class AdminSchedulePeriodServiceTest {
                 .isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
+    @Test
+    void publishSchedulePeriodPublishesApprovedPeriod() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        SchedulePeriod period = draftPeriod(20L, account(principal));
+        period.setStatus("APPROVED");
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(period));
+        when(schedulePeriodRepository.saveAndFlush(period)).thenReturn(period);
+
+        AdminSchedulePeriodResponse response = service.publishSchedulePeriod(principal, 20L);
+
+        assertThat(response.status()).isEqualTo("PUBLISHED");
+        assertThat(response.publishedAt()).isNotNull();
+        verify(schedulePeriodRepository).saveAndFlush(period);
+    }
+
+    @Test
+    void publishSchedulePeriodRejectsNonApprovedPeriods() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        SchedulePeriod draft = draftPeriod(20L, account(principal));
+        SchedulePeriod cancelled = draftPeriod(21L, account(principal));
+        cancelled.setStatus("CANCELLED");
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(draft));
+        when(schedulePeriodRepository.findDetailById(21L)).thenReturn(Optional.of(cancelled));
+
+        assertThatThrownBy(() -> service.publishSchedulePeriod(principal, 20L))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThatThrownBy(() -> service.publishSchedulePeriod(principal, 21L))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(schedulePeriodRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void publishSchedulePeriodRejectsMissingPeriod() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.publishSchedulePeriod(principal, 20L))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void republishSchedulePeriodKeepsOriginalPublishedAt() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        SchedulePeriod period = draftPeriod(20L, account(principal));
+        period.setStatus("PUBLISHED");
+        LocalDateTime publishedAt = LocalDateTime.of(2026, 9, 21, 9, 0);
+        period.setPublishedAt(publishedAt);
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(period));
+
+        AdminSchedulePeriodResponse response = service.publishSchedulePeriod(principal, 20L);
+
+        assertThat(response.status()).isEqualTo("PUBLISHED");
+        assertThat(response.publishedAt()).isEqualTo(publishedAt);
+        verify(schedulePeriodRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void publishSchedulePeriodRejectsNonManagerAccount() {
+        CurrentAccountPrincipal principal = new CurrentAccountPrincipal(2L, "employee01", AccountRole.EMPLOYEE);
+        when(accountRepository.findById(2L)).thenReturn(Optional.of(account(principal)));
+
+        assertForbidden(() -> service.publishSchedulePeriod(principal, 20L));
+
+        verify(schedulePeriodRepository, never()).findDetailById(any());
+    }
+
     private static void assertForbidden(ThrowingServiceCall call) {
         assertThatThrownBy(call::execute)
                 .isInstanceOf(ResponseStatusException.class)

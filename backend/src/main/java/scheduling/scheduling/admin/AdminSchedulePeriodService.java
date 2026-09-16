@@ -1,6 +1,7 @@
 package scheduling.scheduling.admin;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -125,6 +126,21 @@ public class AdminSchedulePeriodService {
         }
         period.setStatus(APPROVED);
         period.setApprovedBy(manager);
+        return AdminSchedulePeriodResponse.from(savePeriod(period));
+    }
+
+    @Transactional
+    public AdminSchedulePeriodResponse publishSchedulePeriod(CurrentAccountPrincipal principal, Long periodId) {
+        requireManager(principal);
+        SchedulePeriod period = findDetail(periodId);
+        if (PUBLISHED.equals(period.getStatus())) {
+            return AdminSchedulePeriodResponse.from(period);
+        }
+        if (!APPROVED.equals(period.getStatus())) {
+            throw invalidRequest();
+        }
+        period.setStatus(PUBLISHED);
+        period.setPublishedAt(LocalDateTime.now());
         return AdminSchedulePeriodResponse.from(savePeriod(period));
     }
 
