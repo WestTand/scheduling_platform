@@ -16,6 +16,7 @@ import scheduling.scheduling.repository.LeaveRequestRepository;
 import scheduling.scheduling.repository.PreferenceRepository;
 import scheduling.scheduling.repository.SchedulingRuleRepository;
 import scheduling.scheduling.repository.SchedulePeriodRepository;
+import scheduling.scheduling.repository.ShiftAssignmentRepository;
 import scheduling.scheduling.repository.ShiftTypeRepository;
 import scheduling.scheduling.repository.WorkShiftRepository;
 
@@ -55,6 +56,9 @@ class SchedulingApplicationTests {
 
 	@MockitoBean
 	private WorkShiftRepository workShiftRepository;
+
+	@MockitoBean
+	private ShiftAssignmentRepository shiftAssignmentRepository;
 
 	@Autowired
 	private JavaMailSender mailSender;
