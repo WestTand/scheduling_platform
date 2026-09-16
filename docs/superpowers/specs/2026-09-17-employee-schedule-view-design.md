@@ -44,6 +44,10 @@ Rules:
 - Same `from`/`to` semantics as the employee endpoint: optional, default today through today plus 30 days, `from` after `to` is `400 BAD_REQUEST`.
 - Same ordering: work date ascending, then shift start time ascending.
 
+### Date Handling
+
+"Today" for the default range is obtained from an injected `java.time.Clock` (system clock by default in production), so tests can fix the clock and assert the exact default window of today through today plus 30 days. Controllers pass raw nullable `from`/`to` through; services normalize the range.
+
 ## Response Shape
 
 Both endpoints return a list of the same item DTO:
@@ -77,11 +81,11 @@ An empty list (no assignments in range) is `200 OK` with `[]`, not an error.
 
 ## Persistence And Repository
 
-No new repository is required:
+No new repository interface is required; services inject the existing `ShiftAssignmentRepository` and `EmployeeRepository`:
 
-- Both endpoints query `ShiftAssignmentRepository.findForEmployeeInWindow(employeeId, from, to)`, which already fetch-joins work shift, schedule period, shift type, and employee, and already orders by work date, shift start time, and assignment id.
+- `ShiftAssignmentRepository.findForEmployeeInWindow` must be extended in this slice to `join fetch ws.schedulePeriod sp` and to add `order by ws.workDate asc, st.startTime asc, sa.id asc`, matching the ordering contract in Endpoint Behavior. The current query only fetch-joins work shift and shift type and has no ordering.
 - The employee endpoint filters the result to `PUBLISHED` periods in service code. The manager endpoint returns all statuses.
-- The manager endpoint loads the employee with the existing employee repository (`findById`); a missing row is `404 NOT_FOUND`.
+- The manager endpoint loads the employee with `EmployeeRepository.findById`; a missing row is `404 NOT_FOUND`.
 
 ## Testing
 
@@ -97,8 +101,8 @@ Service tests cover:
 
 Controller tests cover:
 
-- employee schedule returns `200` and delegates principal plus resolved dates;
-- manager schedule-by-employee returns `200` and delegates principal, path id, and dates;
+- employee schedule returns `200` and delegates principal plus raw nullable `from`/`to` (service normalizes the default range);
+- manager schedule-by-employee returns `200` and delegates principal, path id, and raw nullable `from`/`to`;
 - non-employee access to the employee endpoint is forbidden;
 - non-manager access to the manager endpoint is forbidden;
 - anonymous access to both endpoints is unauthorized.
