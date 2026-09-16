@@ -50,12 +50,12 @@ Request:
 Rules:
 
 - `workShiftId` must exist.
-- Parent schedule period must be `DRAFT`.
+- Parent schedule period must be `DRAFT` (this DRAFT requirement applies to all mutating endpoints in this slice, not to the read-only schedule view below).
 - `employeeId` is required and must reference an existing `Employee` with `status = ACTIVE`.
 - The same employee must not already be assigned to the same work shift (return `409 CONFLICT`).
-- The work shift must still have capacity: current assignment count must be below `shiftType.maxStaff`.
+- The work shift must still have capacity: current assignment count must be below `shiftType.maxStaff`. `WorkShift.requiredStaff` is the target staffing level; `shiftType.maxStaff` is the hard upper bound that also permits deliberate manual overstaffing above the target.
 - The employee must not have an `APPROVED` leave request covering `workShift.workDate` (`startDate <= workDate <= endDate`).
-- The employee must not have another assignment whose real time interval overlaps the target shift interval. Build each interval from `workDate + shiftType.startTime/endTime`; when the shift type is overnight (`endTime <= startTime`), the interval ends on `workDate + 1`. Intervals that only touch at one endpoint do not overlap.
+- The employee must not have another assignment whose real time interval overlaps the target shift interval. Build each interval from `workDate + shiftType.startTime/endTime`; when the shift type is overnight (`endTime <= startTime`), the interval ends on `workDate + 1`. Intervals that only touch at one endpoint do not overlap. The overlap check must cover a date window of `[workDate - 1 day, workDate + 1 day]` across all periods, not only assignments inside the target shift's own period, so overnight shifts spilling over period boundaries are still detected.
 - New assignments store `assignmentStatus = ASSIGNED`, `assignedSource = MANUAL`, `locked = false`.
 
 Response status: `201 Created`.
@@ -69,6 +69,7 @@ GET /api/admin/schedule-periods/{periodId}/schedule
 Rules:
 
 - `periodId` must exist.
+- This is a read-only endpoint and is allowed for all period statuses, including non-`DRAFT` periods.
 - Returns the period summary plus all work shifts ordered by `workDate ASC`, `shiftType.startTime ASC`, then work shift id `ASC`.
 - Each work shift includes its assignments ordered by assignment id `ASC`.
 - This is the read model the future calendar/table UI and approval flow will use.
@@ -152,7 +153,7 @@ Period schedule:
 
 ## Validation And Errors
 
-- `400 BAD_REQUEST`: period is not `DRAFT`, employee is inactive, shift is already at `maxStaff`, approved leave covers the shift date, overlapping assignment for the same employee, missing `employeeId`.
+- `400 BAD_REQUEST`: period is not `DRAFT` (mutating endpoints only; the schedule view accepts any status), employee is inactive, shift is already at `maxStaff`, approved leave covers the shift date, overlapping assignment for the same employee, missing `employeeId`.
 - `403 FORBIDDEN`: authenticated principal is missing, account is missing, or account role is not `MANAGER`.
 - `404 NOT_FOUND`: work shift, schedule period, employee, or assignment does not exist.
 - `409 CONFLICT`: the same employee is already assigned to the same work shift.
@@ -163,7 +164,7 @@ Add `ShiftAssignmentRepository` with methods for:
 
 - detail lookup by id with work shift, period, shift type, and employee fetched;
 - counting assignments for one work shift for the capacity check;
-- loading one employee's assignments inside a period with shift time fields for the overlap check;
+- loading one employee's assignments in the `[workDate - 1 day, workDate + 1 day]` window with shift time fields for the cross-period overlap check;
 - listing assignments for a period schedule ordered by shift date, shift start time, and assignment id.
 
 Fetch joins should cover the associations needed by the response DTOs to avoid lazy-loading surprises.
