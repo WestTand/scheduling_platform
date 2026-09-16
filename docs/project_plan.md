@@ -330,7 +330,7 @@ Ket qua mong doi: nhan vien co the tu gui nhu cau/lien quan lich; manager va AI 
 - [ ] API nhan vien xem profile ca nhan
   - Dung de nhan vien xem thong tin account/employee cua minh.
   - Ho tro man hinh ca nhan tren frontend.
-- [ ] API nhan vien xem lich cua minh
+- [x] API nhan vien xem lich cua minh (da xong: employee sees own PUBLISHED schedule)
   - Dung de nhan vien biet ca duoc phan cong.
   - La chuc nang cot loi sau khi lich duoc tao/cong bo.
 - [x] API dang ky ngay nghi
@@ -385,7 +385,7 @@ Ket qua mong doi: manager co the tao lich, gan nhan vien, kiem tra xung dot, duy
 - [x] API xem lich theo ky (da xong: period schedule view kem assignments; ho tro moi status, khong gioi han DRAFT)
   - Dung de manager xem toan bo lich trong mot period.
   - Ho tro man hinh calendar/table tong quan.
-- [ ] API xem lich theo nhan vien
+- [x] API xem lich theo nhan vien (da xong: manager views any employee schedule)
   - Dung de xem workload cua tung nhan vien.
   - Ho tro kiem tra qua tai/thieu ca.
 - [x] API phan cong nhan vien vao ca thu cong (da xong: assign + delete assignment; chi cho phep khi period o DRAFT)
