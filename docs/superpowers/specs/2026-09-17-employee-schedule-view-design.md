@@ -39,14 +39,14 @@ GET /api/admin/employees/{employeeId}/schedule?from=2026-09-17&to=2026-10-17
 Rules:
 
 - Requires `ROLE_MANAGER` plus the existing service-level `MANAGER` role check.
-- `employeeId` must reference an existing employee; otherwise `404 NOT_FOUND`.
+- `employeeId` must reference an existing employee; otherwise `404 NOT_FOUND`. Any existing employee qualifies regardless of `Employee.status`; status filtering is out of scope.
 - Returns assignments in all period statuses (`DRAFT`, `APPROVED`, `PUBLISHED`, `CANCELLED`) so managers can review workload while a schedule is still being built.
 - Same `from`/`to` semantics as the employee endpoint: optional, default today through today plus 30 days, `from` after `to` is `400 BAD_REQUEST`.
 - Same ordering: work date ascending, then shift start time ascending.
 
 ### Date Handling
 
-"Today" for the default range is obtained from an injected `java.time.Clock` (system clock by default in production), so tests can fix the clock and assert the exact default window of today through today plus 30 days. Controllers pass raw nullable `from`/`to` through; services normalize the range.
+"Today" for the default range is `LocalDate.now(clock)` from a constructor-injected `java.time.Clock`. In production Spring wires the existing `TimeConfig` clock bean (`Clock.systemUTC()`), so the default window is UTC-date based; tests pass `Clock.fixed(...)` directly to assert the exact default window of today through today plus 30 days. Controllers pass raw nullable `from`/`to` through; services normalize the range.
 
 ## Response Shape
 
