@@ -1036,15 +1036,17 @@ Expected: FAIL — 404 for the new path (and compilation error if the helper imp
 
 - [ ] **Step 3: Implement the endpoint**
 
-In `backend/src/main/java/scheduling/scheduling/admin/AdminShiftAssignmentController.java`, add imports:
+In `backend/src/main/java/scheduling/scheduling/admin/AdminShiftAssignmentController.java`, add the missing imports in alphabetical order (check existing imports first; the current file imports none of these):
 
 ```java
 import java.time.LocalDate;
 import java.util.List;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.web.bind.annotation.RequestParam;
+import scheduling.scheduling.employee.dto.EmployeeScheduleItemResponse;
 ```
 
-(Check existing imports first; add only missing ones in alphabetical order. `List` may already be absent — the current file imports neither `List` nor `LocalDate`.)
+(Alphabetical placement: `java.time.LocalDate` / `java.util.List` with the other `java.*` imports; `org.springframework.format.annotation.DateTimeFormat` sorts before `org.springframework.http.*`; `RequestParam` sorts after `RequestMapping` and before `RestController`; the DTO import sorts with the other `scheduling.*` imports.)
 
 Add method after `getSchedule`:
 
@@ -1057,18 +1059,8 @@ Add method after `getSchedule`:
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         return ResponseEntity.ok(
                 adminShiftAssignmentService.getEmployeeSchedule(principal, employeeId, from, to));
-    }
+}
 ```
-
-Add imports:
-
-```java
-import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.web.bind.annotation.RequestParam;
-import scheduling.scheduling.employee.dto.EmployeeScheduleItemResponse;
-```
-
-(Check existing imports: `RequestParam` is NOT currently imported in this controller; `DateTimeFormat` neither. Insert alphabetically: `DateTimeFormat` after `format`... exact order: `org.springframework.format.annotation.DateTimeFormat` sorts before `org.springframework.http.*`; `RequestParam` sorts after `RequestMapping` and before `RestController`.)
 
 - [ ] **Step 4: Run the controller tests**
 
@@ -1122,7 +1114,7 @@ git commit -m "docs: update schedule view status"
 - `GET /api/admin/employees/{employeeId}/schedule`, role `MANAGER`, any existing employee regardless of status: Tasks 4, 5.
 - Employee sees `PUBLISHED` only; manager sees all statuses: Tasks 2, 4.
 - `from`/`to` optional, default today through today plus 30 days via injected `Clock` (`TimeConfig` bean in production, `Clock.fixed` in tests); `from` after `to` is `400`: Tasks 1, 2, 4.
-- Ordering by work date then shift start time via extended repository query: Task 1.
+- Ordering by work date then shift start time is enforced by the extended repository query (Task 1, same `order by ws.workDate asc, st.startTime asc, sa.id asc` pattern as the existing `listForPeriod`). Order preservation through the service layer is asserted by the order-sensitive `containsExactly(300L, 301L)` in Task 4. There is no DB-level ordering test: the repo has no `@DataJpaTest`/H2/testcontainers infrastructure and the precedent `listForPeriod` ordering is likewise covered only by its JPQL plus service/contract tests, so introducing new DB-test infrastructure for this slice is out of scope.
 - Shared DTO + shared date helper: Task 1.
 - `404` unknown employee / missing profile, `403` wrong role / inactive, `401` anonymous: Tasks 2, 3, 4, 5.
 - Empty list is `200 []`: Tasks 2, 3, 4 (asserted in passthrough tests).
