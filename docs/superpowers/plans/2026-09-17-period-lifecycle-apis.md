@@ -8,7 +8,7 @@
 
 **Tech Stack:** Java 17, Spring Boot (WebMVC, Data JPA), JUnit 5, AssertJ, Mockito, MockMvc.
 
-**Working directory:** All commands run from the repo root (`scheduling_platform/`). Maven commands use `.\backend\mvnw.cmd` because the wrapper lives in `backend/`.
+**Working directory:** All commands run from the repo root (`scheduling_platform/`). Maven commands use `.\backend\mvnw.cmd -f backend/pom.xml -f backend/pom.xml` because the wrapper and POM both live in `backend/` (verified: running the wrapper from the root without `-f` fails with `MissingProjectException`).
 
 **Spec:** `docs/superpowers/specs/2026-09-17-period-lifecycle-apis-design.md`
 
@@ -89,7 +89,7 @@ import scheduling.scheduling.repository.ShiftAssignmentRepository;
 
 - [ ] **Step 3: Compile main and test sources**
 
-Run: `.\backend\mvnw.cmd -q -DskipTests compile test-compile`
+Run: `.\backend\mvnw.cmd -f backend/pom.xml -q -DskipTests compile test-compile`
 Expected: BUILD SUCCESS (exit code 0, quiet output).
 
 - [ ] **Step 4: Commit**
@@ -145,7 +145,7 @@ In `AdminSchedulePeriodServiceTest.java`, replace `"PUBLISHED"` with `"ARCHIVED"
 
 - [ ] **Step 3: Run the new test to verify it fails**
 
-Run: `.\backend\mvnw.cmd -q test -Dtest=AdminSchedulePeriodServiceTest#listSchedulePeriodsAcceptsLifecycleStatuses -Dsurefire.failIfNoSpecifiedTests=true`
+Run: `.\backend\mvnw.cmd -f backend/pom.xml -q test -Dtest=AdminSchedulePeriodServiceTest#listSchedulePeriodsAcceptsLifecycleStatuses -Dsurefire.failIfNoSpecifiedTests=true`
 Expected: FAIL — `searchForAdmin("APPROVED", ...)` never invoked (normalizeStatus throws 400 for non-DRAFT).
 
 - [ ] **Step 4: Implement the extended normalizeStatus**
@@ -175,7 +175,7 @@ In `AdminSchedulePeriodService.java`, add constants and replace `normalizeStatus
 
 - [ ] **Step 5: Run the service test class**
 
-Run: `.\backend\mvnw.cmd -q test -Dtest=AdminSchedulePeriodServiceTest -Dsurefire.failIfNoSpecifiedTests=true`
+Run: `.\backend\mvnw.cmd -f backend/pom.xml -q test -Dtest=AdminSchedulePeriodServiceTest -Dsurefire.failIfNoSpecifiedTests=true`
 Expected: all tests PASS.
 
 - [ ] **Step 6: Commit**
@@ -385,7 +385,7 @@ import scheduling.scheduling.entity.WorkShift;
 
 - [ ] **Step 3: Run the new approve tests to verify they fail**
 
-Run: `.\backend\mvnw.cmd -q test -Dtest='AdminSchedulePeriodServiceTest#approveSchedulePeriod*+reapproveSchedulePeriodValidatesStaffingAgain' -Dsurefire.failIfNoSpecifiedTests=true`
+Run: `.\backend\mvnw.cmd -f backend/pom.xml -q test -Dtest='AdminSchedulePeriodServiceTest#approveSchedulePeriod*+reapproveSchedulePeriodValidatesStaffingAgain' -Dsurefire.failIfNoSpecifiedTests=true`
 Expected: FAIL — compilation error, `approveSchedulePeriod` does not exist.
 
 - [ ] **Step 4: Implement approve in the service**
@@ -433,7 +433,7 @@ import scheduling.scheduling.entity.WorkShift;
 
 - [ ] **Step 5: Run the service test class**
 
-Run: `.\backend\mvnw.cmd -q test -Dtest=AdminSchedulePeriodServiceTest -Dsurefire.failIfNoSpecifiedTests=true`
+Run: `.\backend\mvnw.cmd -f backend/pom.xml -q test -Dtest=AdminSchedulePeriodServiceTest -Dsurefire.failIfNoSpecifiedTests=true`
 Expected: all tests PASS.
 
 - [ ] **Step 6: Commit**
@@ -535,7 +535,7 @@ git commit -m "feat: add approve schedule period with staffing validation"
 
 - [ ] **Step 2: Run the new publish tests to verify they fail**
 
-Run: `.\backend\mvnw.cmd -q test -Dtest='AdminSchedulePeriodServiceTest#publishSchedulePeriod*+republishSchedulePeriodKeepsOriginalPublishedAt' -Dsurefire.failIfNoSpecifiedTests=true`
+Run: `.\backend\mvnw.cmd -f backend/pom.xml -q test -Dtest='AdminSchedulePeriodServiceTest#publishSchedulePeriod*+republishSchedulePeriodKeepsOriginalPublishedAt' -Dsurefire.failIfNoSpecifiedTests=true`
 Expected: FAIL — compilation error, `publishSchedulePeriod` does not exist.
 
 - [ ] **Step 3: Implement publish in the service**
@@ -561,7 +561,7 @@ Add after `approveSchedulePeriod`:
 
 - [ ] **Step 4: Run the service test class**
 
-Run: `.\backend\mvnw.cmd -q test -Dtest=AdminSchedulePeriodServiceTest -Dsurefire.failIfNoSpecifiedTests=true`
+Run: `.\backend\mvnw.cmd -f backend/pom.xml -q test -Dtest=AdminSchedulePeriodServiceTest -Dsurefire.failIfNoSpecifiedTests=true`
 Expected: all tests PASS.
 
 - [ ] **Step 5: Commit**
@@ -667,7 +667,7 @@ git commit -m "feat: add publish schedule period endpoint logic"
 
 - [ ] **Step 2: Run the new cancel tests to verify they fail**
 
-Run: `.\backend\mvnw.cmd -q test -Dtest='AdminSchedulePeriodServiceTest#cancelSchedulePeriod*+recancelSchedulePeriodIsIdempotent' -Dsurefire.failIfNoSpecifiedTests=true`
+Run: `.\backend\mvnw.cmd -f backend/pom.xml -q test -Dtest='AdminSchedulePeriodServiceTest#cancelSchedulePeriod*+recancelSchedulePeriodIsIdempotent' -Dsurefire.failIfNoSpecifiedTests=true`
 Expected: FAIL — compilation error, `cancelSchedulePeriod` does not exist.
 
 - [ ] **Step 3: Implement cancel in the service**
@@ -692,7 +692,7 @@ Add after `publishSchedulePeriod`:
 
 - [ ] **Step 4: Run the service test class**
 
-Run: `.\backend\mvnw.cmd -q test -Dtest=AdminSchedulePeriodServiceTest -Dsurefire.failIfNoSpecifiedTests=true`
+Run: `.\backend\mvnw.cmd -f backend/pom.xml -q test -Dtest=AdminSchedulePeriodServiceTest -Dsurefire.failIfNoSpecifiedTests=true`
 Expected: all tests PASS.
 
 - [ ] **Step 5: Commit**
@@ -824,7 +824,7 @@ Add tests:
 
 - [ ] **Step 2: Run the new controller tests to verify they fail**
 
-Run: `.\backend\mvnw.cmd -q test -Dtest='AdminSchedulePeriodControllerTest#managerApprovesSchedulePeriod+managerPublishesSchedulePeriod+managerCancelsSchedulePeriod+nonManagerCannotApproveSchedulePeriod+anonymousCannotApproveSchedulePeriod+nonManagerCannotPublishSchedulePeriod+anonymousCannotPublishSchedulePeriod+nonManagerCannotCancelSchedulePeriod+anonymousCannotCancelSchedulePeriod' -Dsurefire.failIfNoSpecifiedTests=true`
+Run: `.\backend\mvnw.cmd -f backend/pom.xml -q test -Dtest='AdminSchedulePeriodControllerTest#managerApprovesSchedulePeriod+managerPublishesSchedulePeriod+managerCancelsSchedulePeriod+nonManagerCannotApproveSchedulePeriod+anonymousCannotApproveSchedulePeriod+nonManagerCannotPublishSchedulePeriod+anonymousCannotPublishSchedulePeriod+nonManagerCannotCancelSchedulePeriod+anonymousCannotCancelSchedulePeriod' -Dsurefire.failIfNoSpecifiedTests=true`
 Expected: FAIL — 404 for the PATCH paths (no handler methods yet).
 
 - [ ] **Step 3: Implement the three controller endpoints**
@@ -862,7 +862,7 @@ Add methods after `updateSchedulePeriod`:
 
 - [ ] **Step 4: Run the controller test class**
 
-Run: `.\backend\mvnw.cmd -q test -Dtest=AdminSchedulePeriodControllerTest -Dsurefire.failIfNoSpecifiedTests=true`
+Run: `.\backend\mvnw.cmd -f backend/pom.xml -q test -Dtest=AdminSchedulePeriodControllerTest -Dsurefire.failIfNoSpecifiedTests=true`
 Expected: all tests PASS.
 
 - [ ] **Step 5: Commit**
@@ -882,7 +882,7 @@ git commit -m "feat: add approve publish cancel period endpoints"
 
 - [ ] **Step 1: Run the full backend suite**
 
-Run: `.\backend\mvnw.cmd clean test`
+Run: `.\backend\mvnw.cmd -f backend/pom.xml clean test`
 Expected: all tests pass, 0 failures/errors.
 
 - [ ] **Step 2: Check the working tree is diff-clean**
