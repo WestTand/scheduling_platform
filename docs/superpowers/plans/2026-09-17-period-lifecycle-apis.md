@@ -8,7 +8,7 @@
 
 **Tech Stack:** Java 17, Spring Boot (WebMVC, Data JPA), JUnit 5, AssertJ, Mockito, MockMvc.
 
-**Working directory:** All commands run from the repo root (`scheduling_platform/`). Maven commands use `.\backend\mvnw.cmd -f backend/pom.xml -f backend/pom.xml` because the wrapper and POM both live in `backend/` (verified: running the wrapper from the root without `-f` fails with `MissingProjectException`).
+**Working directory:** All commands run from the repo root (`scheduling_platform/`). Maven commands use `.\backend\mvnw.cmd -f backend/pom.xml` because the wrapper and POM both live in `backend/` (verified: running the wrapper from the root without `-f` fails with `MissingProjectException`). In PowerShell, quote every `-D` argument (e.g. `"-Dtest=..." "-Dsurefire.failIfNoSpecifiedTests=true"`) — unquoted dotted args get split and Maven fails with `Unknown lifecycle phase`.
 
 **Spec:** `docs/superpowers/specs/2026-09-17-period-lifecycle-apis-design.md`
 
