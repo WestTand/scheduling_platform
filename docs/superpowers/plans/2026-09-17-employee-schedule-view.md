@@ -765,19 +765,21 @@ Add tests:
         Employee employee = employee(7L, "NV007", "Nguyen Van A");
         ShiftAssignment published = assignment(300L, publishedShift(200L), employee, false);
         ShiftAssignment draft = assignment(301L, draftShift(201L), employee, false);
+        ShiftAssignment approved = assignment(302L, approvedShift(202L), employee, false);
+        ShiftAssignment cancelled = assignment(303L, cancelledShift(203L), employee, false);
         when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
         when(employeeRepository.findById(7L)).thenReturn(Optional.of(employee));
         when(shiftAssignmentRepository.findForEmployeeInWindow(
                         7L, LocalDate.of(2026, 9, 17), LocalDate.of(2026, 10, 17)))
-                .thenReturn(List.of(published, draft));
+                .thenReturn(List.of(published, draft, approved, cancelled));
 
         List<EmployeeScheduleItemResponse> response =
                 service.getEmployeeSchedule(principal, 7L, null, null);
 
         assertThat(response).extracting(EmployeeScheduleItemResponse::assignmentId)
-                .containsExactly(300L, 301L);
+                .containsExactly(300L, 301L, 302L, 303L);
         assertThat(response).extracting(EmployeeScheduleItemResponse::periodStatus)
-                .containsExactly("PUBLISHED", "DRAFT");
+                .containsExactly("PUBLISHED", "DRAFT", "APPROVED", "CANCELLED");
     }
 
     @Test
@@ -867,9 +869,43 @@ Helpers use the existing test file's `managerPrincipal()`, `account(principal)`,
         return shift;
     }
 
+    private static WorkShift approvedShift(Long id) {
+        WorkShift shift = WorkShift.builder()
+                .schedulePeriod(approvedPeriod())
+                .shiftType(shiftType(LocalTime.of(8, 0), LocalTime.of(16, 0), 3))
+                .workDate(LocalDate.of(2026, 9, 17))
+                .requiredStaff(2)
+                .build();
+        shift.setId(id);
+        return shift;
+    }
+
+    private static WorkShift cancelledShift(Long id) {
+        WorkShift shift = WorkShift.builder()
+                .schedulePeriod(cancelledPeriod())
+                .shiftType(shiftType(LocalTime.of(8, 0), LocalTime.of(16, 0), 3))
+                .workDate(LocalDate.of(2026, 9, 17))
+                .requiredStaff(2)
+                .build();
+        shift.setId(id);
+        return shift;
+    }
+
     private static SchedulePeriod publishedPeriod() {
         SchedulePeriod period = draftPeriod();
         period.setStatus("PUBLISHED");
+        return period;
+    }
+
+    private static SchedulePeriod approvedPeriod() {
+        SchedulePeriod period = draftPeriod();
+        period.setStatus("APPROVED");
+        return period;
+    }
+
+    private static SchedulePeriod cancelledPeriod() {
+        SchedulePeriod period = draftPeriod();
+        period.setStatus("CANCELLED");
         return period;
     }
 ```
@@ -988,8 +1024,23 @@ Add tests:
     }
 
     @Test
-    void employeeCannotViewScheduleByEmployee() throws Exception {
-        givenToken("employee-token", employee());
+    void managerViewsEmployeeScheduleWithoutDates() throws Exception {
+        givenToken("manager-token", manager());
+        when(adminShiftAssignmentService.getEmployeeSchedule(
+                        any(CurrentAccountPrincipal.class), eq(7L), eq(null), eq(null)))
+                .thenReturn(List.of());
+
+        mockMvc.perform(get("/api/admin/employees/7/schedule")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer manager-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+
+        verify(adminShiftAssignmentService).getEmployeeSchedule(
+                any(CurrentAccountPrincipal.class), eq(7L), eq(null), eq(null));
+    }
+
+    @Test
+    void employeeCannotViewScheduleByEmployee() throws Exception {        givenToken("employee-token", employee());
 
         mockMvc.perform(get("/api/admin/employees/7/schedule")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer employee-token"))
@@ -1031,7 +1082,7 @@ Add imports: `java.time.LocalTime`, `scheduling.scheduling.employee.dto.Employee
 
 - [ ] **Step 2: Run the new tests to verify they fail**
 
-Run: `.\backend\mvnw.cmd -f backend/pom.xml -q test "-Dtest=AdminShiftAssignmentControllerTest#managerViewsEmployeeSchedule+employeeCannotViewScheduleByEmployee+anonymousCannotViewScheduleByEmployee" "-Dsurefire.failIfNoSpecifiedTests=true"`
+Run: `.\backend\mvnw.cmd -f backend/pom.xml -q test "-Dtest=AdminShiftAssignmentControllerTest#managerViewsEmployeeSchedule+managerViewsEmployeeScheduleWithoutDates+employeeCannotViewScheduleByEmployee+anonymousCannotViewScheduleByEmployee" "-Dsurefire.failIfNoSpecifiedTests=true"`
 Expected: FAIL — 404 for the new path (and compilation error if the helper import is added before the DTO exists — DTO exists since Task 1, so expect 404s).
 
 - [ ] **Step 3: Implement the endpoint**
@@ -1059,7 +1110,7 @@ Add method after `getSchedule`:
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         return ResponseEntity.ok(
                 adminShiftAssignmentService.getEmployeeSchedule(principal, employeeId, from, to));
-}
+    }
 ```
 
 - [ ] **Step 4: Run the controller tests**
