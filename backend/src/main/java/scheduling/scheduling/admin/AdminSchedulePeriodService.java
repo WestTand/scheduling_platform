@@ -144,6 +144,20 @@ public class AdminSchedulePeriodService {
         return AdminSchedulePeriodResponse.from(savePeriod(period));
     }
 
+    @Transactional
+    public AdminSchedulePeriodResponse cancelSchedulePeriod(CurrentAccountPrincipal principal, Long periodId) {
+        requireManager(principal);
+        SchedulePeriod period = findDetail(periodId);
+        if (CANCELLED.equals(period.getStatus())) {
+            return AdminSchedulePeriodResponse.from(period);
+        }
+        if (!DRAFT.equals(period.getStatus()) && !APPROVED.equals(period.getStatus())) {
+            throw invalidRequest();
+        }
+        period.setStatus(CANCELLED);
+        return AdminSchedulePeriodResponse.from(savePeriod(period));
+    }
+
     private void validateStaffing(Long periodId) {
         List<WorkShift> shifts = workShiftRepository.searchForPeriod(periodId, null, null);
         if (shifts.isEmpty()) {

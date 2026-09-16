@@ -749,6 +749,87 @@ class AdminSchedulePeriodServiceTest {
         verify(schedulePeriodRepository, never()).findDetailById(any());
     }
 
+    @Test
+    void cancelSchedulePeriodCancelsDraftPeriod() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        SchedulePeriod period = draftPeriod(20L, account(principal));
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(period));
+        when(schedulePeriodRepository.saveAndFlush(period)).thenReturn(period);
+
+        AdminSchedulePeriodResponse response = service.cancelSchedulePeriod(principal, 20L);
+
+        assertThat(response.status()).isEqualTo("CANCELLED");
+        verify(schedulePeriodRepository).saveAndFlush(period);
+    }
+
+    @Test
+    void cancelSchedulePeriodCancelsApprovedPeriod() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        SchedulePeriod period = draftPeriod(20L, account(principal));
+        period.setStatus("APPROVED");
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(period));
+        when(schedulePeriodRepository.saveAndFlush(period)).thenReturn(period);
+
+        AdminSchedulePeriodResponse response = service.cancelSchedulePeriod(principal, 20L);
+
+        assertThat(response.status()).isEqualTo("CANCELLED");
+        verify(schedulePeriodRepository).saveAndFlush(period);
+    }
+
+    @Test
+    void cancelSchedulePeriodRejectsPublishedPeriod() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        SchedulePeriod period = draftPeriod(20L, account(principal));
+        period.setStatus("PUBLISHED");
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(period));
+
+        assertThatThrownBy(() -> service.cancelSchedulePeriod(principal, 20L))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(schedulePeriodRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void recancelSchedulePeriodIsIdempotent() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        SchedulePeriod period = draftPeriod(20L, account(principal));
+        period.setStatus("CANCELLED");
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(period));
+
+        AdminSchedulePeriodResponse response = service.cancelSchedulePeriod(principal, 20L);
+
+        assertThat(response.status()).isEqualTo("CANCELLED");
+        verify(schedulePeriodRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void cancelSchedulePeriodRejectsMissingPeriod() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.cancelSchedulePeriod(principal, 20L))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void cancelSchedulePeriodRejectsNonManagerAccount() {
+        CurrentAccountPrincipal principal = new CurrentAccountPrincipal(2L, "employee01", AccountRole.EMPLOYEE);
+        when(accountRepository.findById(2L)).thenReturn(Optional.of(account(principal)));
+
+        assertForbidden(() -> service.cancelSchedulePeriod(principal, 20L));
+
+        verify(schedulePeriodRepository, never()).findDetailById(any());
+    }
+
     private static void assertForbidden(ThrowingServiceCall call) {
         assertThatThrownBy(call::execute)
                 .isInstanceOf(ResponseStatusException.class)
