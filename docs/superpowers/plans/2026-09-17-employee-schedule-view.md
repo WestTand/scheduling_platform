@@ -1040,7 +1040,8 @@ Add tests:
     }
 
     @Test
-    void employeeCannotViewScheduleByEmployee() throws Exception {        givenToken("employee-token", employee());
+    void employeeCannotViewScheduleByEmployee() throws Exception {
+        givenToken("employee-token", employee());
 
         mockMvc.perform(get("/api/admin/employees/7/schedule")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer employee-token"))
