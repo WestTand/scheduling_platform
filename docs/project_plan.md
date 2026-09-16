@@ -406,10 +406,10 @@ Ket qua mong doi: manager co the tao lich, gan nhan vien, kiem tra xung dot, duy
 - [ ] API kiem tra gioi han gio lam/ngay
   - Dung de ngan assignment vuot quy dinh/nghiep vu.
   - Giam rui ro lich khong kha thi.
-- [ ] API duyet lich
+- [x] API duyet lich (da xong: approve DRAFT -> APPROVED kem staffing validation)
   - Dung de manager xac nhan lich da san sang.
   - La buoc truoc khi cong bo cho nhan vien.
-- [ ] API cong bo lich
+- [x] API cong bo lich (da xong: publish APPROVED -> PUBLISHED; cancel DRAFT/APPROVED -> CANCELLED)
   - Dung de chuyen lich sang trang thai nhan vien co the xem.
   - Co the kich hoat notification o Phase 7.
 - [ ] Test tao ky lap lich
