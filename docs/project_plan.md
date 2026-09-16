@@ -24,7 +24,7 @@ Tai lieu nay la roadmap chinh cua he thong. Moi phase ben duoi ghi ro muc dich, 
 - Phase 1: Entity chinh da co va da fix mapping theo database design v2. Da bo sung `AccountStatus` gom `ACTIVE`, `PENDING_ACTIVATION`, `FORCE_PASSWORD_CHANGE`, `INACTIVE` vao `Account`. Muc dich la tao nen tang database cho auth, nhan su, ca truc, lich, nghi phep, doi ca, thong bao va audit log.
 - Phase 2: Auth/JWT/refresh cookie da merge. Da bo public self-registration `/api/auth/register`, them mail config, them role `ADMIN`, manager tao account nhan vien bang password mac dinh, OTP kich hoat, force password change, refresh token rotation/revoke, va chan account khong hop le. Muc dich la bao ve he thong truoc khi mo cac API quan tri.
 - Phase 3: Hoan tat backend admin core. Da implement employee admin APIs, manager account APIs, admin account APIs cho list/lock/unlock tai khoan nhan vien, shift type APIs, va scheduling rule APIs.
-- Phase 5: Da bat dau tren branch `phase5/work-shift-apis`. SchedulePeriod APIs cho manager da hoan tat o pham vi `DRAFT`; WorkShift APIs da co manual create/list/detail.
+- Phase 5: Dang lam tren branch `phase5/shift-assignment-apis`. SchedulePeriod APIs cho manager da hoan tat o pham vi `DRAFT`; WorkShift + ShiftAssignment slices da xong (manual assign, period schedule view, delete, lock/unlock).
 
 ## Phase 0 - Setup
 
@@ -382,25 +382,25 @@ Ket qua mong doi: manager co the tao lich, gan nhan vien, kiem tra xung dot, duy
 - [x] API tao work shifts theo ky
   - Dung de sinh cac ca lam cu the dua tren shift types va ngay trong ky.
   - Tao danh sach slot can phan cong nhan vien.
-- [ ] API xem lich theo ky
+- [x] API xem lich theo ky (da xong: period schedule view kem assignments; ho tro moi status, khong gioi han DRAFT)
   - Dung de manager xem toan bo lich trong mot period.
   - Ho tro man hinh calendar/table tong quan.
 - [ ] API xem lich theo nhan vien
   - Dung de xem workload cua tung nhan vien.
   - Ho tro kiem tra qua tai/thieu ca.
-- [ ] API phan cong nhan vien vao ca thu cong
+- [x] API phan cong nhan vien vao ca thu cong (da xong: assign + delete assignment; chi cho phep khi period o DRAFT)
   - Dung de manager gan employee vao work shift.
   - La fallback/override khi AI khong dung hoac can dieu chinh.
 - [ ] API cap nhat phan cong
   - Dung de doi nhan vien/ca trong assignment.
   - Can validate xung dot va gio lam.
-- [ ] API khoa phan cong `is_locked`
+- [x] API khoa phan cong `is_locked` (da xong; chi cho phep khi period o DRAFT)
   - Dung de danh dau assignment khong duoc AI thay doi.
   - Quan trong khi manager muon giu cac ca da chot.
-- [ ] API mo khoa phan cong
+- [x] API mo khoa phan cong (da xong; chi cho phep khi period o DRAFT)
   - Dung de cho phep AI/manual adjustment sua lai assignment truoc do.
   - Tang linh hoat khi lich thay doi.
-- [ ] API kiem tra trung ca khi phan cong thu cong
+- [x] API kiem tra trung ca khi phan cong thu cong (da xong nhu mot phan cua manual assign: chan overlap)
   - Dung de ngan mot nhan vien bi gan hai ca bi overlap.
   - Bao ve tinh hop le cua lich.
 - [ ] API kiem tra gioi han gio lam/ngay
@@ -840,13 +840,13 @@ Ket qua mong doi: Docker compose chay sach, co account/nhan vien/ca/rules mau, c
 
 ## Trang Thai Hien Tai
 
-- Branch dang lam: `phase5/work-shift-apis`.
+- Branch dang lam: `phase5/shift-assignment-apis`.
 - Phase 0: gan xong, da co monorepo, Docker setup, backend/frontend/AI health scaffold.
 - Phase 1: entity chinh da co va da fix mapping theo database design v2.
 - Phase 2: auth/security da hoan tat cac flow chinh tren `main` va da bo sung hardening lifecycle.
 - Phase 3: da implement employee admin APIs, manager account APIs, admin account APIs cho list/lock/unlock tai khoan nhan vien, shift type APIs, va scheduling rule APIs.
 - Phase 4: da co employee leave/preference APIs va manager review leave requests.
-- Phase 5: da bat dau; SchedulePeriod APIs cho manager da hoan tat o pham vi `DRAFT`; WorkShift APIs da co manual create/list/detail.
+- Phase 5: WorkShift + ShiftAssignment slices da xong; SchedulePeriod APIs cho manager da hoan tat o pham vi `DRAFT`; WorkShift APIs da co manual create/list/detail; ShiftAssignment da co manual assign, period schedule view kem assignments, delete assignment, lock/unlock (mutations chi cho phep khi period o DRAFT; schedule view ho tro moi status). Con lai: update-in-place, view-by-employee, approval/publish transitions, AI orchestration.
 
 ## Verification Gan Nhat
 
