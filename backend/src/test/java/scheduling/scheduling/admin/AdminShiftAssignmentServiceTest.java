@@ -9,8 +9,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -20,6 +23,7 @@ import scheduling.scheduling.admin.dto.AdminPeriodScheduleResponse;
 import scheduling.scheduling.admin.dto.AdminShiftAssignmentResponse;
 import scheduling.scheduling.admin.dto.CreateShiftAssignmentRequest;
 import scheduling.scheduling.auth.CurrentAccountPrincipal;
+import scheduling.scheduling.employee.dto.EmployeeScheduleItemResponse;
 import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
 import scheduling.scheduling.entity.AccountStatus;
@@ -44,9 +48,11 @@ class AdminShiftAssignmentServiceTest {
     private final EmployeeRepository employeeRepository = mock(EmployeeRepository.class);
     private final LeaveRequestRepository leaveRequestRepository = mock(LeaveRequestRepository.class);
     private final AccountRepository accountRepository = mock(AccountRepository.class);
+    private static final Clock FIXED_CLOCK =
+            Clock.fixed(Instant.parse("2026-09-17T00:00:00Z"), ZoneOffset.UTC);
     private final AdminShiftAssignmentService service = new AdminShiftAssignmentService(
             shiftAssignmentRepository, workShiftRepository, schedulePeriodRepository,
-            employeeRepository, leaveRequestRepository, accountRepository);
+            employeeRepository, leaveRequestRepository, accountRepository, FIXED_CLOCK);
 
     @Test
     void managerAssignsActiveEmployee() {
@@ -525,6 +531,90 @@ class AdminShiftAssignmentServiceTest {
         verify(schedulePeriodRepository, never()).findDetailById(any());
     }
 
+    @Test
+    void managerViewsEmployeeScheduleInAllStatuses() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        Employee employee = employee(7L, "NV007", "Nguyen Van A");
+        ShiftAssignment published = assignment(300L, publishedShift(200L), employee, false);
+        ShiftAssignment draft = assignment(301L, draftShift(201L), employee, false);
+        ShiftAssignment approved = assignment(302L, approvedShift(202L), employee, false);
+        ShiftAssignment cancelled = assignment(303L, cancelledShift(203L), employee, false);
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(employeeRepository.findById(7L)).thenReturn(Optional.of(employee));
+        when(shiftAssignmentRepository.findForEmployeeInWindow(
+                        7L, LocalDate.of(2026, 9, 17), LocalDate.of(2026, 10, 17)))
+                .thenReturn(List.of(published, draft, approved, cancelled));
+
+        List<EmployeeScheduleItemResponse> response =
+                service.getEmployeeSchedule(principal, 7L, null, null);
+
+        assertThat(response).extracting(EmployeeScheduleItemResponse::assignmentId)
+                .containsExactly(300L, 301L, 302L, 303L);
+        assertThat(response).extracting(EmployeeScheduleItemResponse::periodStatus)
+                .containsExactly("PUBLISHED", "DRAFT", "APPROVED", "CANCELLED");
+    }
+
+    @Test
+    void managerViewPassesExplicitRangeThrough() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        Employee employee = employee(7L, "NV007", "Nguyen Van A");
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(employeeRepository.findById(7L)).thenReturn(Optional.of(employee));
+        when(shiftAssignmentRepository.findForEmployeeInWindow(
+                        7L, LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30)))
+                .thenReturn(List.of());
+
+        List<EmployeeScheduleItemResponse> response = service.getEmployeeSchedule(
+                principal, 7L, LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30));
+
+        assertThat(response).isEmpty();
+        verify(shiftAssignmentRepository).findForEmployeeInWindow(
+                7L, LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30));
+    }
+
+    @Test
+    void managerViewRejectsFromAfterTo() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        Employee employee = employee(7L, "NV007", "Nguyen Van A");
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(employeeRepository.findById(7L)).thenReturn(Optional.of(employee));
+
+        assertThatThrownBy(() -> service.getEmployeeSchedule(
+                        principal, 7L, LocalDate.of(2026, 9, 30), LocalDate.of(2026, 9, 1)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(shiftAssignmentRepository, never()).findForEmployeeInWindow(any(), any(), any());
+    }
+
+    @Test
+    void managerViewRejectsUnknownEmployee() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(employeeRepository.findById(7L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.getEmployeeSchedule(principal, 7L, null, null))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+
+        verify(shiftAssignmentRepository, never()).findForEmployeeInWindow(any(), any(), any());
+    }
+
+    @Test
+    void managerViewRejectsNonManagerAccount() {
+        CurrentAccountPrincipal principal = new CurrentAccountPrincipal(2L, "employee01", AccountRole.EMPLOYEE);
+        when(accountRepository.findById(2L)).thenReturn(Optional.of(account(principal)));
+
+        assertThatThrownBy(() -> service.getEmployeeSchedule(principal, 7L, null, null))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+
+        verify(employeeRepository, never()).findById(any());
+    }
+
     private static CurrentAccountPrincipal managerPrincipal() {
         return new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
     }
@@ -668,6 +758,68 @@ class AdminShiftAssignmentServiceTest {
                 .build();
         assignment.setId(id);
         return assignment;
+    }
+
+    private static WorkShift publishedShift(Long id) {
+        WorkShift shift = WorkShift.builder()
+                .schedulePeriod(publishedPeriod())
+                .shiftType(shiftType(LocalTime.of(8, 0), LocalTime.of(16, 0), 3))
+                .workDate(LocalDate.of(2026, 9, 17))
+                .requiredStaff(2)
+                .build();
+        shift.setId(id);
+        return shift;
+    }
+
+    private static WorkShift draftShift(Long id) {
+        WorkShift shift = WorkShift.builder()
+                .schedulePeriod(draftPeriod())
+                .shiftType(shiftType(LocalTime.of(8, 0), LocalTime.of(16, 0), 3))
+                .workDate(LocalDate.of(2026, 9, 17))
+                .requiredStaff(2)
+                .build();
+        shift.setId(id);
+        return shift;
+    }
+
+    private static WorkShift approvedShift(Long id) {
+        WorkShift shift = WorkShift.builder()
+                .schedulePeriod(approvedPeriod())
+                .shiftType(shiftType(LocalTime.of(8, 0), LocalTime.of(16, 0), 3))
+                .workDate(LocalDate.of(2026, 9, 17))
+                .requiredStaff(2)
+                .build();
+        shift.setId(id);
+        return shift;
+    }
+
+    private static WorkShift cancelledShift(Long id) {
+        WorkShift shift = WorkShift.builder()
+                .schedulePeriod(cancelledPeriod())
+                .shiftType(shiftType(LocalTime.of(8, 0), LocalTime.of(16, 0), 3))
+                .workDate(LocalDate.of(2026, 9, 17))
+                .requiredStaff(2)
+                .build();
+        shift.setId(id);
+        return shift;
+    }
+
+    private static SchedulePeriod publishedPeriod() {
+        SchedulePeriod period = draftPeriod();
+        period.setStatus("PUBLISHED");
+        return period;
+    }
+
+    private static SchedulePeriod approvedPeriod() {
+        SchedulePeriod period = draftPeriod();
+        period.setStatus("APPROVED");
+        return period;
+    }
+
+    private static SchedulePeriod cancelledPeriod() {
+        SchedulePeriod period = draftPeriod();
+        period.setStatus("CANCELLED");
+        return period;
     }
 
     private static LeaveRequest approvedLeave(Employee employee) {

@@ -1,5 +1,7 @@
 package scheduling.scheduling.admin;
 
+import java.time.Clock;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -13,6 +15,8 @@ import scheduling.scheduling.admin.dto.AdminPeriodScheduleResponse;
 import scheduling.scheduling.admin.dto.AdminShiftAssignmentResponse;
 import scheduling.scheduling.admin.dto.CreateShiftAssignmentRequest;
 import scheduling.scheduling.auth.CurrentAccountPrincipal;
+import scheduling.scheduling.employee.ScheduleWindows;
+import scheduling.scheduling.employee.dto.EmployeeScheduleItemResponse;
 import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
 import scheduling.scheduling.entity.Employee;
@@ -43,6 +47,7 @@ public class AdminShiftAssignmentService {
     private final EmployeeRepository employeeRepository;
     private final LeaveRequestRepository leaveRequestRepository;
     private final AccountRepository accountRepository;
+    private final Clock clock;
 
     public AdminShiftAssignmentService(
             ShiftAssignmentRepository shiftAssignmentRepository,
@@ -50,13 +55,15 @@ public class AdminShiftAssignmentService {
             SchedulePeriodRepository schedulePeriodRepository,
             EmployeeRepository employeeRepository,
             LeaveRequestRepository leaveRequestRepository,
-            AccountRepository accountRepository) {
+            AccountRepository accountRepository,
+            Clock clock) {
         this.shiftAssignmentRepository = shiftAssignmentRepository;
         this.workShiftRepository = workShiftRepository;
         this.schedulePeriodRepository = schedulePeriodRepository;
         this.employeeRepository = employeeRepository;
         this.leaveRequestRepository = leaveRequestRepository;
         this.accountRepository = accountRepository;
+        this.clock = clock;
     }
 
     @Transactional
@@ -140,6 +147,18 @@ public class AdminShiftAssignmentService {
                 period.getStartDate(),
                 period.getEndDate(),
                 scheduled);
+    }
+
+    @Transactional(readOnly = true)
+    public List<EmployeeScheduleItemResponse> getEmployeeSchedule(
+            CurrentAccountPrincipal principal, Long employeeId, LocalDate from, LocalDate to) {
+        requireManager(principal);
+        employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Employee not found"));
+        ScheduleWindows.Window window = ScheduleWindows.resolve(clock, from, to);
+        return shiftAssignmentRepository.findForEmployeeInWindow(employeeId, window.from(), window.to()).stream()
+                .map(EmployeeScheduleItemResponse::from)
+                .toList();
     }
 
     @Transactional

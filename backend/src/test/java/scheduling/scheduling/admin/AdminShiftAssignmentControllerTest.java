@@ -14,6 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -35,6 +36,7 @@ import scheduling.scheduling.auth.CurrentAccountPrincipal;
 import scheduling.scheduling.auth.JwtAuthenticationFilter;
 import scheduling.scheduling.auth.JwtService;
 import scheduling.scheduling.auth.SecurityConfig;
+import scheduling.scheduling.employee.dto.EmployeeScheduleItemResponse;
 import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
 import scheduling.scheduling.entity.AccountStatus;
@@ -185,6 +187,62 @@ class AdminShiftAssignmentControllerTest {
         verifyNoInteractions(adminShiftAssignmentService);
     }
 
+    @Test
+    void managerViewsEmployeeSchedule() throws Exception {
+        givenToken("manager-token", manager());
+        when(adminShiftAssignmentService.getEmployeeSchedule(
+                        any(CurrentAccountPrincipal.class), eq(7L),
+                        eq(LocalDate.of(2026, 9, 1)), eq(LocalDate.of(2026, 9, 30))))
+                .thenReturn(List.of(scheduleItem()));
+
+        mockMvc.perform(get("/api/admin/employees/7/schedule")
+                        .param("from", "2026-09-01")
+                        .param("to", "2026-09-30")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer manager-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].assignmentId").value(300))
+                .andExpect(jsonPath("$[0].periodStatus").value("PUBLISHED"));
+
+        verify(adminShiftAssignmentService).getEmployeeSchedule(
+                any(CurrentAccountPrincipal.class), eq(7L),
+                eq(LocalDate.of(2026, 9, 1)), eq(LocalDate.of(2026, 9, 30)));
+    }
+
+    @Test
+    void managerViewsEmployeeScheduleWithoutDates() throws Exception {
+        givenToken("manager-token", manager());
+        when(adminShiftAssignmentService.getEmployeeSchedule(
+                        any(CurrentAccountPrincipal.class), eq(7L), eq(null), eq(null)))
+                .thenReturn(List.of());
+
+        mockMvc.perform(get("/api/admin/employees/7/schedule")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer manager-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+
+        verify(adminShiftAssignmentService).getEmployeeSchedule(
+                any(CurrentAccountPrincipal.class), eq(7L), eq(null), eq(null));
+    }
+
+    @Test
+    void employeeCannotViewScheduleByEmployee() throws Exception {
+        givenToken("employee-token", employee());
+
+        mockMvc.perform(get("/api/admin/employees/7/schedule")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer employee-token"))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(adminShiftAssignmentService);
+    }
+
+    @Test
+    void anonymousCannotViewScheduleByEmployee() throws Exception {
+        mockMvc.perform(get("/api/admin/employees/7/schedule"))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(adminShiftAssignmentService);
+    }
+
     private void givenToken(String token, CurrentAccountPrincipal principal) {
         when(jwtService.parseAccessToken(token)).thenReturn(principal);
         when(accountRepository.findById(principal.accountId())).thenReturn(Optional.of(account(principal)));
@@ -213,5 +271,21 @@ class AdminShiftAssignmentControllerTest {
     private static AdminShiftAssignmentResponse assignment(boolean locked) {
         return new AdminShiftAssignmentResponse(
                 500L, 200L, 20L, 7L, "NV007", "Nguyen Van A", "ASSIGNED", "MANUAL", locked);
+    }
+
+    private static EmployeeScheduleItemResponse scheduleItem() {
+        return new EmployeeScheduleItemResponse(
+                300L,
+                "ASSIGNED",
+                "MANUAL",
+                false,
+                LocalDate.of(2026, 9, 17),
+                100L,
+                "Day",
+                LocalTime.of(8, 0),
+                LocalTime.of(16, 0),
+                20L,
+                "Week 38",
+                "PUBLISHED");
     }
 }
