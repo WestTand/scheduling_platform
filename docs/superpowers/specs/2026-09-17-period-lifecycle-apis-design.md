@@ -24,7 +24,7 @@ Allowed transitions, no backward moves:
 - `APPROVED -> PUBLISHED` via publish.
 - `DRAFT -> CANCELLED` and `APPROVED -> CANCELLED` via cancel.
 - `PUBLISHED` is terminal in this slice; cancelling a published period is out of scope until the Phase 7 notification flow exists.
-- Repeating the same transition is idempotent and returns `200 OK` with the current state.
+- Repeating the same transition is idempotent and returns `200 OK` with the current state, as long as its preconditions still hold. The only exception is re-approve: it re-validates staffing and returns `400 BAD_REQUEST` when staffing no longer passes.
 
 Field effects:
 
@@ -86,7 +86,7 @@ The period list endpoint (`GET /api/admin/schedule-periods`) currently only acce
 
 ## Response Shape
 
-All three endpoints return the existing `AdminSchedulePeriodResponse`, which must now also expose the lifecycle fields:
+All three endpoints return the existing `AdminSchedulePeriodResponse`, which already exposes the lifecycle fields:
 
 ```json
 {
@@ -109,7 +109,7 @@ The current response DTO already exposes these lifecycle fields with null-safe m
 
 ## Validation And Errors
 
-- `400 BAD_REQUEST`: wrong-state transition (e.g. publish from `DRAFT`, approve from `PUBLISHED`/`CANCELLED`, approve/publish/cancel targeting a different terminal state from `CANCELLED`), empty period on approve, understaffed shift on approve, invalid list status filter. Repeating the same state (approve on `APPROVED`, publish on `PUBLISHED`, cancel on `CANCELLED`) is idempotent `200 OK`, not an error.
+- `400 BAD_REQUEST`: wrong-state transition (e.g. publish from `DRAFT`, approve from `PUBLISHED` or `CANCELLED`, publish from `CANCELLED`, cancel from `PUBLISHED`), empty period on approve, understaffed shift on approve (including re-approve), invalid list status filter. Repeating the same state (approve on `APPROVED` with staffing still passing, publish on `PUBLISHED`, cancel on `CANCELLED`) is idempotent `200 OK`, not an error.
 - `403 FORBIDDEN`: authenticated principal is missing, account is missing, or account role is not `MANAGER`.
 - `404 NOT_FOUND`: schedule period does not exist.
 
