@@ -24,6 +24,11 @@ import scheduling.scheduling.repository.WorkShiftRepository;
 public class AdminSchedulePeriodService {
 
     private static final String DRAFT = "DRAFT";
+    private static final String APPROVED = "APPROVED";
+    private static final String PUBLISHED = "PUBLISHED";
+    private static final String CANCELLED = "CANCELLED";
+    private static final java.util.Set<String> LISTABLE_STATUSES =
+            java.util.Set.of(DRAFT, APPROVED, PUBLISHED, CANCELLED);
 
     private final SchedulePeriodRepository schedulePeriodRepository;
     private final AccountRepository accountRepository;
@@ -152,7 +157,7 @@ public class AdminSchedulePeriodService {
             return DRAFT;
         }
         String normalized = status.trim().toUpperCase(Locale.ROOT);
-        if (!DRAFT.equals(normalized)) {
+        if (!LISTABLE_STATUSES.contains(normalized)) {
             throw invalidRequest();
         }
         return normalized;

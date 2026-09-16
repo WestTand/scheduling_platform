@@ -214,10 +214,24 @@ class AdminSchedulePeriodServiceTest {
         CurrentAccountPrincipal principal = managerPrincipal();
         when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
 
-        assertThatThrownBy(() -> service.listSchedulePeriods(principal, "PUBLISHED", null, null))
+        assertThatThrownBy(() -> service.listSchedulePeriods(principal, "ARCHIVED", null, null))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
                 .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void listSchedulePeriodsAcceptsLifecycleStatuses() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+
+        service.listSchedulePeriods(principal, " approved ", null, null);
+        service.listSchedulePeriods(principal, "PUBLISHED", null, null);
+        service.listSchedulePeriods(principal, "CANCELLED", null, null);
+
+        verify(schedulePeriodRepository).searchForAdmin("APPROVED", null, null);
+        verify(schedulePeriodRepository).searchForAdmin("PUBLISHED", null, null);
+        verify(schedulePeriodRepository).searchForAdmin("CANCELLED", null, null);
     }
 
     @Test
