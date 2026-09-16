@@ -10,6 +10,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -64,6 +65,27 @@ public class AdminSchedulePeriodController {
             @PathVariable Long periodId,
             @Valid @RequestBody SchedulePeriodRequest request) {
         return ResponseEntity.ok(adminSchedulePeriodService.updateSchedulePeriod(principal, periodId, request));
+    }
+
+    @PatchMapping("/{periodId}/approve")
+    ResponseEntity<AdminSchedulePeriodResponse> approveSchedulePeriod(
+            @AuthenticationPrincipal CurrentAccountPrincipal principal,
+            @PathVariable Long periodId) {
+        return ResponseEntity.ok(adminSchedulePeriodService.approveSchedulePeriod(principal, periodId));
+    }
+
+    @PatchMapping("/{periodId}/publish")
+    ResponseEntity<AdminSchedulePeriodResponse> publishSchedulePeriod(
+            @AuthenticationPrincipal CurrentAccountPrincipal principal,
+            @PathVariable Long periodId) {
+        return ResponseEntity.ok(adminSchedulePeriodService.publishSchedulePeriod(principal, periodId));
+    }
+
+    @PatchMapping("/{periodId}/cancel")
+    ResponseEntity<AdminSchedulePeriodResponse> cancelSchedulePeriod(
+            @AuthenticationPrincipal CurrentAccountPrincipal principal,
+            @PathVariable Long periodId) {
+        return ResponseEntity.ok(adminSchedulePeriodService.cancelSchedulePeriod(principal, periodId));
     }
 
     private static String listStatus(String status) {

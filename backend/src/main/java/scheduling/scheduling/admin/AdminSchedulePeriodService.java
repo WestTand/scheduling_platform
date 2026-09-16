@@ -1,8 +1,12 @@
 package scheduling.scheduling.admin;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -15,20 +19,36 @@ import scheduling.scheduling.auth.CurrentAccountPrincipal;
 import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
 import scheduling.scheduling.entity.SchedulePeriod;
+import scheduling.scheduling.entity.WorkShift;
 import scheduling.scheduling.repository.AccountRepository;
 import scheduling.scheduling.repository.SchedulePeriodRepository;
+import scheduling.scheduling.repository.ShiftAssignmentRepository;
+import scheduling.scheduling.repository.WorkShiftRepository;
 
 @Service
 public class AdminSchedulePeriodService {
 
     private static final String DRAFT = "DRAFT";
+    private static final String APPROVED = "APPROVED";
+    private static final String PUBLISHED = "PUBLISHED";
+    private static final String CANCELLED = "CANCELLED";
+    private static final Set<String> LISTABLE_STATUSES =
+            Set.of(DRAFT, APPROVED, PUBLISHED, CANCELLED);
 
     private final SchedulePeriodRepository schedulePeriodRepository;
     private final AccountRepository accountRepository;
+    private final WorkShiftRepository workShiftRepository;
+    private final ShiftAssignmentRepository shiftAssignmentRepository;
 
-    public AdminSchedulePeriodService(SchedulePeriodRepository schedulePeriodRepository, AccountRepository accountRepository) {
+    public AdminSchedulePeriodService(
+            SchedulePeriodRepository schedulePeriodRepository,
+            AccountRepository accountRepository,
+            WorkShiftRepository workShiftRepository,
+            ShiftAssignmentRepository shiftAssignmentRepository) {
         this.schedulePeriodRepository = schedulePeriodRepository;
         this.accountRepository = accountRepository;
+        this.workShiftRepository = workShiftRepository;
+        this.shiftAssignmentRepository = shiftAssignmentRepository;
     }
 
     @Transactional
@@ -93,6 +113,66 @@ public class AdminSchedulePeriodService {
         return AdminSchedulePeriodResponse.from(savePeriod(period));
     }
 
+    @Transactional
+    public AdminSchedulePeriodResponse approveSchedulePeriod(CurrentAccountPrincipal principal, Long periodId) {
+        Account manager = requireManager(principal);
+        SchedulePeriod period = findDetail(periodId);
+        if (!DRAFT.equals(period.getStatus()) && !APPROVED.equals(period.getStatus())) {
+            throw invalidRequest();
+        }
+        validateStaffing(periodId);
+        if (APPROVED.equals(period.getStatus())) {
+            return AdminSchedulePeriodResponse.from(period);
+        }
+        period.setStatus(APPROVED);
+        period.setApprovedBy(manager);
+        return AdminSchedulePeriodResponse.from(savePeriod(period));
+    }
+
+    @Transactional
+    public AdminSchedulePeriodResponse publishSchedulePeriod(CurrentAccountPrincipal principal, Long periodId) {
+        requireManager(principal);
+        SchedulePeriod period = findDetail(periodId);
+        if (PUBLISHED.equals(period.getStatus())) {
+            return AdminSchedulePeriodResponse.from(period);
+        }
+        if (!APPROVED.equals(period.getStatus())) {
+            throw invalidRequest();
+        }
+        period.setStatus(PUBLISHED);
+        period.setPublishedAt(LocalDateTime.now());
+        return AdminSchedulePeriodResponse.from(savePeriod(period));
+    }
+
+    @Transactional
+    public AdminSchedulePeriodResponse cancelSchedulePeriod(CurrentAccountPrincipal principal, Long periodId) {
+        requireManager(principal);
+        SchedulePeriod period = findDetail(periodId);
+        if (CANCELLED.equals(period.getStatus())) {
+            return AdminSchedulePeriodResponse.from(period);
+        }
+        if (!DRAFT.equals(period.getStatus()) && !APPROVED.equals(period.getStatus())) {
+            throw invalidRequest();
+        }
+        period.setStatus(CANCELLED);
+        return AdminSchedulePeriodResponse.from(savePeriod(period));
+    }
+
+    private void validateStaffing(Long periodId) {
+        List<WorkShift> shifts = workShiftRepository.searchForPeriod(periodId, null, null);
+        if (shifts.isEmpty()) {
+            throw invalidRequest();
+        }
+        Map<Long, Long> assignmentCounts = shiftAssignmentRepository.listForPeriod(periodId).stream()
+                .collect(Collectors.groupingBy(
+                        assignment -> assignment.getWorkShift().getId(), Collectors.counting()));
+        for (WorkShift shift : shifts) {
+            if (assignmentCounts.getOrDefault(shift.getId(), 0L) < shift.getRequiredStaff()) {
+                throw invalidRequest();
+            }
+        }
+    }
+
     private Account requireManager(CurrentAccountPrincipal principal) {
         if (principal == null) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Manager access required");
@@ -142,7 +222,7 @@ public class AdminSchedulePeriodService {
             return DRAFT;
         }
         String normalized = status.trim().toUpperCase(Locale.ROOT);
-        if (!DRAFT.equals(normalized)) {
+        if (!LISTABLE_STATUSES.contains(normalized)) {
             throw invalidRequest();
         }
         return normalized;
