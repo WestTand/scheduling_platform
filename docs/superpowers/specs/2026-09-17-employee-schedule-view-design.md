@@ -13,7 +13,7 @@ Add two read-only endpoints:
 - `GET /api/employee/schedule` (role `EMPLOYEE`, own schedule only)
 - `GET /api/admin/employees/{employeeId}/schedule` (role `MANAGER`, any employee)
 
-Implementation follows approach A from brainstorming: one service per package boundary (`EmployeeScheduleService` in `employee`, new method in the admin assignment area for managers), sharing one response DTO and one date-range normalization helper. Access control stays separated per side, matching the existing `employee/*` vs `admin/*` split.
+Implementation follows approach A from brainstorming: `EmployeeScheduleService` + `EmployeeScheduleController` in the `employee` package; manager logic as a new read-only method in `AdminShiftAssignmentService`, exposed via `AdminShiftAssignmentController` as `GET /employees/{employeeId}/schedule` under its existing `/api/admin` mapping. Both sides share one response DTO and one date-range normalization helper (exact home decided in the implementation plan). Access control stays separated per side, matching the existing `employee/*` vs `admin/*` split.
 
 ## Endpoint Behavior
 
@@ -76,7 +76,8 @@ An empty list (no assignments in range) is `200 OK` with `[]`, not an error.
 ## Validation And Errors
 
 - `400 BAD_REQUEST`: `from` after `to`, unparseable date parameters.
-- `403 FORBIDDEN`: missing principal, missing account, wrong role, or inactive employee (reuse the existing `EmployeeAccess`/`requireManager` behavior unchanged).
+- `401 UNAUTHORIZED`: anonymous requests, rejected by security before reaching services (existing controller behavior).
+- `403 FORBIDDEN`: missing account, wrong role, inactive employee, or (manager side only) missing principal (reuse the existing `EmployeeAccess`/`requireManager` behavior unchanged; `EmployeeAccess` assumes a non-null principal).
 - `404 NOT_FOUND`: manager queries a non-existent `employeeId`; employee account has no linked employee profile (existing `EmployeeAccess` behavior, kept as-is).
 
 ## Persistence And Repository
