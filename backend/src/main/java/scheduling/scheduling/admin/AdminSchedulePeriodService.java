@@ -3,7 +3,9 @@ package scheduling.scheduling.admin;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -16,6 +18,7 @@ import scheduling.scheduling.auth.CurrentAccountPrincipal;
 import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
 import scheduling.scheduling.entity.SchedulePeriod;
+import scheduling.scheduling.entity.WorkShift;
 import scheduling.scheduling.repository.AccountRepository;
 import scheduling.scheduling.repository.SchedulePeriodRepository;
 import scheduling.scheduling.repository.ShiftAssignmentRepository;
@@ -107,6 +110,37 @@ public class AdminSchedulePeriodService {
         period.setEndDate(request.endDate());
         period.setVersionNo(versionNo);
         return AdminSchedulePeriodResponse.from(savePeriod(period));
+    }
+
+    @Transactional
+    public AdminSchedulePeriodResponse approveSchedulePeriod(CurrentAccountPrincipal principal, Long periodId) {
+        Account manager = requireManager(principal);
+        SchedulePeriod period = findDetail(periodId);
+        if (!DRAFT.equals(period.getStatus()) && !APPROVED.equals(period.getStatus())) {
+            throw invalidRequest();
+        }
+        validateStaffing(periodId);
+        if (APPROVED.equals(period.getStatus())) {
+            return AdminSchedulePeriodResponse.from(period);
+        }
+        period.setStatus(APPROVED);
+        period.setApprovedBy(manager);
+        return AdminSchedulePeriodResponse.from(savePeriod(period));
+    }
+
+    private void validateStaffing(Long periodId) {
+        List<WorkShift> shifts = workShiftRepository.searchForPeriod(periodId, null, null);
+        if (shifts.isEmpty()) {
+            throw invalidRequest();
+        }
+        Map<Long, Long> assignmentCounts = shiftAssignmentRepository.listForPeriod(periodId).stream()
+                .collect(Collectors.groupingBy(
+                        assignment -> assignment.getWorkShift().getId(), Collectors.counting()));
+        for (WorkShift shift : shifts) {
+            if (assignmentCounts.getOrDefault(shift.getId(), 0L) < shift.getRequiredStaff()) {
+                throw invalidRequest();
+            }
+        }
     }
 
     private Account requireManager(CurrentAccountPrincipal principal) {

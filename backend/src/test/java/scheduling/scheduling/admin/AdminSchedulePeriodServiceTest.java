@@ -23,7 +23,10 @@ import scheduling.scheduling.auth.CurrentAccountPrincipal;
 import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
 import scheduling.scheduling.entity.AccountStatus;
+import scheduling.scheduling.entity.Employee;
 import scheduling.scheduling.entity.SchedulePeriod;
+import scheduling.scheduling.entity.ShiftAssignment;
+import scheduling.scheduling.entity.WorkShift;
 import scheduling.scheduling.repository.AccountRepository;
 import scheduling.scheduling.repository.SchedulePeriodRepository;
 import scheduling.scheduling.repository.ShiftAssignmentRepository;
@@ -529,6 +532,146 @@ class AdminSchedulePeriodServiceTest {
                 .isEqualTo(HttpStatus.FORBIDDEN);
     }
 
+    @Test
+    void approveSchedulePeriodApprovesFullyStaffedDraft() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        Account manager = account(principal);
+        SchedulePeriod period = draftPeriod(20L, manager);
+        WorkShift shift = staffedShift(200L, 2);
+        Employee first = activeEmployee(10L, "EMP010", "Employee Ten");
+        Employee second = activeEmployee(11L, "EMP011", "Employee Eleven");
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(period));
+        when(workShiftRepository.searchForPeriod(20L, null, null)).thenReturn(List.of(shift));
+        when(shiftAssignmentRepository.listForPeriod(20L))
+                .thenReturn(List.of(shiftAssignment(300L, shift, first), shiftAssignment(301L, shift, second)));
+        when(schedulePeriodRepository.saveAndFlush(period)).thenReturn(period);
+
+        AdminSchedulePeriodResponse response = service.approveSchedulePeriod(principal, 20L);
+
+        assertThat(response.status()).isEqualTo("APPROVED");
+        assertThat(response.approvedByAccountId()).isEqualTo(1L);
+        assertThat(response.approvedByUsername()).isEqualTo("manager01");
+        verify(schedulePeriodRepository).saveAndFlush(period);
+    }
+
+    @Test
+    void approveSchedulePeriodRejectsNonManagerAccount() {
+        CurrentAccountPrincipal principal = new CurrentAccountPrincipal(2L, "employee01", AccountRole.EMPLOYEE);
+        when(accountRepository.findById(2L)).thenReturn(Optional.of(account(principal)));
+
+        assertForbidden(() -> service.approveSchedulePeriod(principal, 20L));
+
+        verify(schedulePeriodRepository, never()).findDetailById(any());
+    }
+
+    @Test
+    void approveSchedulePeriodRejectsMissingPeriod() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.approveSchedulePeriod(principal, 20L))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void approveSchedulePeriodRejectsPublishedAndCancelledPeriods() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        SchedulePeriod published = draftPeriod(20L, account(principal));
+        published.setStatus("PUBLISHED");
+        SchedulePeriod cancelled = draftPeriod(21L, account(principal));
+        cancelled.setStatus("CANCELLED");
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(published));
+        when(schedulePeriodRepository.findDetailById(21L)).thenReturn(Optional.of(cancelled));
+
+        assertThatThrownBy(() -> service.approveSchedulePeriod(principal, 20L))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThatThrownBy(() -> service.approveSchedulePeriod(principal, 21L))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(schedulePeriodRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void approveSchedulePeriodRejectsEmptyPeriod() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        SchedulePeriod period = draftPeriod(20L, account(principal));
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(period));
+        when(workShiftRepository.searchForPeriod(20L, null, null)).thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.approveSchedulePeriod(principal, 20L))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(schedulePeriodRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void approveSchedulePeriodRejectsUnderstaffedShift() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        SchedulePeriod period = draftPeriod(20L, account(principal));
+        WorkShift shift = staffedShift(200L, 2);
+        Employee only = activeEmployee(10L, "EMP010", "Employee Ten");
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(period));
+        when(workShiftRepository.searchForPeriod(20L, null, null)).thenReturn(List.of(shift));
+        when(shiftAssignmentRepository.listForPeriod(20L))
+                .thenReturn(List.of(shiftAssignment(300L, shift, only)));
+
+        assertThatThrownBy(() -> service.approveSchedulePeriod(principal, 20L))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(schedulePeriodRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void reapproveSchedulePeriodValidatesStaffingAgain() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        Account manager = account(principal);
+        Account originalApprover = account(new CurrentAccountPrincipal(3L, "approver01", AccountRole.MANAGER));
+        SchedulePeriod passing = draftPeriod(20L, manager);
+        passing.setStatus("APPROVED");
+        passing.setApprovedBy(originalApprover);
+        SchedulePeriod failing = draftPeriod(21L, manager);
+        failing.setStatus("APPROVED");
+        failing.setApprovedBy(originalApprover);
+        WorkShift shift = staffedShift(200L, 2);
+        Employee first = activeEmployee(10L, "EMP010", "Employee Ten");
+        Employee second = activeEmployee(11L, "EMP011", "Employee Eleven");
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(passing));
+        when(schedulePeriodRepository.findDetailById(21L)).thenReturn(Optional.of(failing));
+        when(workShiftRepository.searchForPeriod(20L, null, null)).thenReturn(List.of(shift));
+        when(workShiftRepository.searchForPeriod(21L, null, null)).thenReturn(List.of(shift));
+        when(shiftAssignmentRepository.listForPeriod(20L))
+                .thenReturn(List.of(shiftAssignment(300L, shift, first), shiftAssignment(301L, shift, second)));
+        when(shiftAssignmentRepository.listForPeriod(21L))
+                .thenReturn(List.of(shiftAssignment(300L, shift, first)));
+
+        AdminSchedulePeriodResponse response = service.approveSchedulePeriod(principal, 20L);
+
+        assertThat(response.status()).isEqualTo("APPROVED");
+        assertThat(response.approvedByAccountId()).isEqualTo(3L);
+        assertThat(response.approvedByUsername()).isEqualTo("approver01");
+        verify(schedulePeriodRepository, never()).saveAndFlush(any());
+        assertThatThrownBy(() -> service.approveSchedulePeriod(principal, 21L))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
     private static void assertForbidden(ThrowingServiceCall call) {
         assertThatThrownBy(call::execute)
                 .isInstanceOf(ResponseStatusException.class)
@@ -568,5 +711,36 @@ class AdminSchedulePeriodServiceTest {
                 .build();
         period.setId(id);
         return period;
+    }
+
+    private static WorkShift staffedShift(Long id, int requiredStaff) {
+        WorkShift shift = WorkShift.builder()
+                .workDate(LocalDate.of(2026, 9, 14))
+                .requiredStaff(requiredStaff)
+                .build();
+        shift.setId(id);
+        return shift;
+    }
+
+    private static Employee activeEmployee(Long id, String code, String name) {
+        Employee employee = Employee.builder()
+                .employeeCode(code)
+                .fullName(name)
+                .status("ACTIVE")
+                .build();
+        employee.setId(id);
+        return employee;
+    }
+
+    private static ShiftAssignment shiftAssignment(Long id, WorkShift shift, Employee employee) {
+        ShiftAssignment assignment = ShiftAssignment.builder()
+                .workShift(shift)
+                .employee(employee)
+                .assignmentStatus("ASSIGNED")
+                .assignedSource("MANUAL")
+                .locked(false)
+                .build();
+        assignment.setId(id);
+        return assignment;
     }
 }
