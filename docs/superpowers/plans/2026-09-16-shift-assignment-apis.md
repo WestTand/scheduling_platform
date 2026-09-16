@@ -61,6 +61,8 @@ public interface ShiftAssignmentRepository extends JpaRepository<ShiftAssignment
 
     long countByWorkShiftId(Long workShiftId);
 
+    boolean existsByWorkShiftIdAndEmployeeId(Long workShiftId, Long employeeId);
+
     @Query("""
             select sa
             from ShiftAssignment sa
@@ -78,9 +80,10 @@ public interface ShiftAssignmentRepository extends JpaRepository<ShiftAssignment
             select sa
             from ShiftAssignment sa
             join fetch sa.workShift ws
+            join fetch ws.schedulePeriod sp
             join fetch ws.shiftType st
             join fetch sa.employee e
-            where ws.schedulePeriod.id = :periodId
+            where sp.id = :periodId
             order by ws.workDate asc, st.startTime asc, sa.id asc
             """)
     List<ShiftAssignment> listForPeriod(@Param("periodId") Long periodId);
@@ -192,24 +195,28 @@ package scheduling.scheduling.admin;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
+import scheduling.scheduling.admin.dto.AdminPeriodScheduleResponse;
 import scheduling.scheduling.admin.dto.AdminShiftAssignmentResponse;
 import scheduling.scheduling.admin.dto.CreateShiftAssignmentRequest;
 import scheduling.scheduling.auth.CurrentAccountPrincipal;
 import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
+import scheduling.scheduling.entity.AccountStatus;
 import scheduling.scheduling.entity.Employee;
+import scheduling.scheduling.entity.LeaveRequest;
 import scheduling.scheduling.entity.SchedulePeriod;
 import scheduling.scheduling.entity.ShiftAssignment;
 import scheduling.scheduling.entity.ShiftType;
@@ -221,60 +228,27 @@ import scheduling.scheduling.repository.SchedulePeriodRepository;
 import scheduling.scheduling.repository.ShiftAssignmentRepository;
 import scheduling.scheduling.repository.WorkShiftRepository;
 
-@ExtendWith(MockitoExtension.class)
 class AdminShiftAssignmentServiceTest {
 
-    @Mock
-    private ShiftAssignmentRepository shiftAssignmentRepository;
-    @Mock
-    private WorkShiftRepository workShiftRepository;
-    @Mock
-    private SchedulePeriodRepository schedulePeriodRepository;
-    @Mock
-    private EmployeeRepository employeeRepository;
-    @Mock
-    private LeaveRequestRepository leaveRequestRepository;
-    @Mock
-    private AccountRepository accountRepository;
-
-    private AdminShiftAssignmentService service;
-
-    @BeforeEach
-    void setUp() {
-        service = new AdminShiftAssignmentService(
-                shiftAssignmentRepository,
-                workShiftRepository,
-                schedulePeriodRepository,
-                employeeRepository,
-                leaveRequestRepository,
-                accountRepository);
-    }
+    private final ShiftAssignmentRepository shiftAssignmentRepository = mock(ShiftAssignmentRepository.class);
+    private final WorkShiftRepository workShiftRepository = mock(WorkShiftRepository.class);
+    private final SchedulePeriodRepository schedulePeriodRepository = mock(SchedulePeriodRepository.class);
+    private final EmployeeRepository employeeRepository = mock(EmployeeRepository.class);
+    private final LeaveRequestRepository leaveRequestRepository = mock(LeaveRequestRepository.class);
+    private final AccountRepository accountRepository = mock(AccountRepository.class);
+    private final AdminShiftAssignmentService service = new AdminShiftAssignmentService(
+            shiftAssignmentRepository, workShiftRepository, schedulePeriodRepository,
+            employeeRepository, leaveRequestRepository, accountRepository);
 
     @Test
     void managerAssignsActiveEmployee() {
-        CurrentAccountPrincipal principal = new CurrentAccountPrincipal(1L, "manager");
-        Account manager = Account.builder().role(AccountRole.MANAGER).build();
-        manager.setId(1L);
-        SchedulePeriod period = SchedulePeriod.builder().status("DRAFT").build();
-        period.setId(20L);
-        ShiftType shiftType = ShiftType.builder()
-                .status("ACTIVE").startTime(LocalTime.of(8, 0)).endTime(LocalTime.of(16, 0))
-                .minStaff(1).maxStaff(3).build();
-        shiftType.setId(100L);
-        WorkShift shift = WorkShift.builder()
-                .schedulePeriod(period).shiftType(shiftType)
-                .workDate(LocalDate.of(2026, 9, 14)).requiredStaff(2).build();
-        shift.setId(200L);
-        Employee employee = Employee.builder().status("ACTIVE").build();
-        employee.setId(7L);
-        ShiftAssignment saved = ShiftAssignment.builder()
-                .workShift(shift).employee(employee)
-                .assignmentStatus("ASSIGNED").assignedSource("MANUAL").locked(false).build();
-        saved.setId(500L);
-
-        when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
+        CurrentAccountPrincipal principal = managerPrincipal();
+        WorkShift shift = workShift();
+        Employee employee = employee(7L, "NV007", "Nguyen Van A");
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
         when(workShiftRepository.findDetailById(200L)).thenReturn(Optional.of(shift));
         when(employeeRepository.findById(7L)).thenReturn(Optional.of(employee));
+        when(shiftAssignmentRepository.existsByWorkShiftIdAndEmployeeId(200L, 7L)).thenReturn(false);
         when(shiftAssignmentRepository.countByWorkShiftId(200L)).thenReturn(1L);
         when(leaveRequestRepository.searchForEmployee(7L, "APPROVED",
                 LocalDate.of(2026, 9, 14), LocalDate.of(2026, 9, 14)))
@@ -282,51 +256,609 @@ class AdminShiftAssignmentServiceTest {
         when(shiftAssignmentRepository.findForEmployeeInWindow(7L,
                 LocalDate.of(2026, 9, 13), LocalDate.of(2026, 9, 15)))
                 .thenReturn(List.of());
-        when(shiftAssignmentRepository.save(any(ShiftAssignment.class))).thenReturn(saved);
+        when(shiftAssignmentRepository.save(any(ShiftAssignment.class)))
+                .thenAnswer(invocation -> {
+                    ShiftAssignment saved = invocation.getArgument(0);
+                    saved.setId(500L);
+                    return saved;
+                });
 
         AdminShiftAssignmentResponse response = service.createAssignment(
                 principal, 200L, new CreateShiftAssignmentRequest(7L));
 
         assertThat(response.id()).isEqualTo(500L);
+        assertThat(response.workShiftId()).isEqualTo(200L);
+        assertThat(response.periodId()).isEqualTo(20L);
+        assertThat(response.employeeId()).isEqualTo(7L);
+        assertThat(response.assignmentStatus()).isEqualTo("ASSIGNED");
         assertThat(response.assignedSource()).isEqualTo("MANUAL");
         assertThat(response.locked()).isFalse();
     }
 
     @Test
     void assignRejectsDuplicateWithConflict() {
-        CurrentAccountPrincipal principal = new CurrentAccountPrincipal(1L, "manager");
-        Account manager = Account.builder().role(AccountRole.MANAGER).build();
-        manager.setId(1L);
-        SchedulePeriod period = SchedulePeriod.builder().status("DRAFT").build();
-        period.setId(20L);
-        ShiftType shiftType = ShiftType.builder()
-                .status("ACTIVE").startTime(LocalTime.of(8, 0)).endTime(LocalTime.of(16, 0))
-                .minStaff(1).maxStaff(3).build();
-        shiftType.setId(100L);
-        WorkShift shift = WorkShift.builder()
-                .schedulePeriod(period).shiftType(shiftType)
-                .workDate(LocalDate.of(2026, 9, 14)).requiredStaff(2).build();
-        shift.setId(200L);
-        Employee employee = Employee.builder().status("ACTIVE").build();
-        employee.setId(7L);
-
-        when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
-        when(workShiftRepository.findDetailById(200L)).thenReturn(Optional.of(shift));
-        when(employeeRepository.findById(7L)).thenReturn(Optional.of(employee));
-
-        ShiftAssignment existing = ShiftAssignment.builder().workShift(shift).employee(employee).build();
-        existing.setId(501L);
-        // Duplicate check runs before capacity/leave/overlap checks, so only this stub is needed.
-        when(shiftAssignmentRepository.listForPeriod(20L)).thenReturn(List.of(existing));
+        CurrentAccountPrincipal principal = managerPrincipal();
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(workShiftRepository.findDetailById(200L)).thenReturn(Optional.of(workShift()));
+        when(employeeRepository.findById(7L))
+                .thenReturn(Optional.of(employee(7L, "NV007", "Nguyen Van A")));
+        when(shiftAssignmentRepository.existsByWorkShiftIdAndEmployeeId(200L, 7L)).thenReturn(true);
 
         assertThatThrownBy(() -> service.createAssignment(
                 principal, 200L, new CreateShiftAssignmentRequest(7L)))
-                .isInstanceOf(ResponseStatusException.class);
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.CONFLICT);
+
+        verify(shiftAssignmentRepository, never()).save(any());
+    }
+
+    @Test
+    void assignAllowsOverstaffingAboveRequiredStaff() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        WorkShift shift = workShift();
+        Employee employee = employee(8L, "NV008", "Tran Thi B");
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(workShiftRepository.findDetailById(200L)).thenReturn(Optional.of(shift));
+        when(employeeRepository.findById(8L)).thenReturn(Optional.of(employee));
+        when(shiftAssignmentRepository.existsByWorkShiftIdAndEmployeeId(200L, 8L)).thenReturn(false);
+        when(shiftAssignmentRepository.countByWorkShiftId(200L)).thenReturn(2L);
+        when(leaveRequestRepository.searchForEmployee(8L, "APPROVED",
+                LocalDate.of(2026, 9, 14), LocalDate.of(2026, 9, 14)))
+                .thenReturn(List.of());
+        when(shiftAssignmentRepository.findForEmployeeInWindow(8L,
+                LocalDate.of(2026, 9, 13), LocalDate.of(2026, 9, 15)))
+                .thenReturn(List.of());
+        when(shiftAssignmentRepository.save(any(ShiftAssignment.class)))
+                .thenAnswer(invocation -> {
+                    ShiftAssignment saved = invocation.getArgument(0);
+                    saved.setId(501L);
+                    return saved;
+                });
+
+        AdminShiftAssignmentResponse response = service.createAssignment(
+                principal, 200L, new CreateShiftAssignmentRequest(8L));
+
+        assertThat(response.id()).isEqualTo(501L);
+    }
+
+    @Test
+    void assignRejectsFullShift() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(workShiftRepository.findDetailById(200L)).thenReturn(Optional.of(workShift()));
+        when(employeeRepository.findById(8L))
+                .thenReturn(Optional.of(employee(8L, "NV008", "Tran Thi B")));
+        when(shiftAssignmentRepository.existsByWorkShiftIdAndEmployeeId(200L, 8L)).thenReturn(false);
+        when(shiftAssignmentRepository.countByWorkShiftId(200L)).thenReturn(3L);
+
+        assertThatThrownBy(() -> service.createAssignment(
+                principal, 200L, new CreateShiftAssignmentRequest(8L)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(shiftAssignmentRepository, never()).save(any());
+    }
+
+    @Test
+    void assignRejectsApprovedLeave() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        Employee employee = employee(7L, "NV007", "Nguyen Van A");
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(workShiftRepository.findDetailById(200L)).thenReturn(Optional.of(workShift()));
+        when(employeeRepository.findById(7L)).thenReturn(Optional.of(employee));
+        when(shiftAssignmentRepository.existsByWorkShiftIdAndEmployeeId(200L, 7L)).thenReturn(false);
+        when(shiftAssignmentRepository.countByWorkShiftId(200L)).thenReturn(0L);
+        when(leaveRequestRepository.searchForEmployee(7L, "APPROVED",
+                LocalDate.of(2026, 9, 14), LocalDate.of(2026, 9, 14)))
+                .thenReturn(List.of(approvedLeave(employee)));
+
+        assertThatThrownBy(() -> service.createAssignment(
+                principal, 200L, new CreateShiftAssignmentRequest(7L)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(shiftAssignmentRepository, never()).save(any());
+    }
+
+    @Test
+    void assignRejectsOverlappingShift() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        Employee employee = employee(7L, "NV007", "Nguyen Van A");
+        ShiftAssignment clash = assignment(502L, eveningShift(), employee, false);
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(workShiftRepository.findDetailById(200L)).thenReturn(Optional.of(workShift()));
+        when(employeeRepository.findById(7L)).thenReturn(Optional.of(employee));
+        when(shiftAssignmentRepository.existsByWorkShiftIdAndEmployeeId(200L, 7L)).thenReturn(false);
+        when(shiftAssignmentRepository.countByWorkShiftId(200L)).thenReturn(0L);
+        when(leaveRequestRepository.searchForEmployee(7L, "APPROVED",
+                LocalDate.of(2026, 9, 14), LocalDate.of(2026, 9, 14)))
+                .thenReturn(List.of());
+        when(shiftAssignmentRepository.findForEmployeeInWindow(7L,
+                LocalDate.of(2026, 9, 13), LocalDate.of(2026, 9, 15)))
+                .thenReturn(List.of(clash));
+
+        assertThatThrownBy(() -> service.createAssignment(
+                principal, 200L, new CreateShiftAssignmentRequest(7L)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(shiftAssignmentRepository, never()).save(any());
+    }
+
+    @Test
+    void assignAllowsBackToBackTouchingShifts() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        Employee employee = employee(7L, "NV007", "Nguyen Van A");
+        ShiftAssignment touching = assignment(503L, lateShift(), employee, false);
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(workShiftRepository.findDetailById(200L)).thenReturn(Optional.of(workShift()));
+        when(employeeRepository.findById(7L)).thenReturn(Optional.of(employee));
+        when(shiftAssignmentRepository.existsByWorkShiftIdAndEmployeeId(200L, 7L)).thenReturn(false);
+        when(shiftAssignmentRepository.countByWorkShiftId(200L)).thenReturn(0L);
+        when(leaveRequestRepository.searchForEmployee(7L, "APPROVED",
+                LocalDate.of(2026, 9, 14), LocalDate.of(2026, 9, 14)))
+                .thenReturn(List.of());
+        when(shiftAssignmentRepository.findForEmployeeInWindow(7L,
+                LocalDate.of(2026, 9, 13), LocalDate.of(2026, 9, 15)))
+                .thenReturn(List.of(touching));
+        when(shiftAssignmentRepository.save(any(ShiftAssignment.class)))
+                .thenAnswer(invocation -> {
+                    ShiftAssignment saved = invocation.getArgument(0);
+                    saved.setId(504L);
+                    return saved;
+                });
+
+        AdminShiftAssignmentResponse response = service.createAssignment(
+                principal, 200L, new CreateShiftAssignmentRequest(7L));
+
+        assertThat(response.id()).isEqualTo(504L);
+    }
+
+    @Test
+    void assignRejectsOvernightOverlap() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        Employee employee = employee(7L, "NV007", "Nguyen Van A");
+        WorkShift night = nightShift();
+        ShiftAssignment earlyMorning = assignment(505L, morningAfterNight(), employee, false);
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(workShiftRepository.findDetailById(300L)).thenReturn(Optional.of(night));
+        when(employeeRepository.findById(7L)).thenReturn(Optional.of(employee));
+        when(shiftAssignmentRepository.existsByWorkShiftIdAndEmployeeId(300L, 7L)).thenReturn(false);
+        when(shiftAssignmentRepository.countByWorkShiftId(300L)).thenReturn(0L);
+        when(leaveRequestRepository.searchForEmployee(7L, "APPROVED",
+                LocalDate.of(2026, 9, 14), LocalDate.of(2026, 9, 14)))
+                .thenReturn(List.of());
+        when(shiftAssignmentRepository.findForEmployeeInWindow(7L,
+                LocalDate.of(2026, 9, 13), LocalDate.of(2026, 9, 15)))
+                .thenReturn(List.of(earlyMorning));
+
+        assertThatThrownBy(() -> service.createAssignment(
+                principal, 300L, new CreateShiftAssignmentRequest(7L)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(shiftAssignmentRepository, never()).save(any());
+    }
+
+    @Test
+    void assignRejectsOverlapFromAnotherPeriod() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        Employee employee = employee(7L, "NV007", "Nguyen Van A");
+        ShiftAssignment foreign = assignment(506L, foreignPeriodShift(), employee, false);
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(workShiftRepository.findDetailById(200L)).thenReturn(Optional.of(workShift()));
+        when(employeeRepository.findById(7L)).thenReturn(Optional.of(employee));
+        when(shiftAssignmentRepository.existsByWorkShiftIdAndEmployeeId(200L, 7L)).thenReturn(false);
+        when(shiftAssignmentRepository.countByWorkShiftId(200L)).thenReturn(0L);
+        when(leaveRequestRepository.searchForEmployee(7L, "APPROVED",
+                LocalDate.of(2026, 9, 14), LocalDate.of(2026, 9, 14)))
+                .thenReturn(List.of());
+        when(shiftAssignmentRepository.findForEmployeeInWindow(7L,
+                LocalDate.of(2026, 9, 13), LocalDate.of(2026, 9, 15)))
+                .thenReturn(List.of(foreign));
+
+        assertThatThrownBy(() -> service.createAssignment(
+                principal, 200L, new CreateShiftAssignmentRequest(7L)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(shiftAssignmentRepository, never()).save(any());
+    }
+
+    @Test
+    void assignRejectsNonManager() {
+        CurrentAccountPrincipal principal = employeePrincipal();
+        when(accountRepository.findById(2L)).thenReturn(Optional.of(account(principal)));
+
+        assertThatThrownBy(() -> service.createAssignment(
+                principal, 200L, new CreateShiftAssignmentRequest(7L)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+
+        verify(workShiftRepository, never()).findDetailById(any());
+    }
+
+    @Test
+    void assignRejectsMissingAccount() {
+        when(accountRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.createAssignment(
+                managerPrincipal(), 200L, new CreateShiftAssignmentRequest(7L)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+
+        verify(workShiftRepository, never()).findDetailById(any());
+    }
+
+    @Test
+    void assignRejectsMissingWorkShift() {
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(managerPrincipal())));
+        when(workShiftRepository.findDetailById(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.createAssignment(
+                managerPrincipal(), 999L, new CreateShiftAssignmentRequest(7L)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void assignRejectsMissingEmployee() {
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(managerPrincipal())));
+        when(workShiftRepository.findDetailById(200L)).thenReturn(Optional.of(workShift()));
+        when(employeeRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.createAssignment(
+                managerPrincipal(), 200L, new CreateShiftAssignmentRequest(999L)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void assignRejectsInactiveEmployee() {
+        Employee inactive = employee(7L, "NV007", "Nguyen Van A");
+        inactive.setStatus("INACTIVE");
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(managerPrincipal())));
+        when(workShiftRepository.findDetailById(200L)).thenReturn(Optional.of(workShift()));
+        when(employeeRepository.findById(7L)).thenReturn(Optional.of(inactive));
+
+        assertThatThrownBy(() -> service.createAssignment(
+                managerPrincipal(), 200L, new CreateShiftAssignmentRequest(7L)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(shiftAssignmentRepository, never()).save(any());
+    }
+
+    @Test
+    void assignRejectsNonDraftPeriod() {
+        WorkShift shift = workShift();
+        shift.getSchedulePeriod().setStatus("PUBLISHED");
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(managerPrincipal())));
+        when(workShiftRepository.findDetailById(200L)).thenReturn(Optional.of(shift));
+
+        assertThatThrownBy(() -> service.createAssignment(
+                managerPrincipal(), 200L, new CreateShiftAssignmentRequest(7L)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(shiftAssignmentRepository, never()).save(any());
+    }
+
+    @Test
+    void assignRejectsMissingEmployeeId() {
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(managerPrincipal())));
+
+        assertThatThrownBy(() -> service.createAssignment(
+                managerPrincipal(), 200L, new CreateShiftAssignmentRequest(null)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(workShiftRepository, never()).findDetailById(any());
+    }
+
+    @Test
+    void deleteRemovesLockedAssignmentInDraft() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        Employee employee = employee(7L, "NV007", "Nguyen Van A");
+        ShiftAssignment locked = assignment(500L, workShift(), employee, true);
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(shiftAssignmentRepository.findDetailById(500L)).thenReturn(Optional.of(locked));
+
+        service.deleteAssignment(principal, 500L);
+
+        verify(shiftAssignmentRepository).delete(locked);
+    }
+
+    @Test
+    void deleteRejectsNonDraftPeriod() {
+        WorkShift shift = workShift();
+        shift.getSchedulePeriod().setStatus("APPROVED");
+        ShiftAssignment locked = assignment(500L, shift, employee(7L, "NV007", "Nguyen Van A"), true);
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(managerPrincipal())));
+        when(shiftAssignmentRepository.findDetailById(500L)).thenReturn(Optional.of(locked));
+
+        assertThatThrownBy(() -> service.deleteAssignment(managerPrincipal(), 500L))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(shiftAssignmentRepository, never()).delete(any());
+    }
+
+    @Test
+    void deleteRejectsMissingAssignment() {
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(managerPrincipal())));
+        when(shiftAssignmentRepository.findDetailById(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.deleteAssignment(managerPrincipal(), 999L))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void lockAndUnlockFlipFlag() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        Employee employee = employee(7L, "NV007", "Nguyen Van A");
+        ShiftAssignment assignment = assignment(500L, workShift(), employee, false);
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(shiftAssignmentRepository.findDetailById(500L)).thenReturn(Optional.of(assignment));
+        when(shiftAssignmentRepository.save(any(ShiftAssignment.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        assertThat(service.lockAssignment(principal, 500L).locked()).isTrue();
+        assertThat(service.unlockAssignment(principal, 500L).locked()).isFalse();
+    }
+
+    @Test
+    void lockIsIdempotent() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        Employee employee = employee(7L, "NV007", "Nguyen Van A");
+        ShiftAssignment assignment = assignment(500L, workShift(), employee, true);
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(shiftAssignmentRepository.findDetailById(500L)).thenReturn(Optional.of(assignment));
+        when(shiftAssignmentRepository.save(any(ShiftAssignment.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        assertThat(service.lockAssignment(principal, 500L).locked()).isTrue();
+    }
+
+    @Test
+    void lockRejectsNonDraftPeriod() {
+        WorkShift shift = workShift();
+        shift.getSchedulePeriod().setStatus("PUBLISHED");
+        ShiftAssignment assignment = assignment(500L, shift, employee(7L, "NV007", "Nguyen Van A"), false);
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(managerPrincipal())));
+        when(shiftAssignmentRepository.findDetailById(500L)).thenReturn(Optional.of(assignment));
+
+        assertThatThrownBy(() -> service.lockAssignment(managerPrincipal(), 500L))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void scheduleViewReturnsOrderedShiftsWithAssignments() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        WorkShift morning = workShift();
+        WorkShift evening = eveningShift();
+        Employee first = employee(7L, "NV007", "Nguyen Van A");
+        Employee second = employee(8L, "NV008", "Tran Thi B");
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(draftPeriod()));
+        when(workShiftRepository.searchForPeriod(20L, null, null)).thenReturn(List.of(morning, evening));
+        when(shiftAssignmentRepository.listForPeriod(20L)).thenReturn(List.of(
+                assignment(500L, morning, first, false),
+                assignment(501L, evening, second, true)));
+
+        AdminPeriodScheduleResponse response = service.getSchedule(principal, 20L);
+
+        assertThat(response.periodId()).isEqualTo(20L);
+        assertThat(response.status()).isEqualTo("DRAFT");
+        assertThat(response.workShifts()).hasSize(2);
+        assertThat(response.workShifts().get(0).id()).isEqualTo(200L);
+        assertThat(response.workShifts().get(0).assignments()).hasSize(1);
+        assertThat(response.workShifts().get(0).assignments().get(0).employeeCode()).isEqualTo("NV007");
+        assertThat(response.workShifts().get(1).id()).isEqualTo(201L);
+        assertThat(response.workShifts().get(1).shiftStartTime()).isEqualTo(LocalTime.of(14, 0));
+        assertThat(response.workShifts().get(1).maxStaff()).isEqualTo(3);
+        assertThat(response.workShifts().get(1).assignments().get(0).locked()).isTrue();
+    }
+
+    @Test
+    void scheduleViewRejectsMissingPeriod() {
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(managerPrincipal())));
+        when(schedulePeriodRepository.findDetailById(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.getSchedule(managerPrincipal(), 999L))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void scheduleViewRejectsNonManager() {
+        CurrentAccountPrincipal principal = employeePrincipal();
+        when(accountRepository.findById(2L)).thenReturn(Optional.of(account(principal)));
+
+        assertThatThrownBy(() -> service.getSchedule(principal, 20L))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+
+        verify(schedulePeriodRepository, never()).findDetailById(any());
+    }
+
+    private static CurrentAccountPrincipal managerPrincipal() {
+        return new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
+    }
+
+    private static CurrentAccountPrincipal employeePrincipal() {
+        return new CurrentAccountPrincipal(2L, "employee01", AccountRole.EMPLOYEE);
+    }
+
+    private static Account account(CurrentAccountPrincipal principal) {
+        Account account = Account.builder()
+                .username(principal.username())
+                .passwordHash("hash")
+                .role(principal.role())
+                .status(AccountStatus.ACTIVE)
+                .isActive(true)
+                .build();
+        account.setId(principal.accountId());
+        return account;
+    }
+
+    private static SchedulePeriod draftPeriod() {
+        SchedulePeriod period = SchedulePeriod.builder()
+                .periodName("Week 38")
+                .startDate(LocalDate.of(2026, 9, 14))
+                .endDate(LocalDate.of(2026, 9, 20))
+                .versionNo(1)
+                .status("DRAFT")
+                .createdBy(account(managerPrincipal()))
+                .build();
+        period.setId(20L);
+        return period;
+    }
+
+    private static ShiftType shiftType(LocalTime startTime, LocalTime endTime, int maxStaff) {
+        ShiftType type = ShiftType.builder()
+                .shiftName("Day")
+                .startTime(startTime)
+                .endTime(endTime)
+                .durationHours(new BigDecimal("8.0"))
+                .overnight(false)
+                .heavy(false)
+                .minStaff(1)
+                .maxStaff(maxStaff)
+                .quotaCategory("REGULAR")
+                .status("ACTIVE")
+                .build();
+        type.setId(100L);
+        return type;
+    }
+
+    private static WorkShift workShift() {
+        WorkShift shift = WorkShift.builder()
+                .schedulePeriod(draftPeriod())
+                .shiftType(shiftType(LocalTime.of(8, 0), LocalTime.of(16, 0), 3))
+                .workDate(LocalDate.of(2026, 9, 14))
+                .requiredStaff(2)
+                .build();
+        shift.setId(200L);
+        return shift;
+    }
+
+    private static WorkShift eveningShift() {
+        WorkShift shift = WorkShift.builder()
+                .schedulePeriod(draftPeriod())
+                .shiftType(shiftType(LocalTime.of(14, 0), LocalTime.of(22, 0), 3))
+                .workDate(LocalDate.of(2026, 9, 14))
+                .requiredStaff(1)
+                .build();
+        shift.setId(201L);
+        shift.getShiftType().setId(101L);
+        return shift;
+    }
+
+    private static WorkShift lateShift() {
+        WorkShift shift = WorkShift.builder()
+                .schedulePeriod(draftPeriod())
+                .shiftType(shiftType(LocalTime.of(16, 0), LocalTime.of(0, 0), 3))
+                .workDate(LocalDate.of(2026, 9, 14))
+                .requiredStaff(1)
+                .build();
+        shift.setId(202L);
+        shift.getShiftType().setId(102L);
+        return shift;
+    }
+
+    private static WorkShift nightShift() {
+        WorkShift shift = WorkShift.builder()
+                .schedulePeriod(draftPeriod())
+                .shiftType(shiftType(LocalTime.of(22, 0), LocalTime.of(6, 0), 2))
+                .workDate(LocalDate.of(2026, 9, 14))
+                .requiredStaff(1)
+                .build();
+        shift.setId(300L);
+        shift.getShiftType().setId(103L);
+        return shift;
+    }
+
+    private static WorkShift morningAfterNight() {
+        WorkShift shift = WorkShift.builder()
+                .schedulePeriod(draftPeriod())
+                .shiftType(shiftType(LocalTime.of(0, 0), LocalTime.of(8, 0), 2))
+                .workDate(LocalDate.of(2026, 9, 15))
+                .requiredStaff(1)
+                .build();
+        shift.setId(301L);
+        shift.getShiftType().setId(104L);
+        return shift;
+    }
+
+    private static WorkShift foreignPeriodShift() {
+        SchedulePeriod other = draftPeriod();
+        other.setId(21L);
+        WorkShift shift = WorkShift.builder()
+                .schedulePeriod(other)
+                .shiftType(shiftType(LocalTime.of(10, 0), LocalTime.of(18, 0), 2))
+                .workDate(LocalDate.of(2026, 9, 14))
+                .requiredStaff(1)
+                .build();
+        shift.setId(400L);
+        shift.getShiftType().setId(105L);
+        return shift;
+    }
+
+    private static Employee employee(Long id, String code, String name) {
+        Employee employee = Employee.builder()
+                .employeeCode(code)
+                .fullName(name)
+                .status("ACTIVE")
+                .build();
+        employee.setId(id);
+        return employee;
+    }
+
+    private static ShiftAssignment assignment(Long id, WorkShift shift, Employee employee, boolean locked) {
+        ShiftAssignment assignment = ShiftAssignment.builder()
+                .workShift(shift)
+                .employee(employee)
+                .assignmentStatus("ASSIGNED")
+                .assignedSource("MANUAL")
+                .locked(locked)
+                .build();
+        assignment.setId(id);
+        return assignment;
+    }
+
+    private static LeaveRequest approvedLeave(Employee employee) {
+        return LeaveRequest.builder()
+                .employee(employee)
+                .startDate(LocalDate.of(2026, 9, 14))
+                .endDate(LocalDate.of(2026, 9, 14))
+                .status("APPROVED")
+                .build();
     }
 }
 ```
 
-Note: the duplicate test above is a placeholder-shape guard; the real implementation checks duplicates by scanning existing assignments for the same `(workShiftId, employeeId)` before the capacity check and throws `409 CONFLICT`. Keep the duplicate-first ordering in the service so this behavior holds.
+The service checks duplicates with `existsByWorkShiftIdAndEmployeeId` before the capacity check and throws `409 CONFLICT`, so the ordering above must be preserved in the implementation.
 
 - [ ] **Step 2: Run the new test to verify it fails (no service yet)**
 
@@ -413,16 +945,10 @@ public class AdminShiftAssignmentService {
         if (!ACTIVE.equals(employee.getStatus())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid shift assignment request");
         }
-        List<ShiftAssignment> existingInShift = shiftAssignmentRepository.listForPeriod(
-                shift.getSchedulePeriod().getId()).stream()
-                .filter(candidate -> candidate.getWorkShift() != null
-                        && workShiftId.equals(candidate.getWorkShift().getId()))
-                .toList();
-        if (existingInShift.stream().anyMatch(candidate -> candidate.getEmployee() != null
-                && employee.getId().equals(candidate.getEmployee().getId()))) {
+        if (shiftAssignmentRepository.existsByWorkShiftIdAndEmployeeId(workShiftId, employee.getId())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Employee already assigned to this shift");
         }
-        if (existingInShift.size() >= shift.getShiftType().getMaxStaff()) {
+        if (shiftAssignmentRepository.countByWorkShiftId(workShiftId) >= shift.getShiftType().getMaxStaff()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid shift assignment request");
         }
         List<LeaveRequest> leaves = leaveRequestRepository.searchForEmployee(
@@ -554,23 +1080,10 @@ private ShiftAssignmentRepository shiftAssignmentRepository;
 
 with import `scheduling.scheduling.repository.ShiftAssignmentRepository` in `SchedulingApplicationTests.java`.
 
-- [ ] **Step 4: Expand the service test to the full spec matrix, then run it**
-
-Extend `AdminShiftAssignmentServiceTest` with these cases (Mockito style, same fixture pattern as Step 1):
-- rejects non-manager and missing account with `403`;
-- rejects missing work shift, missing employee, inactive employee, non-draft period;
-- allows assignment count above `requiredStaff` while below `maxStaff` (count `2`, required `2`, max `3` → `201`);
-- rejects approved leave covering the date;
-- rejects same-day time overlap (`08:00-16:00` vs `14:00-22:00`);
-- allows back-to-back touching intervals (`08:00-16:00` vs `16:00-00:00`);
-- rejects overnight overlap (`22:00-06:00` vs next-day `00:00-08:00`);
-- rejects overlap with an assignment from another period inside the window;
-- delete removes locked assignments in draft, rejects non-draft and missing id;
-- lock/unlock flip the flag, are idempotent, and reject non-draft;
-- schedule view requires manager, returns `404` for missing period, and nests ordered shifts with assignments.
+- [ ] **Step 4: Run the service test suite**
 
 Run: `.\mvnw.cmd test "-Dtest=AdminShiftAssignmentServiceTest"` from `backend`
-Expected: PASS, all tests green.
+Expected: PASS, all 25 tests green.
 
 - [ ] **Step 5: Commit**
 
@@ -594,15 +1107,21 @@ package scheduling.scheduling.admin;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -624,7 +1143,6 @@ import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
 import scheduling.scheduling.entity.AccountStatus;
 import scheduling.scheduling.repository.AccountRepository;
-import java.util.Optional;
 
 @WebMvcTest(AdminShiftAssignmentController.class)
 @Import({ SecurityConfig.class, JwtAuthenticationFilter.class, AuthExceptionHandler.class })
@@ -649,26 +1167,12 @@ class AdminShiftAssignmentControllerTest {
     @MockitoBean
     private AccountRepository accountRepository;
 
-    private void givenToken(String token, Account account) throws Exception {
-        when(jwtService.validateAccessToken(token)).thenReturn(
-                new CurrentAccountPrincipal(account.getId(), account.getUsername()));
-        when(accountRepository.findById(account.getId())).thenReturn(Optional.of(account));
-    }
-
-    private Account manager() {
-        Account account = Account.builder()
-                .username("manager").role(AccountRole.MANAGER).status(AccountStatus.ACTIVE).build();
-        account.setId(1L);
-        return account;
-    }
-
     @Test
     void managerAssignsEmployee() throws Exception {
         givenToken("manager-token", manager());
         when(adminShiftAssignmentService.createAssignment(
                 any(CurrentAccountPrincipal.class), eq(200L), any(CreateShiftAssignmentRequest.class)))
-                .thenReturn(new AdminShiftAssignmentResponse(
-                        500L, 200L, 20L, 7L, "NV007", "Nguyen Van A", "ASSIGNED", "MANUAL", false));
+                .thenReturn(assignment(false));
 
         mockMvc.perform(post("/api/admin/work-shifts/200/assignments")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer manager-token")
@@ -679,6 +1183,15 @@ class AdminShiftAssignmentControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(500))
                 .andExpect(jsonPath("$.assignedSource").value("MANUAL"));
+
+        ArgumentCaptor<CurrentAccountPrincipal> principalCaptor =
+                ArgumentCaptor.forClass(CurrentAccountPrincipal.class);
+        ArgumentCaptor<CreateShiftAssignmentRequest> requestCaptor =
+                ArgumentCaptor.forClass(CreateShiftAssignmentRequest.class);
+        verify(adminShiftAssignmentService)
+                .createAssignment(principalCaptor.capture(), eq(200L), requestCaptor.capture());
+        assertThat(principalCaptor.getValue().accountId()).isEqualTo(1L);
+        assertThat(requestCaptor.getValue().employeeId()).isEqualTo(7L);
     }
 
     @Test
@@ -693,8 +1206,125 @@ class AdminShiftAssignmentControllerTest {
                         .header(HttpHeaders.AUTHORIZATION, "Bearer manager-token"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.periodId").value(20));
+
+        verify(adminShiftAssignmentService).getSchedule(any(CurrentAccountPrincipal.class), eq(20L));
+    }
+
+    @Test
+    void managerDeletesAssignment() throws Exception {
+        givenToken("manager-token", manager());
+
+        mockMvc.perform(delete("/api/admin/assignments/500")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer manager-token"))
+                .andExpect(status().isNoContent());
+
+        verify(adminShiftAssignmentService).deleteAssignment(any(CurrentAccountPrincipal.class), eq(500L));
+    }
+
+    @Test
+    void managerLocksAssignment() throws Exception {
+        givenToken("manager-token", manager());
+        when(adminShiftAssignmentService.lockAssignment(any(CurrentAccountPrincipal.class), eq(500L)))
+                .thenReturn(assignment(true));
+
+        mockMvc.perform(patch("/api/admin/assignments/500/lock")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer manager-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.locked").value(true));
+
+        verify(adminShiftAssignmentService).lockAssignment(any(CurrentAccountPrincipal.class), eq(500L));
+    }
+
+    @Test
+    void managerUnlocksAssignment() throws Exception {
+        givenToken("manager-token", manager());
+        when(adminShiftAssignmentService.unlockAssignment(any(CurrentAccountPrincipal.class), eq(500L)))
+                .thenReturn(assignment(false));
+
+        mockMvc.perform(patch("/api/admin/assignments/500/unlock")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer manager-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.locked").value(false));
+
+        verify(adminShiftAssignmentService).unlockAssignment(any(CurrentAccountPrincipal.class), eq(500L));
+    }
+
+    @Test
+    void createRejectsMissingEmployeeId() throws Exception {
+        givenToken("manager-token", manager());
+
+        mockMvc.perform(post("/api/admin/work-shifts/200/assignments")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer manager-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(adminShiftAssignmentService);
+    }
+
+    @Test
+    void nonManagerCannotAssign() throws Exception {
+        givenToken("employee-token", employee());
+
+        mockMvc.perform(post("/api/admin/work-shifts/200/assignments")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer employee-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"employeeId": 7}
+                                """))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(adminShiftAssignmentService);
+    }
+
+    @Test
+    void anonymousCannotAssign() throws Exception {
+        mockMvc.perform(post("/api/admin/work-shifts/200/assignments")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"employeeId": 7}
+                                """))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(adminShiftAssignmentService);
+    }
+
+    private void givenToken(String token, CurrentAccountPrincipal principal) {
+        when(jwtService.parseAccessToken(token)).thenReturn(principal);
+        when(accountRepository.findById(principal.accountId())).thenReturn(Optional.of(account(principal)));
+    }
+
+    private static CurrentAccountPrincipal manager() {
+        return new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
+    }
+
+    private static CurrentAccountPrincipal employee() {
+        return new CurrentAccountPrincipal(2L, "employee01", AccountRole.EMPLOYEE);
+    }
+
+    private static Account account(CurrentAccountPrincipal principal) {
+        Account account = Account.builder()
+                .username(principal.username())
+                .passwordHash("hash")
+                .role(principal.role())
+                .status(AccountStatus.ACTIVE)
+                .isActive(true)
+                .build();
+        account.setId(principal.accountId());
+        return account;
+    }
+
+    private static AdminShiftAssignmentResponse assignment(boolean locked) {
+        return new AdminShiftAssignmentResponse(
+                500L, 200L, 20L, 7L, "NV007", "Nguyen Van A", "ASSIGNED", "MANUAL", locked);
     }
 }
+```
+
+The test class above uses `assertThat`, so add this import alongside the other static imports:
+
+```java
+import static org.assertj.core.api.Assertions.assertThat;
 ```
 
 - [ ] **Step 2: Run the controller test to verify it fails (no controller yet)**
@@ -776,12 +1406,10 @@ public class AdminShiftAssignmentController {
 }
 ```
 
-- [ ] **Step 4: Extend the controller test, then run it**
-
-Add delete (`204`), lock, unlock, body-validation `400`, non-manager `403`, and anonymous `401` cases following the `AdminWorkShiftControllerTest` pattern, then run:
+- [ ] **Step 4: Run the controller and service tests together**
 
 Run: `.\mvnw.cmd test "-Dtest=AdminShiftAssignmentControllerTest,AdminShiftAssignmentServiceTest"` from `backend`
-Expected: PASS.
+Expected: PASS, all 8 controller tests plus all 25 service tests green.
 
 - [ ] **Step 5: Commit**
 
@@ -799,7 +1427,7 @@ git commit -m "feat: add shift assignment endpoints"
 
 - [ ] **Step 1: Update the roadmap status**
 
-In `docs/project_plan.md`, update the Phase 5 section: manual assignment, period schedule view, and lock/unlock are implemented for `DRAFT` periods; remaining items are update-in-place, view-by-employee, approval/publish, and AI orchestration.
+In `docs/project_plan.md`, update the Phase 5 section: manual assignment, delete, and lock/unlock mutations require `DRAFT` periods while the period schedule view supports all statuses; remaining items are update-in-place, view-by-employee, approval/publish, and AI orchestration.
 
 - [ ] **Step 2: Run the full backend suite**
 
