@@ -26,12 +26,17 @@ import scheduling.scheduling.entity.AccountStatus;
 import scheduling.scheduling.entity.SchedulePeriod;
 import scheduling.scheduling.repository.AccountRepository;
 import scheduling.scheduling.repository.SchedulePeriodRepository;
+import scheduling.scheduling.repository.WorkShiftRepository;
+import scheduling.scheduling.repository.ShiftAssignmentRepository;
 
 class AdminSchedulePeriodServiceTest {
 
     private final SchedulePeriodRepository schedulePeriodRepository = mock(SchedulePeriodRepository.class);
     private final AccountRepository accountRepository = mock(AccountRepository.class);
-    private final AdminSchedulePeriodService service = new AdminSchedulePeriodService(schedulePeriodRepository, accountRepository);
+    private final WorkShiftRepository workShiftRepository = mock(WorkShiftRepository.class);
+    private final ShiftAssignmentRepository shiftAssignmentRepository = mock(ShiftAssignmentRepository.class);
+    private final AdminSchedulePeriodService service = new AdminSchedulePeriodService(
+            schedulePeriodRepository, accountRepository, workShiftRepository, shiftAssignmentRepository);
 
     @Test
     void createSchedulePeriodCreatesDraftWithDefaultVersionAndCreator() {

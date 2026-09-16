@@ -17,6 +17,8 @@ import scheduling.scheduling.entity.AccountRole;
 import scheduling.scheduling.entity.SchedulePeriod;
 import scheduling.scheduling.repository.AccountRepository;
 import scheduling.scheduling.repository.SchedulePeriodRepository;
+import scheduling.scheduling.repository.WorkShiftRepository;
+import scheduling.scheduling.repository.ShiftAssignmentRepository;
 
 @Service
 public class AdminSchedulePeriodService {
@@ -25,10 +27,18 @@ public class AdminSchedulePeriodService {
 
     private final SchedulePeriodRepository schedulePeriodRepository;
     private final AccountRepository accountRepository;
+    private final WorkShiftRepository workShiftRepository;
+    private final ShiftAssignmentRepository shiftAssignmentRepository;
 
-    public AdminSchedulePeriodService(SchedulePeriodRepository schedulePeriodRepository, AccountRepository accountRepository) {
+    public AdminSchedulePeriodService(
+            SchedulePeriodRepository schedulePeriodRepository,
+            AccountRepository accountRepository,
+            WorkShiftRepository workShiftRepository,
+            ShiftAssignmentRepository shiftAssignmentRepository) {
         this.schedulePeriodRepository = schedulePeriodRepository;
         this.accountRepository = accountRepository;
+        this.workShiftRepository = workShiftRepository;
+        this.shiftAssignmentRepository = shiftAssignmentRepository;
     }
 
     @Transactional
