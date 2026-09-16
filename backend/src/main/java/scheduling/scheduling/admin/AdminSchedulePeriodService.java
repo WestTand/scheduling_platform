@@ -3,6 +3,7 @@ package scheduling.scheduling.admin;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -27,8 +28,8 @@ public class AdminSchedulePeriodService {
     private static final String APPROVED = "APPROVED";
     private static final String PUBLISHED = "PUBLISHED";
     private static final String CANCELLED = "CANCELLED";
-    private static final java.util.Set<String> LISTABLE_STATUSES =
-            java.util.Set.of(DRAFT, APPROVED, PUBLISHED, CANCELLED);
+    private static final Set<String> LISTABLE_STATUSES =
+            Set.of(DRAFT, APPROVED, PUBLISHED, CANCELLED);
 
     private final SchedulePeriodRepository schedulePeriodRepository;
     private final AccountRepository accountRepository;
