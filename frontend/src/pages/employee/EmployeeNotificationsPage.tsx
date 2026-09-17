@@ -1,5 +1,6 @@
 import { BellRing, CheckCheck, Eye } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { DataTable } from '@/components/common/DataTable'
@@ -16,9 +17,17 @@ const notifications = [
 ]
 
 export function EmployeeNotificationsPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState('ALL')
-  const [selected, setSelected] = useState<(typeof notifications)[number] | null>(null)
+  const [statusFilter, setStatusFilter] = useState(() => searchParams.get('status') ?? 'ALL')
+  const [selected, setSelected] = useState<(typeof notifications)[number] | null>(() => notifications.find((item) => item.id === searchParams.get('notificationId')) ?? null)
+
+  const closeDetails = () => {
+    setSelected(null)
+    const params = new URLSearchParams(searchParams)
+    params.delete('notificationId')
+    setSearchParams(params, { replace: true })
+  }
 
   const filtered = useMemo(() => notifications.filter((item) => {
     const matchesSearch = !search || item.title.toLowerCase().includes(search.toLowerCase()) || item.content.toLowerCase().includes(search.toLowerCase())
@@ -30,7 +39,7 @@ export function EmployeeNotificationsPage() {
     const target = notifications.find((item) => item.id === id)
     if (!target) return
     target.isRead = true
-    setSelected(null)
+    closeDetails()
     window.alert('Thông báo đã được đánh dấu là đã đọc.')
   }
 
@@ -48,7 +57,7 @@ export function EmployeeNotificationsPage() {
         <CardContent className="space-y-4 p-4">
           <div className="grid gap-3 md:grid-cols-[1.2fr_0.8fr]">
             <SearchInput value={search} placeholder="Tìm kiếm thông báo" onChange={setSearch} />
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm">
+            <select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); const params = new URLSearchParams(searchParams); params.set('status', event.target.value); setSearchParams(params) }} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm">
               <option value="ALL">Tất cả</option>
               <option value="UNREAD">Chưa đọc</option>
               <option value="READ">Đã đọc</option>
@@ -64,7 +73,7 @@ export function EmployeeNotificationsPage() {
               { key: 'isRead', label: 'Trạng thái', render: (item: (typeof notifications)[number]) => <StatusBadge status={item.isRead ? 'APPROVED' : 'PENDING'} /> },
               { key: 'actions', label: 'Thao tác', render: (item: (typeof notifications)[number]) => (
                 <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="icon" onClick={() => setSelected(item)}><Eye className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" onClick={() => { setSelected(item); const params = new URLSearchParams(searchParams); params.set('notificationId', item.id); setSearchParams(params) }} aria-label="Xem chi tiết thông báo"><Eye className="h-4 w-4" /></Button>
                   {!item.isRead && <Button variant="ghost" size="icon" onClick={() => handleMarkRead(item.id)}><CheckCheck className="h-4 w-4" /></Button>}
                 </div>
               ) },
@@ -77,8 +86,8 @@ export function EmployeeNotificationsPage() {
         open={Boolean(selected)}
         title={selected?.title ?? 'Chi tiết thông báo'}
         description={selected?.content ?? 'Thông tin chi tiết về thông báo.'}
-        onCancel={() => setSelected(null)}
-        onConfirm={() => setSelected(null)}
+        onCancel={closeDetails}
+        onConfirm={closeDetails}
         confirmLabel="Đóng"
       >
         {selected && (

@@ -1,5 +1,6 @@
 import { Check, Clock3, Eye, Search, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { DataTable } from '@/components/common/DataTable'
@@ -25,9 +26,10 @@ const statusOptions = [
 ]
 
 export function SwapRequestsPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
-  const [status, setStatus] = useState('ALL')
+  const [status, setStatus] = useState(() => searchParams.get('status') ?? 'ALL')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [loading, setLoading] = useState(true)
@@ -122,7 +124,7 @@ export function SwapRequestsPage() {
         <CardContent className="space-y-4 p-4">
           <div className="grid gap-3 md:grid-cols-[1.3fr_0.8fr_0.8fr_0.8fr]">
             <SearchInput value={search} placeholder="Tìm theo nhân viên hoặc ca" onChange={setSearch} />
-            <select value={status} onChange={(event) => { setStatus(event.target.value); setPage(1) }} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm">
+            <select value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); const params = new URLSearchParams(searchParams); params.set('status', event.target.value); setSearchParams(params) }} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm">
               {statusOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
             <input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm" />

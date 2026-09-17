@@ -17,6 +17,8 @@ import type { LucideIcon } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
+import { leaveRequestSeed, notificationSeed, preferenceSeed, swapRequestSeed } from '@/mocks/managementData'
+import { scheduleSeed } from '@/mocks/schedules'
 import { Role, type User } from '@/types/auth'
 
 const iconMap: Record<string, LucideIcon> = {
@@ -37,6 +39,25 @@ interface SidebarItem {
   label: string
   href: string
   icon: string
+}
+
+const getBadgeCount = (label: string, role: Role) => {
+  if (label === 'Ngày nghỉ') {
+    return leaveRequestSeed.filter((item) => item.status === 'PENDING').length
+  }
+  if (label === 'Nguyện vọng') {
+    return preferenceSeed.filter((item) => item.status === 'PENDING').length
+  }
+  if (label === 'Yêu cầu đổi ca') {
+    return swapRequestSeed.filter((item) => item.status === 'PENDING').length
+  }
+  if (label === 'Thông báo') {
+    return notificationSeed.filter((item) => !item.isRead).length
+  }
+  if (role === Role.MANAGER && label === 'Quản lý lịch') {
+    return scheduleSeed.filter((item) => item.status === 'PENDING_APPROVAL').length
+  }
+  return 0
 }
 
 interface SidebarProps {
@@ -89,7 +110,8 @@ export function Sidebar({ items, user, isMobileOpen, onMobileToggle, onLogout }:
               }
             >
               <Icon className="h-4 w-4" />
-              <span>{item.label}</span>
+              <span className="min-w-0 flex-1 truncate">{item.label}</span>
+              {getBadgeCount(item.label, user.role) > 0 && <span className="min-w-5 rounded-full bg-amber-100 px-1.5 py-0.5 text-center text-[11px] font-semibold text-amber-700">{getBadgeCount(item.label, user.role)}</span>}
             </NavLink>
           )
         })}

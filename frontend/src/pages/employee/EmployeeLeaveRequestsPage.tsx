@@ -21,7 +21,7 @@ export function EmployeeLeaveRequestsPage() {
   const [showForm, setShowForm] = useState(() => searchParams.get('action') === 'create')
   const [selected, setSelected] = useState<(typeof seedRequests)[number] | null>(null)
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState('ALL')
+  const [statusFilter, setStatusFilter] = useState(() => searchParams.get('status') ?? 'ALL')
   const [requests, setRequests] = useState(seedRequests)
   const [form, setForm] = useState({ startDate: '2026-09-27', endDate: '2026-09-28', type: 'Nghỉ phép', reason: '', note: '' })
   const [error, setError] = useState('')
@@ -82,7 +82,7 @@ export function EmployeeLeaveRequestsPage() {
         <CardContent className="space-y-4 p-4">
           <div className="grid gap-3 md:grid-cols-[1.2fr_0.8fr]">
             <SearchInput value={search} placeholder="Tìm kiếm theo lý do" onChange={setSearch} />
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm">
+            <select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); const params = new URLSearchParams(searchParams); params.set('status', event.target.value); setSearchParams(params) }} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm">
               <option value="ALL">Tất cả trạng thái</option>
               <option value="PENDING">Chờ duyệt</option>
               <option value="APPROVED">Đã duyệt</option>

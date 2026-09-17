@@ -1,6 +1,6 @@
 import { AlertTriangle, ArrowLeft, CalendarDays, ClipboardCheck, Clock3, Users } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -17,7 +17,11 @@ import { ScheduleViewMode } from '@/types/schedule'
 export function ScheduleDetailPage() {
   const { scheduleId } = useParams()
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState<'schedule' | 'warnings' | 'evaluation'>('schedule')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [activeTab, setActiveTab] = useState<'schedule' | 'warnings' | 'evaluation'>(() => {
+    const tab = searchParams.get('tab')
+    return tab === 'warnings' || tab === 'evaluation' ? tab : 'schedule'
+  })
   const [viewMode, setViewMode] = useState<ScheduleViewMode>(ScheduleViewMode.WEEK)
   const [employeeFilter, setEmployeeFilter] = useState('')
   const [shiftFilter, setShiftFilter] = useState('')
@@ -46,7 +50,7 @@ export function ScheduleDetailPage() {
         <ScheduleSummaryCard label="Điểm công bằng mẫu" value={detail.evaluation.fairnessPenalty} icon={<CalendarDays className="h-5 w-5" />} tone="blue" />
       </section>
 
-      <Card className="border-slate-200 shadow-sm"><CardContent className="p-2"><div className="flex flex-wrap gap-2">{[['schedule', 'Lịch làm việc'], ['warnings', 'Cảnh báo'], ['evaluation', 'Đánh giá']].map(([value, label]) => <Button key={value} variant={activeTab === value ? 'default' : 'ghost'} onClick={() => setActiveTab(value as typeof activeTab)}>{label}</Button>)}</div></CardContent></Card>
+      <Card className="border-slate-200 shadow-sm"><CardContent className="p-2"><div className="flex flex-wrap gap-2">{[['schedule', 'Lịch làm việc'], ['warnings', 'Cảnh báo'], ['evaluation', 'Đánh giá']].map(([value, label]) => <Button key={value} variant={activeTab === value ? 'default' : 'ghost'} onClick={() => { setActiveTab(value as typeof activeTab); const params = new URLSearchParams(searchParams); if (value === 'schedule') { params.delete('tab') } else { params.set('tab', value) } setSearchParams(params) }}>{label}</Button>)}</div></CardContent></Card>
 
       {activeTab === 'schedule' && <div className="space-y-4"><Card className="border-slate-200 shadow-sm"><CardContent className="grid gap-3 p-4 md:grid-cols-4"><select value={viewMode} onChange={(event) => setViewMode(event.target.value as ScheduleViewMode)} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm"><option value={ScheduleViewMode.WEEK}>Xem theo tuần</option><option value={ScheduleViewMode.DAY}>Xem theo ngày</option><option value={ScheduleViewMode.LIST}>Xem dạng danh sách</option></select><select value={employeeFilter} onChange={(event) => setEmployeeFilter(event.target.value)} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm"><option value="">Tất cả nhân viên</option>{employees.map((employee) => <option key={employee} value={employee}>{employee}</option>)}</select><select value={shiftFilter} onChange={(event) => setShiftFilter(event.target.value)} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm"><option value="">Tất cả loại ca</option>{shifts.map(([code, name]) => <option key={code} value={code}>{name}</option>)}</select><div className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2.5 text-sm"><input type="date" value={dateFilter} onChange={(event) => setDateFilter(event.target.value)} /><label className="ml-auto flex items-center gap-2 whitespace-nowrap"><input type="checkbox" checked={warningOnly} onChange={(event) => setWarningOnly(event.target.checked)} />Có cảnh báo</label></div></CardContent></Card><ScheduleCalendar assignments={detail.assignments} mode={viewMode} employeeFilter={employeeFilter} shiftFilter={shiftFilter} dateFilter={dateFilter} warningOnly={warningOnly} /></div>}
       {activeTab === 'warnings' && <ScheduleWarningList warnings={detail.warnings} />}

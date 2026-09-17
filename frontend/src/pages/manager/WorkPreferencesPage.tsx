@@ -1,5 +1,6 @@
 import { Check, Filter, Search, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { DataTable } from '@/components/common/DataTable'
@@ -32,9 +33,10 @@ const preferenceTypeLabels: Record<WorkPreference['type'], string> = {
 }
 
 export function WorkPreferencesPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
-  const [status, setStatus] = useState('ALL')
+  const [status, setStatus] = useState(() => searchParams.get('status') ?? 'ALL')
   const [type, setType] = useState('ALL')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -133,7 +135,7 @@ export function WorkPreferencesPage() {
         <CardContent className="space-y-4 p-4">
           <div className="grid gap-3 md:grid-cols-[1.2fr_0.8fr_0.8fr]">
             <SearchInput value={search} placeholder="Tìm theo tên nhân viên hoặc ca" onChange={setSearch} />
-            <select value={status} onChange={(event) => { setStatus(event.target.value); setPage(1) }} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none">
+            <select value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); const params = new URLSearchParams(searchParams); params.set('status', event.target.value); setSearchParams(params) }} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none">
               {statusOptions.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}

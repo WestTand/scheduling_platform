@@ -28,7 +28,7 @@ export function EmployeePreferencesPage() {
   const [selected, setSelected] = useState<(typeof seedPreferences)[number] | null>(null)
   const [search, setSearch] = useState('')
   const [monthFilter, setMonthFilter] = useState('ALL')
-  const [statusFilter, setStatusFilter] = useState('ALL')
+  const [statusFilter, setStatusFilter] = useState(() => searchParams.get('status') ?? 'ALL')
   const [preferences, setPreferences] = useState(seedPreferences)
   const [form, setForm] = useState({ month: '2026-10', type: 'PREFERRED', relatedShiftType: 'Ca sáng', priority: '1', note: '', })
 
@@ -88,7 +88,7 @@ export function EmployeePreferencesPage() {
               <option value="2026-09">09/2026</option>
               <option value="2026-10">10/2026</option>
             </select>
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm">
+            <select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); const params = new URLSearchParams(searchParams); params.set('status', event.target.value); setSearchParams(params) }} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm">
               <option value="ALL">Tất cả trạng thái</option>
               <option value="PENDING">Chờ xét duyệt</option>
               <option value="APPROVED">Đã duyệt</option>

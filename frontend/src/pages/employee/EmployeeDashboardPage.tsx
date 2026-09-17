@@ -1,5 +1,5 @@
 import { BellDot, CalendarCheck2, Clock3, FileText, PlaneTakeoff } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -29,8 +29,10 @@ export function EmployeeDashboardPage() {
       </div>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {employeeDashboardData.summary.map((item) => (
-          <Card key={item.label} className="border-slate-200 bg-white shadow-sm">
+        {employeeDashboardData.summary.map((item, index) => {
+          const paths = ['/employee/schedule?view=today', '/employee/schedule?assignmentId=assignment-05', '/employee/schedule?view=week', '/employee/leave-requests?status=PENDING']
+          return <Link key={item.label} to={paths[index]} className="block rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+          <Card className="h-full cursor-pointer border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md">
             <CardHeader className="px-4 pb-3 pt-4">
               <CardTitle className="text-sm text-slate-500">{item.label}</CardTitle>
             </CardHeader>
@@ -39,7 +41,8 @@ export function EmployeeDashboardPage() {
               <p className="mt-1 text-xs text-slate-500">{item.detail}</p>
             </CardContent>
           </Card>
-        ))}
+          </Link>
+        })}
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
@@ -49,15 +52,16 @@ export function EmployeeDashboardPage() {
             <CardDescription>Ca trực sắp tới của bạn.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 px-5 pb-5">
-            {employeeDashboardData.nextShifts.map((shift) => (
-              <div key={shift.date} className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+            {employeeDashboardData.nextShifts.map((shift, index) => (
+              <Link key={shift.date} to={`/employee/schedule?assignmentId=assignment-0${index + 4}`} className="flex cursor-pointer items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
                 <div>
                   <p className="font-medium text-slate-800">{shift.day} • {shift.date}</p>
                   <p className="text-sm text-slate-500">{shift.shift} • {shift.hours}</p>
                 </div>
                 <Badge variant="outline">Đã xác nhận</Badge>
-              </div>
+              </Link>
             ))}
+            <Button variant="outline" className="w-full" onClick={() => navigate('/employee/schedule?view=week')}>Xem toàn bộ lịch</Button>
           </CardContent>
         </Card>
 
@@ -81,14 +85,15 @@ export function EmployeeDashboardPage() {
           <CardTitle>Thông báo mới</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 px-5 pb-5">
-          {employeeDashboardData.notifications.map((notice) => (
-            <div key={notice} className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+            {employeeDashboardData.notifications.map((notice, index) => (
+            <Link key={notice} to={`/employee/notifications?notificationId=NOTI-00${index + 1}`} className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
               <div className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-blue-700">
                 <BellDot className="h-4 w-4" />
               </div>
               <p className="text-sm text-slate-700">{notice}</p>
-            </div>
+            </Link>
           ))}
+            <Link to="/employee/notifications" className="inline-flex text-sm font-medium text-blue-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">Xem tất cả thông báo</Link>
         </CardContent>
       </Card>
     </div>
