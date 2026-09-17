@@ -1,4 +1,5 @@
 import { BellDot, CalendarCheck2, Clock3, FileText, PlaneTakeoff } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -8,12 +9,13 @@ import { useAuth } from '@/contexts/useAuth'
 
 export function EmployeeDashboardPage() {
   const { user } = useAuth()
+  const navigate = useNavigate()
 
   const quickActions = [
-    { label: 'Xem lịch của tôi', icon: CalendarCheck2 },
-    { label: 'Đăng ký ngày nghỉ', icon: PlaneTakeoff },
-    { label: 'Đăng ký nguyện vọng', icon: FileText },
-    { label: 'Gửi yêu cầu đổi ca', icon: Clock3 },
+    { label: 'Xem lịch của tôi', icon: CalendarCheck2, path: '/employee/schedule' },
+    { label: 'Đăng ký ngày nghỉ', icon: PlaneTakeoff, path: '/employee/leave-requests?action=create' },
+    { label: 'Đăng ký nguyện vọng', icon: FileText, path: '/employee/preferences?action=create' },
+    { label: 'Gửi yêu cầu đổi ca', icon: Clock3, path: '/employee/swap-requests?action=create' },
   ]
 
   return (
@@ -64,8 +66,8 @@ export function EmployeeDashboardPage() {
             <CardTitle>Thao tác nhanh</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 px-5 pb-5">
-            {quickActions.map(({ label, icon: Icon }) => (
-              <Button key={label} variant="outline" className="w-full justify-start gap-2" onClick={() => window.alert(`${label} đang trong giai đoạn phát triển.`)}>
+            {quickActions.map(({ label, icon: Icon, path }) => (
+              <Button key={label} variant="outline" className="w-full cursor-pointer justify-start gap-2 focus-visible:ring-2 focus-visible:ring-slate-500" onClick={() => navigate(path)}>
                 <Icon className="h-4 w-4" />
                 {label}
               </Button>

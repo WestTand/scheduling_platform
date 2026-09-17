@@ -20,6 +20,33 @@ export const LeaveRequestStatus = {
 
 export type LeaveRequestStatus = (typeof LeaveRequestStatus)[keyof typeof LeaveRequestStatus]
 
+export const SwapRequestStatus = {
+  PENDING: 'PENDING',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+  CANCELLED: 'CANCELLED',
+} as const
+
+export type SwapRequestStatus = (typeof SwapRequestStatus)[keyof typeof SwapRequestStatus]
+
+export const NotificationType = {
+  SCHEDULE: 'SCHEDULE',
+  LEAVE: 'LEAVE',
+  PREFERENCE: 'PREFERENCE',
+  SWAP: 'SWAP',
+  GENERAL: 'GENERAL',
+} as const
+
+export type NotificationType = (typeof NotificationType)[keyof typeof NotificationType]
+
+export const NotificationPriority = {
+  LOW: 'LOW',
+  MEDIUM: 'MEDIUM',
+  HIGH: 'HIGH',
+} as const
+
+export type NotificationPriority = (typeof NotificationPriority)[keyof typeof NotificationPriority]
+
 export const PreferenceType = {
   PREFERRED: 'PREFERRED',
   AVOID: 'AVOID',
@@ -135,4 +162,46 @@ export interface ShiftTypeFormValues {
 export interface LeaveRequestDecision {
   status: LeaveRequestStatus
   managerNote: string
+}
+
+export interface SwapRequest {
+  id: string
+  employeeName: string
+  employeeEmail: string
+  currentShift: string
+  requestedShift: string
+  partnerName?: string
+  requestedDate: string
+  reason: string
+  note?: string
+  status: SwapRequestStatus
+  submittedAt: string
+  reviewedBy?: string
+  reviewedAt?: string
+  managerNote?: string
+}
+
+export interface NotificationItem {
+  id: string
+  title: string
+  content: string
+  type: NotificationType
+  priority: NotificationPriority
+  recipient: string
+  recipientType: 'ALL' | 'SELECTED'
+  createdAt: string
+  isRead: boolean
+  metadata?: string
+}
+
+export interface ActivityLog {
+  id: string
+  timestamp: string
+  actorName: string
+  actorRole: 'MANAGER' | 'EMPLOYEE'
+  action: string
+  target: string
+  description: string
+  status: 'SUCCESS' | 'FAILED' | 'INFO'
+  ipAddress: string
 }

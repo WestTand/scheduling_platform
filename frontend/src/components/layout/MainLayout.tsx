@@ -22,9 +22,16 @@ const breadcrumbLabels: Record<string, string> = {
   employees: 'Nhân viên',
   'shift-types': 'Loại ca trực',
   'leave-requests': 'Yêu cầu ngày nghỉ',
+  leaves: 'Đăng ký ngày nghỉ',
   preferences: 'Nguyện vọng làm việc',
   'schedule-generation': 'Tạo lịch tự động',
   schedules: 'Quản lý lịch',
+  edit: 'Chỉnh sửa lịch',
+  'swap-requests': 'Yêu cầu đổi ca',
+  exports: 'Xuất dữ liệu',
+  notifications: 'Thông báo',
+  'activity-logs': 'Nhật ký hoạt động',
+  schedule: 'Lịch làm việc',
 }
 
 interface MainLayoutProps {
