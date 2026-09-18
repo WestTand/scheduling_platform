@@ -10,10 +10,12 @@ import static org.mockito.Mockito.when;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import scheduling.scheduling.admin.dto.AdminWorkShiftResponse;
@@ -74,6 +76,40 @@ class AdminWorkShiftServiceTest {
         assertThat(response.workDate()).isEqualTo(LocalDate.of(2026, 9, 14));
         assertThat(response.requiredStaff()).isEqualTo(2);
         assertThat(response.note()).isEqualTo("Morning coverage");
+        ArgumentCaptor<WorkShift> captor = ArgumentCaptor.forClass(WorkShift.class);
+        verify(workShiftRepository).save(captor.capture());
+        WorkShift saved = captor.getValue();
+        assertThat(saved.getStartsAt()).isEqualTo(OffsetDateTime.parse("2026-09-14T08:00:00+07:00"));
+        assertThat(saved.getEndsAt()).isEqualTo(OffsetDateTime.parse("2026-09-14T16:00:00+07:00"));
+        assertThat(saved.getWorkMinutes()).isEqualTo(480);
+        assertThat(saved.getTransitionShift()).isFalse();
+        assertThat(response.startsAt()).isEqualTo(OffsetDateTime.parse("2026-09-14T08:00:00+07:00"));
+    }
+
+    @Test
+    void responseFallsBackToDerivedWindowWhenPersistedFieldsAreNull() {
+        AdminWorkShiftResponse response = AdminWorkShiftResponse.from(workShift());
+
+        assertThat(response.startsAt()).isEqualTo(OffsetDateTime.parse("2026-09-14T08:00:00+07:00"));
+        assertThat(response.endsAt()).isEqualTo(OffsetDateTime.parse("2026-09-14T16:00:00+07:00"));
+        assertThat(response.workMinutes()).isEqualTo(480);
+        assertThat(response.isTransitionShift()).isFalse();
+    }
+
+    @Test
+    void responseUsesPersistedWindowWhenAllFieldsPresent() {
+        WorkShift workShift = workShift();
+        workShift.setStartsAt(OffsetDateTime.parse("2026-09-14T09:00:00+07:00"));
+        workShift.setEndsAt(OffsetDateTime.parse("2026-09-14T17:30:00+07:00"));
+        workShift.setWorkMinutes(510);
+        workShift.setTransitionShift(true);
+
+        AdminWorkShiftResponse response = AdminWorkShiftResponse.from(workShift);
+
+        assertThat(response.startsAt()).isEqualTo(OffsetDateTime.parse("2026-09-14T09:00:00+07:00"));
+        assertThat(response.endsAt()).isEqualTo(OffsetDateTime.parse("2026-09-14T17:30:00+07:00"));
+        assertThat(response.workMinutes()).isEqualTo(510);
+        assertThat(response.isTransitionShift()).isTrue();
     }
 
     @Test
