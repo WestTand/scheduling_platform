@@ -4,6 +4,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.format.DateTimeParseException;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -13,8 +16,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.ResourcePatternResolver;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,7 +33,19 @@ import scheduling.scheduling.entity.Holiday;
 import scheduling.scheduling.repository.HolidayRepository;
 
 @Component
+@Order(2)
 public class HolidaySeedService implements ApplicationRunner {
+
+    // Boot 4 auto-configures tools.jackson ObjectMapper, not com.fasterxml.jackson;
+    // provide a com.fasterxml.jackson bean so constructor injection works in prod.
+    @Configuration
+    static class HolidayJacksonConfig {
+        @Bean
+        @ConditionalOnMissingBean(ObjectMapper.class)
+        ObjectMapper holidayObjectMapper() {
+            return new ObjectMapper();
+        }
+    }
 
     private static final Logger log = LoggerFactory.getLogger(HolidaySeedService.class);
 
@@ -39,36 +59,52 @@ public class HolidaySeedService implements ApplicationRunner {
 
     private final HolidayRepository holidayRepository;
     private final ResourcePatternResolver resourceResolver;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
 
     public HolidaySeedService(HolidayRepository holidayRepository,
-            ResourcePatternResolver resourceResolver) {
+            ResourcePatternResolver resourceResolver,
+            ObjectMapper objectMapper) {
         this.holidayRepository = holidayRepository;
         this.resourceResolver = resourceResolver;
+        this.objectMapper = objectMapper;
     }
 
     @Override
-    @Transactional
     public void run(ApplicationArguments args) throws Exception {
         int currentYear = LocalDate.now(ZONE).getYear();
         seedFixedHolidaysForYear(currentYear);
         seedFixedHolidaysForYear(currentYear + 1);
-        Resource[] resources = resourceResolver.getResources("classpath:holidays/holidays-*.json");
+        Resource[] resources = resourceResolver.getResources("classpath*:holidays/holidays-*.json");
+        if (resources.length == 0) {
+            log.info("No annual holiday files found under classpath*:holidays/holidays-*.json");
+            return;
+        }
+        Arrays.sort(resources, Comparator.comparing(r -> {
+            String name = r.getFilename();
+            return name == null ? "" : name;
+        }));
         for (Resource resource : resources) {
             String filename = resource.getFilename();
             if (filename == null) {
                 throw new IllegalStateException("Holiday resource has no filename");
             }
-            importAnnualHolidayResource(filename, resource);
+            try {
+                importAnnualHolidayResource(filename, resource);
+            } catch (IllegalStateException ex) {
+                // Non-fatal per-file: one bad file must not rollback fixed holidays or other files.
+                log.error("Skipping holiday file {} due to bad input: {}", filename, ex.getMessage());
+            }
         }
     }
 
+    @Transactional
     void seedFixedHolidaysForYear(int year) {
         for (FixedHoliday fixed : fixedHolidays(year)) {
             upsert(fixed.date(), fixed.name(), year, FIXED_TYPE, FIXED_SOURCE, null);
         }
     }
 
+    @Transactional
     void importAnnualHolidayResource(String filename, Resource resource) {
         int fileYear = parseFilenameYear(filename);
         JsonNode root = readJsonArray(filename, resource);
@@ -91,7 +127,7 @@ public class HolidaySeedService implements ApplicationRunner {
             LocalDate date;
             try {
                 date = LocalDate.parse(dateText);
-            } catch (Exception ex) {
+            } catch (DateTimeParseException ex) {
                 throw new IllegalStateException(
                         "Unparsable holiday date in " + filename + ": " + dateText, ex);
             }
@@ -108,20 +144,46 @@ public class HolidaySeedService implements ApplicationRunner {
         Holiday holiday = holidayRepository.findByHolidayDate(date).orElseGet(() -> Holiday.builder()
                 .holidayDate(date)
                 .build());
+        boolean isOverlapOnFixed = FIXED_SOURCE.equals(holiday.getSourceType())
+                && ANNUAL_SOURCE.equals(sourceType);
         holiday.setHolidayDate(date);
         holiday.setHolidayName(name);
         holiday.setHolidayYear(year);
         holiday.setHolidayType(type);
-        holiday.setSourceType(sourceType);
-        holiday.setSourceReference(sourceReference);
+        if (isOverlapOnFixed) {
+            // Fixed holidays are canonical: on JSON overlap, update name/type/year/active
+            // but preserve FIXED_RULE (and its sourceReference) so Task3 fixed spec wins.
+            // Overlap in holidays-2026.json is kept intentionally to exercise this upsert path.
+            log.info("Preserving FIXED_RULE for overlapping holiday {} from annual seed", date);
+        } else {
+            holiday.setSourceType(sourceType);
+            holiday.setSourceReference(sourceReference);
+        }
+        // Ensure fixed rows created via builder path get sourceType set.
+        if (holiday.getSourceType() == null) {
+            holiday.setSourceType(sourceType);
+            holiday.setSourceReference(sourceReference);
+        }
         holiday.setActive(true);
-        holidayRepository.save(holiday);
+        try {
+            holidayRepository.save(holiday);
+        } catch (DataIntegrityViolationException ex) {
+            // Concurrency-safe upsert (same pattern as StandardShiftTypeSeeder.saveSafely):
+            // another instance inserted the same date concurrently; re-fetch and skip create.
+            log.warn("Concurrent seeding conflict for holiday date {}: {}. Re-fetching existing row.",
+                    date, ex.getMessage());
+            holidayRepository.findByHolidayDate(date)
+                    .ifPresent(existing -> log.warn(
+                            "Found existing holiday date {} after conflict, skipping create",
+                            existing.getHolidayDate()));
+            return;
+        }
         log.info("Seeded holiday {}: {}", date, name);
     }
 
     private int parseFilenameYear(String filename) {
         Matcher matcher = FILENAME_YEAR.matcher(filename);
-        if (!matcher.find()) {
+        if (!matcher.matches()) {
             throw new IllegalStateException("Cannot parse year from filename: " + filename);
         }
         return Integer.parseInt(matcher.group(1));

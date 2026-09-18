@@ -9,5 +9,6 @@ public interface HolidayRepository extends JpaRepository<Holiday, Long> {
 
     Optional<Holiday> findByHolidayDate(LocalDate holidayDate);
 
+    // used by Task4, do not remove
     boolean existsByHolidayDateAndActiveTrue(LocalDate holidayDate);
 }
