@@ -73,14 +73,20 @@ CREATE TYPE account_role AS ENUM ('MANAGER', 'EMPLOYEE');
 |---|---|---|---|
 | shift_type_id | BIGSERIAL | PK | |
 | shift_name | VARCHAR(50) | UNIQUE, NOT NULL | VD: Ngoài giờ, Thông tầm, Trực đêm |
+| shift_code | VARCHAR(30) | UNIQUE, NULL (tạm thời) | Mã ổn định (VD: `THONG_TAM`, `NGOAI_GIO_1`, `TRUC_SANG`). Application bắt buộc khi tạo/cập nhật (unique, uppercase snake-case, ≤ 30 ký tự) nhưng DB vẫn NULL-able cho đến migration backfill + `NOT NULL` ở slice sau |
 | start_time | TIME | NOT NULL | |
 | end_time | TIME | NOT NULL | |
-| duration_hours | NUMERIC(4,1) | NOT NULL, CHECK > 0 | |
+| duration_hours | NUMERIC(4,1) | NOT NULL, CHECK > 0 AND <= 8.0 | |
 | is_overnight | BOOLEAN | NOT NULL, DEFAULT FALSE | Ca kéo dài qua ngày hôm sau |
 | is_heavy | BOOLEAN | NOT NULL, DEFAULT FALSE | Dùng cho ràng buộc tránh dồn ca |
 | min_staff | INT | NOT NULL, CHECK > 0 | |
 | max_staff | INT | NOT NULL, CHECK (max_staff >= min_staff) | |
+| applicable_weekdays | VARCHAR(40) | NOT NULL | Token ngày ISO, phân tách dấu phẩy, chuẩn hóa theo thứ tự MON..SUN, loại trùng (VD: `MON,TUE,WED,THU,FRI`). Default `MON,TUE,WED,THU,FRI,SAT,SUN` khi tạo mới không truyền |
+| applies_on_holidays | BOOLEAN | NOT NULL, DEFAULT FALSE | `true` = ca được phép xếp vào ngày lễ |
+| penalty_weight_multiplier | NUMERIC(3,2) | NOT NULL, DEFAULT 1.00, CHECK (0.00–9.99) | Hệ số phạt đã lưu ở backend; AI-service slice hiện tại chưa tiêu thụ |
 | status | VARCHAR(20) | NOT NULL, DEFAULT 'ACTIVE' | |
+
+> Quy tắc applicability: ít nhất 1 weekday bắt buộc trừ khi `applies_on_holidays=true`; token lạ bị từ chối `400 BAD_REQUEST`. Phân loại ngày: `HOLIDAY` (có dòng `holidays` active) > `WEEKEND` (T7/CN) > `WEEKDAY`; `work_shifts` chỉ nhận shift type phù hợp ngày (`Shift type is not applicable on this date` nếu sai).
 
 ### 3.4 `schedule_periods` — Kỳ lập lịch
 
@@ -223,6 +229,23 @@ CREATE TYPE account_role AS ENUM ('MANAGER', 'EMPLOYEE');
 | created_at | TIMESTAMP | NOT NULL, DEFAULT now() | |
 | ip_address | VARCHAR(45) | NULL | |
 
+### 3.14 `holidays` — Ngày lễ
+
+| Cột | Kiểu dữ liệu | Ràng buộc | Ghi chú |
+|---|---|---|---|
+| holiday_id | BIGSERIAL | PK | |
+| holiday_date | DATE | UNIQUE, NOT NULL | Ngày lễ Gregorian/Việt Nam (`YYYY-MM-DD`); upsert theo cột này |
+| holiday_name | VARCHAR(150) | NOT NULL | Tên hiển thị |
+| holiday_year | INT | NOT NULL | Năm của ngày lễ |
+| holiday_type | VARCHAR(30) | NOT NULL | `PUBLIC_HOLIDAY` / `LUNAR_HOLIDAY` / `SUBSTITUTE_HOLIDAY` / `SPECIAL_HOLIDAY` |
+| source_type | VARCHAR(30) | NOT NULL | `FIXED_RULE` (lễ cố định 01/01, 30/04, 01/05, 02/09) / `ANNUAL_SEED` (import JSON năm) |
+| source_reference | VARCHAR(255) | NULL | Tham chiếu nguồn (VD: thông báo lịch nghỉ năm) |
+| is_active | BOOLEAN | NOT NULL, DEFAULT TRUE | Chỉ dòng active tham gia phân loại ngày |
+| created_at | TIMESTAMP | NOT NULL, DEFAULT now() | |
+| updated_at | TIMESTAMP | NULL | |
+
+> Nguồn dữ liệu: backend luôn seed lễ cố định + import `backend/src/main/resources/holidays/holidays-YYYY.json` (idempotent, trùng ngày thì update). Không lưu chuỗi âm lịch, không convert âm–dương trong code. Chưa có CRUD quản lý nhập lễ và chưa có bảng trạng thái đầy đủ lịch lễ trong slice này.
+
 ## 4. Bảng tổng hợp
 
 | Bảng | Mục đích |
@@ -240,12 +263,13 @@ CREATE TYPE account_role AS ENUM ('MANAGER', 'EMPLOYEE');
 | swap_requests | Yêu cầu đổi/nhận ca |
 | notifications | Thông báo hệ thống |
 | activity_logs | Nhật ký thao tác, phục vụ truy vết |
+| holidays | Ngày lễ (seed cố định + JSON năm), dùng phân loại ngày HOLIDAY/WEEKEND/WEEKDAY |
 
 ## 5. Ràng buộc toàn vẹn & quy tắc dữ liệu
 
 | Nhóm | Quy tắc |
 |---|---|
-| Khóa & duy nhất | Mọi bảng có PK; `employee_code`, `username`, `rule_code` là duy nhất. `(work_shift_id, employee_id)` trong `shift_assignments` không được trùng. |
+| Khóa & duy nhất | Mọi bảng có PK; `employee_code`, `username`, `rule_code` là duy nhất. `shift_types.shift_code` unique (DB-nullable tạm thời, application bắt buộc). `holidays.holiday_date` unique. `(work_shift_id, employee_id)` trong `shift_assignments` không được trùng. |
 | Ngày & thời gian | `start_date ≤ end_date`; `duration_hours > 0`; `required_staff > 0`; `min_staff ≤ max_staff`; ngày của `work_shifts` phải nằm trong khoảng của `schedule_periods`. |
 | Nghiệp vụ xếp lịch | Một nhân viên không được làm 2 ca trùng thời gian, tối đa 12h/ngày, nghỉ tối thiểu 12h giữa 2 ca — kiểm tra ở tầng service/thuật toán, không lưu cột riêng. |
 | Trạng thái | Dùng tập giá trị kiểm soát (CHECK/ENUM) cho `accounts.role`, đơn nghỉ, nguyện vọng, lịch, phân công, đổi ca. |
@@ -260,6 +284,7 @@ CREATE TYPE account_role AS ENUM ('MANAGER', 'EMPLOYEE');
 - `leave_requests(employee_id, start_date, end_date)`
 - `preferences(employee_id, preference_date)`
 - `notifications(recipient_id, is_read, created_at)`
+- `holidays(holiday_date)` (unique + index `idx_holidays_date`)
 - Unique: `schedule_periods(start_date, end_date, version_no)`, `shift_assignments(work_shift_id, employee_id)`
 - Dùng kiểu `JSONB` cho `weights_json`, `rule_value_json`, `penalty_details_json`, `old_value_json`/`new_value_json` — chỉ dùng khi cấu trúc cần linh hoạt, không thay thế cột quan hệ cốt lõi.
 
