@@ -180,6 +180,8 @@ Rules:
 - `requiredStaff > 0` va nam trong `[shiftType.minStaff, shiftType.maxStaff]`.
 - `startsAt` va `endsAt` phai co timezone offset.
 
+> Scheduling accuracy windows slice: backend now persists exact `startsAt`/`endsAt` on `work_shifts`; this slice does not change `schemaVersion` from `1.0`; later AI payload slice can switch snapshot assembly to persisted windows if not already doing so.
+
 ### `approvedLeaves`
 
 ```json

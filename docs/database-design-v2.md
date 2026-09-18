@@ -114,7 +114,13 @@ CREATE TYPE account_role AS ENUM ('MANAGER', 'EMPLOYEE');
 | shift_type_id | BIGINT | FK → shift_types, NOT NULL | |
 | work_date | DATE | NOT NULL | Phải nằm trong [start_date, end_date] của period |
 | required_staff | INT | NOT NULL, CHECK > 0 | Có thể override min_staff của shift_type |
+| starts_at | TIMESTAMP WITH TIME ZONE | NULL in current ddl-auto slice | Derived from work_date + shift_type.start_time using Asia/Ho_Chi_Minh |
+| ends_at | TIMESTAMP WITH TIME ZONE | NULL in current ddl-auto slice | Add one day when derived end is not after start |
+| work_minutes | INT | NULL in current ddl-auto slice | Derived from shift_type.duration_hours * 60 |
+| is_transition_shift | BOOLEAN | NULL in current ddl-auto slice | True when ends_at local date is after starts_at local date |
 | note | TEXT | NULL | |
+
+> **Ghi chú:** Backend hiện persist các trường window (`starts_at`, `ends_at`, `work_minutes`, `is_transition_shift`) khi tạo `work_shifts` mới; các dòng cũ có thể NULL cho đến migration/backfill ở slice sau.
 
 ### 3.6 `shift_assignments` — Phân công ca (bảng trung gian n–n)
 
