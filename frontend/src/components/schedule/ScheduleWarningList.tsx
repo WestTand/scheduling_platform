@@ -1,5 +1,6 @@
 import { AlertTriangle, Info, ShieldAlert } from 'lucide-react'
 
+import { getShiftDefinition } from '@/configs/shiftDefinitions'
 import type { ScheduleWarning } from '@/types/schedule'
 
 interface ScheduleWarningListProps {
@@ -33,7 +34,7 @@ export function ScheduleWarningList({ warnings }: ScheduleWarningListProps) {
                   <span className="rounded-full bg-white/70 px-2 py-0.5 text-xs text-slate-600">Mức độ: {warning.severity}</span>
                 </div>
                 <p className="mt-2 text-sm text-slate-700">{warning.content}</p>
-                <p className="mt-2 text-xs text-slate-600">{warning.employeeName} · {warning.date} · {warning.shift}</p>
+                <p className="mt-2 text-xs text-slate-600">{warning.employeeName} · {warning.date} · {getShiftDefinition(warning.shiftCode)?.name ?? 'Lịch tổng hợp'}</p>
                 <p className="mt-2 text-sm text-slate-600"><strong>Gợi ý:</strong> {warning.suggestion}</p>
               </div>
             </div>

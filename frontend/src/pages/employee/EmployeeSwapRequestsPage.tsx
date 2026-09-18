@@ -9,10 +9,11 @@ import { SearchInput } from '@/components/common/SearchInput'
 import { StatusBadge } from '@/components/common/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { formatShiftRangeLabel, getShiftDefinition, shiftDefinitions } from '@/configs/shiftDefinitions'
 
 const seedRequests = [
-  { id: 'SWAP-001', currentShift: 'Ca sáng • 07:00 - 12:00', requestedShift: 'Ca chiều • 13:00 - 18:00', requestedDate: '2026-09-17', partner: 'Lê Thị Hòa', reason: 'Có lịch học vào buổi sáng', note: 'Chờ quản lý duyệt', status: 'PENDING' },
-  { id: 'SWAP-002', currentShift: 'Ca chiều • 13:00 - 18:00', requestedShift: 'Ca sáng • 07:00 - 12:00', requestedDate: '2026-09-18', partner: 'Trần Văn Nam', reason: 'Muốn đổi để bù thời gian gia đình', note: 'Đã duyệt', status: 'APPROVED' },
+  { id: 'SWAP-001', currentShiftCode: 'THONG_TAM', requestedShiftCode: 'NGOAI_GIO_1', requestedDate: '2026-09-17', partner: 'Lê Thị Hòa', reason: 'Có lịch học vào buổi sáng', note: 'Chờ quản lý duyệt', status: 'PENDING' },
+  { id: 'SWAP-002', currentShiftCode: 'NGOAI_GIO_1', requestedShiftCode: 'NGOAI_GIO_2', requestedDate: '2026-09-18', partner: 'Trần Văn Nam', reason: 'Muốn đổi để bù thời gian gia đình', note: 'Đã duyệt', status: 'APPROVED' },
 ]
 
 export function EmployeeSwapRequestsPage() {
@@ -22,7 +23,7 @@ export function EmployeeSwapRequestsPage() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState(() => searchParams.get('status') ?? 'ALL')
   const [requests, setRequests] = useState(seedRequests)
-  const [form, setForm] = useState({ currentShift: 'Ca sáng • 07:00 - 12:00', requestedShift: 'Ca chiều • 13:00 - 18:00', partner: 'Lê Thị Hòa', reason: '', note: '' })
+  const [form, setForm] = useState({ currentShiftCode: 'THONG_TAM', requestedShiftCode: 'NGOAI_GIO_1', partner: 'Lê Thị Hòa', reason: '', note: '' })
 
   useEffect(() => {
     if (searchParams.get('action') !== 'create') {
@@ -41,20 +42,20 @@ export function EmployeeSwapRequestsPage() {
   }), [requests, search, statusFilter])
 
   const handleSubmit = () => {
-    if (!form.currentShift || !form.reason.trim()) {
+    if (!form.currentShiftCode || !form.reason.trim()) {
       window.alert('Phải chọn ca hiện tại và nhập lý do.')
       return
     }
 
-    if (form.currentShift === form.requestedShift) {
+    if (form.currentShiftCode === form.requestedShiftCode) {
       window.alert('Không được chọn lại chính ca hiện tại làm ca muốn đổi.')
       return
     }
 
     setRequests((current) => [{
       id: `SWAP-${Date.now()}`,
-      currentShift: form.currentShift,
-      requestedShift: form.requestedShift,
+      currentShiftCode: form.currentShiftCode,
+      requestedShiftCode: form.requestedShiftCode,
       requestedDate: '2026-09-21',
       partner: form.partner,
       reason: form.reason,
@@ -63,7 +64,7 @@ export function EmployeeSwapRequestsPage() {
     }, ...current])
 
     setShowForm(false)
-    setForm({ currentShift: 'Ca sáng • 07:00 - 12:00', requestedShift: 'Ca chiều • 13:00 - 18:00', partner: 'Lê Thị Hòa', reason: '', note: '' })
+    setForm({ currentShiftCode: 'THONG_TAM', requestedShiftCode: 'NGOAI_GIO_1', partner: 'Lê Thị Hòa', reason: '', note: '' })
     window.alert('Yêu cầu đổi ca đã được tạo và đang chờ quản lý phê duyệt.')
   }
 
@@ -92,8 +93,8 @@ export function EmployeeSwapRequestsPage() {
             data={filtered}
             columns={[
               { key: 'id', label: 'Mã yêu cầu' },
-              { key: 'currentShift', label: 'Ca hiện tại' },
-              { key: 'requestedShift', label: 'Ca muốn đổi' },
+              { key: 'currentShiftCode', label: 'Ca hiện tại', render: (item: (typeof seedRequests)[number]) => <span>{getShiftDefinition(item.currentShiftCode)?.name} · {formatShiftRangeLabel(getShiftDefinition(item.currentShiftCode)!)}</span> },
+              { key: 'requestedShiftCode', label: 'Ca muốn đổi', render: (item: (typeof seedRequests)[number]) => <span>{getShiftDefinition(item.requestedShiftCode)?.name} · {formatShiftRangeLabel(getShiftDefinition(item.requestedShiftCode)!)}</span> },
               { key: 'partner', label: 'Nhân viên đổi cùng' },
               { key: 'requestedDate', label: 'Ngày mong muốn' },
               { key: 'status', label: 'Trạng thái', render: (item: (typeof seedRequests)[number]) => <StatusBadge status={item.status} /> },
@@ -119,18 +120,14 @@ export function EmployeeSwapRequestsPage() {
         <div className="mt-4 grid gap-4">
           <div className="space-y-1">
             <label className="text-sm text-slate-700">Ca hiện tại của bạn</label>
-            <select value={form.currentShift} onChange={(event) => setForm((current) => ({ ...current, currentShift: event.target.value }))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm">
-              <option value="Ca sáng • 07:00 - 12:00">Ca sáng • 07:00 - 12:00</option>
-              <option value="Ca chiều • 13:00 - 18:00">Ca chiều • 13:00 - 18:00</option>
-              <option value="Ca đêm • 19:00 - 23:00">Ca đêm • 19:00 - 23:00</option>
+            <select value={form.currentShiftCode} onChange={(event) => setForm((current) => ({ ...current, currentShiftCode: event.target.value }))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm">
+              {shiftDefinitions.map((shift) => <option key={shift.code} value={shift.code}>{shift.name} · {formatShiftRangeLabel(shift)}</option>)}
             </select>
           </div>
           <div className="space-y-1">
             <label className="text-sm text-slate-700">Ca muốn đổi</label>
-            <select value={form.requestedShift} onChange={(event) => setForm((current) => ({ ...current, requestedShift: event.target.value }))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm">
-              <option value="Ca chiều • 13:00 - 18:00">Ca chiều • 13:00 - 18:00</option>
-              <option value="Ca sáng • 07:00 - 12:00">Ca sáng • 07:00 - 12:00</option>
-              <option value="Ca đêm • 19:00 - 23:00">Ca đêm • 19:00 - 23:00</option>
+            <select value={form.requestedShiftCode} onChange={(event) => setForm((current) => ({ ...current, requestedShiftCode: event.target.value }))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm">
+              {shiftDefinitions.map((shift) => <option key={shift.code} value={shift.code}>{shift.name} · {formatShiftRangeLabel(shift)}</option>)}
             </select>
           </div>
           <div className="space-y-1">
@@ -163,8 +160,8 @@ export function EmployeeSwapRequestsPage() {
         {selected && (
           <div className="mt-4 space-y-3 text-sm text-slate-600">
             <div className="flex justify-between"><span>Mã yêu cầu</span><strong>{selected.id}</strong></div>
-            <div className="flex justify-between"><span>Ca hiện tại</span><strong>{selected.currentShift}</strong></div>
-            <div className="flex justify-between"><span>Ca muốn đổi</span><strong>{selected.requestedShift}</strong></div>
+            <div className="flex justify-between"><span>Ca hiện tại</span><strong>{getShiftDefinition(selected.currentShiftCode)?.name}</strong></div>
+            <div className="flex justify-between"><span>Ca muốn đổi</span><strong>{getShiftDefinition(selected.requestedShiftCode)?.name}</strong></div>
             <div className="flex justify-between"><span>Nhân viên đổi cùng</span><strong>{selected.partner}</strong></div>
             <div className="flex justify-between"><span>Ngày mong muốn</span><strong>{selected.requestedDate}</strong></div>
             <div className="flex justify-between"><span>Lý do</span><strong>{selected.reason}</strong></div>

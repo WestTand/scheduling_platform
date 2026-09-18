@@ -1,4 +1,5 @@
 import { swapRequestSeed } from '@/mocks/managementData'
+import { getShiftDefinition } from '@/configs/shiftDefinitions'
 import type { PaginatedResult, SwapRequest, SwapRequestStatus } from '@/types/management'
 
 const delay = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms))
@@ -25,7 +26,7 @@ export const swapRequestService = {
     await delay(300)
 
     const filtered = swapRequests.filter((request) => {
-      const matchesSearch = !search || [request.employeeName, request.currentShift, request.requestedShift].some((value) => value.toLowerCase().includes(search.toLowerCase()))
+      const matchesSearch = !search || [request.employeeName, request.currentShiftCode, request.requestedShiftCode, getShiftDefinition(request.currentShiftCode)?.name ?? '', getShiftDefinition(request.requestedShiftCode)?.name ?? ''].some((value) => value.toLowerCase().includes(search.toLowerCase()))
       const matchesStatus = status === 'ALL' || request.status === status
       const matchesStartDate = !startDate || request.requestedDate >= startDate
       const matchesEndDate = !endDate || request.requestedDate <= endDate

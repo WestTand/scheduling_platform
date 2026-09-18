@@ -14,17 +14,25 @@ import { StatCard } from '@/components/common/StatCard'
 import { StatusBadge } from '@/components/common/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { shiftDefinitions } from '@/configs/shiftDefinitions'
 import { shiftTypeService } from '@/services/shiftTypeService'
 import type { PaginatedResult, ShiftType, ShiftTypeFormValues } from '@/types/management'
+
+const defaultShift = shiftDefinitions[0]
 
 const emptyForm: ShiftTypeFormValues = {
   code: '',
   name: '',
-  startTime: '07:00',
-  endTime: '12:00',
-  color: '#2563eb',
-  minEmployees: 1,
-  maxEmployees: 3,
+  group: defaultShift.group,
+  startTime: defaultShift.startTime,
+  endTime: defaultShift.endTime,
+  crossesMidnight: defaultShift.crossesMidnight,
+  breakStart: defaultShift.breakStart,
+  breakEnd: defaultShift.breakEnd,
+  breakMinutes: defaultShift.breakMinutes,
+  workMinutes: defaultShift.workMinutes,
+  applicableDayType: defaultShift.applicableDayType,
+  color: defaultShift.color,
   description: '',
   status: 'ACTIVE',
 }
@@ -104,8 +112,8 @@ export function ShiftTypesPage() {
     if (!formState.code.trim()) return 'Mã ca là bắt buộc.'
     if (!formState.name.trim()) return 'Tên ca là bắt buộc.'
     if (!formState.startTime || !formState.endTime) return 'Giờ bắt đầu và kết thúc là bắt buộc.'
-    if (Number(formState.minEmployees) <= 0) return 'Số nhân viên tối thiểu phải lớn hơn 0.'
-    if (Number(formState.maxEmployees) < Number(formState.minEmployees)) return 'Số tối đa không được nhỏ hơn số tối thiểu.'
+    if (formState.breakMinutes < 0) return 'Thời gian nghỉ không được âm.'
+    if (formState.workMinutes <= 0) return 'Thời gian làm việc thực tế phải lớn hơn 0.'
 
     return ''
   }
@@ -122,11 +130,16 @@ export function ShiftTypesPage() {
     setFormState({
       code: shiftType.code,
       name: shiftType.name,
+      group: shiftType.group,
       startTime: shiftType.startTime,
       endTime: shiftType.endTime,
+      crossesMidnight: shiftType.crossesMidnight,
+      breakStart: shiftType.breakStart,
+      breakEnd: shiftType.breakEnd,
+      breakMinutes: shiftType.breakMinutes,
+      workMinutes: shiftType.workMinutes,
+      applicableDayType: shiftType.applicableDayType,
       color: shiftType.color,
-      minEmployees: shiftType.minEmployees,
-      maxEmployees: shiftType.maxEmployees,
       description: shiftType.description,
       status: shiftType.status,
     })
@@ -227,11 +240,12 @@ export function ShiftTypesPage() {
                 columns={[
                   { key: 'code', label: 'Mã ca' },
                   { key: 'name', label: 'Tên ca' },
+                  { key: 'group', label: 'Nhóm ca' },
                   { key: 'startTime', label: 'Bắt đầu' },
                   { key: 'endTime', label: 'Kết thúc' },
-                  { key: 'durationHours', label: 'Thời lượng (h)' },
-                  { key: 'minEmployees', label: 'Tối thiểu' },
-                  { key: 'maxEmployees', label: 'Tối đa' },
+                  { key: 'breakMinutes', label: 'Nghỉ' },
+                  { key: 'workMinutes', label: 'Làm việc' },
+                  { key: 'applicableDayType', label: 'Loại ngày' },
                   { key: 'status', label: 'Trạng thái', render: (item: ShiftType) => <StatusBadge status={item.status} /> },
                   { key: 'actions', label: 'Thao tác', render: (item: ShiftType) => (
                     <div className="flex items-center gap-2">
@@ -272,6 +286,14 @@ export function ShiftTypesPage() {
             <input value={formState.code} onChange={(event) => setFormState((current) => ({ ...current, code: event.target.value }))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none" />
           </div>
           <div className="space-y-1">
+            <label className="text-sm text-slate-700">Nhóm ca</label>
+            <select value={formState.group} onChange={(event) => setFormState((current) => ({ ...current, group: event.target.value as ShiftTypeFormValues['group'] }))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none">
+              <option value="THONG_TAM">Ca thông tầm</option>
+              <option value="NGOAI_GIO">Ca ngoài giờ</option>
+              <option value="CA_TRUC">Ca trực</option>
+            </select>
+          </div>
+          <div className="space-y-1">
             <label className="text-sm text-slate-700">Tên ca</label>
             <input value={formState.name} onChange={(event) => setFormState((current) => ({ ...current, name: event.target.value }))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none" />
           </div>
@@ -282,6 +304,28 @@ export function ShiftTypesPage() {
           <div className="space-y-1">
             <label className="text-sm text-slate-700">Giờ kết thúc</label>
             <input type="time" value={formState.endTime} onChange={(event) => setFormState((current) => ({ ...current, endTime: event.target.value }))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none" />
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm text-slate-700">Loại ngày áp dụng</label>
+            <select value={formState.applicableDayType} onChange={(event) => setFormState((current) => ({ ...current, applicableDayType: event.target.value as ShiftTypeFormValues['applicableDayType'] }))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none">
+              <option value="WEEKDAY">Thứ Hai đến Thứ Sáu</option>
+              <option value="WEEKEND_OR_HOLIDAY">Thứ Bảy, Chủ nhật và ngày lễ</option>
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm text-slate-700">Ca qua ngày hôm sau</label>
+            <select value={String(formState.crossesMidnight)} onChange={(event) => setFormState((current) => ({ ...current, crossesMidnight: event.target.value === 'true' }))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none">
+              <option value="false">Không</option>
+              <option value="true">Có</option>
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm text-slate-700">Thời gian nghỉ (phút)</label>
+            <input type="number" min={0} value={formState.breakMinutes} onChange={(event) => setFormState((current) => ({ ...current, breakMinutes: Number(event.target.value) }))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none" />
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm text-slate-700">Thời gian làm thực tế (phút)</label>
+            <input type="number" min={1} value={formState.workMinutes} onChange={(event) => setFormState((current) => ({ ...current, workMinutes: Number(event.target.value) }))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none" />
           </div>
           <div className="space-y-1">
             <label className="text-sm text-slate-700">Màu hiển thị</label>
@@ -296,14 +340,6 @@ export function ShiftTypesPage() {
               <option value="ACTIVE">Đang hoạt động</option>
               <option value="INACTIVE">Tạm ngưng</option>
             </select>
-          </div>
-          <div className="space-y-1">
-            <label className="text-sm text-slate-700">Số nhân viên tối thiểu</label>
-            <input type="number" min={1} value={formState.minEmployees} onChange={(event) => setFormState((current) => ({ ...current, minEmployees: Number(event.target.value) }))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none" />
-          </div>
-          <div className="space-y-1">
-            <label className="text-sm text-slate-700">Số nhân viên tối đa</label>
-            <input type="number" min={1} value={formState.maxEmployees} onChange={(event) => setFormState((current) => ({ ...current, maxEmployees: Number(event.target.value) }))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none" />
           </div>
           <div className="space-y-1 md:col-span-2">
             <label className="text-sm text-slate-700">Mô tả</label>
@@ -327,10 +363,12 @@ export function ShiftTypesPage() {
           <div className="space-y-3 text-sm text-slate-600">
             <div className="flex justify-between"><span>Mã ca</span><strong>{selectedShift.code}</strong></div>
             <div className="flex justify-between"><span>Tên ca</span><strong>{selectedShift.name}</strong></div>
+            <div className="flex justify-between"><span>Nhóm ca</span><strong>{selectedShift.group}</strong></div>
             <div className="flex justify-between"><span>Thời gian</span><strong>{selectedShift.startTime} - {selectedShift.endTime}</strong></div>
-            <div className="flex justify-between"><span>Thời lượng</span><strong>{selectedShift.durationHours} giờ</strong></div>
-            <div className="flex justify-between"><span>Nhân viên tối thiểu</span><strong>{selectedShift.minEmployees}</strong></div>
-            <div className="flex justify-between"><span>Nhân viên tối đa</span><strong>{selectedShift.maxEmployees}</strong></div>
+            <div className="flex justify-between"><span>Thời gian nghỉ</span><strong>{selectedShift.breakMinutes} phút</strong></div>
+            <div className="flex justify-between"><span>Thời gian làm thực tế</span><strong>{Math.round(selectedShift.workMinutes / 60)} giờ</strong></div>
+            <div className="flex justify-between"><span>Loại ngày</span><strong>{selectedShift.applicableDayType === 'WEEKDAY' ? 'Thứ Hai đến Thứ Sáu' : 'Thứ Bảy, Chủ nhật và ngày lễ'}</strong></div>
+            <div className="flex justify-between"><span>Qua ngày hôm sau</span><strong>{selectedShift.crossesMidnight ? 'Có' : 'Không'}</strong></div>
             <div className="flex justify-between"><span>Trạng thái</span><StatusBadge status={selectedShift.status} /></div>
             <div className="flex justify-between"><span>Mô tả</span><strong>{selectedShift.description}</strong></div>
           </div>

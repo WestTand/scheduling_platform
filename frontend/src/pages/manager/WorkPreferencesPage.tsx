@@ -15,6 +15,7 @@ import { StatCard } from '@/components/common/StatCard'
 import { StatusBadge } from '@/components/common/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { getShiftDefinition } from '@/configs/shiftDefinitions'
 import { preferenceService } from '@/services/preferenceService'
 import type { PaginatedResult, WorkPreference, WorkPreferenceDecision } from '@/types/management'
 
@@ -162,7 +163,7 @@ export function WorkPreferencesPage() {
                 columns={[
                   { key: 'employeeName', label: 'Nhân viên' },
                   { key: 'type', label: 'Loại', render: (item: WorkPreference) => <span>{preferenceTypeLabels[item.type]}</span> },
-                  { key: 'relatedShiftType', label: 'Ca liên quan', render: (item: WorkPreference) => <span>{item.relatedShiftType ?? 'Không có'}</span> },
+                  { key: 'relatedShiftCode', label: 'Ca liên quan', render: (item: WorkPreference) => <span>{item.relatedShiftCode ? `${getShiftDefinition(item.relatedShiftCode)?.name} (${item.relatedShiftCode})` : 'Không có'}</span> },
                   { key: 'submittedAt', label: 'Ngày gửi', render: (item: WorkPreference) => <span>{new Date(item.submittedAt).toLocaleDateString('vi-VN')}</span> },
                   { key: 'status', label: 'Trạng thái', render: (item: WorkPreference) => <StatusBadge status={item.status} /> },
                   { key: 'actions', label: 'Thao tác', render: (item: WorkPreference) => (
@@ -192,7 +193,7 @@ export function WorkPreferencesPage() {
           <div className="space-y-3 text-sm text-slate-600">
             <div className="flex justify-between"><span>Nhân viên</span><strong>{selectedPreference.employeeName}</strong></div>
             <div className="flex justify-between"><span>Loại</span><strong>{preferenceTypeLabels[selectedPreference.type]}</strong></div>
-            <div className="flex justify-between"><span>Ca liên quan</span><strong>{selectedPreference.relatedShiftType ?? 'Không có'}</strong></div>
+            <div className="flex justify-between"><span>Ca liên quan</span><strong>{selectedPreference.relatedShiftCode ? `${getShiftDefinition(selectedPreference.relatedShiftCode)?.name} (${selectedPreference.relatedShiftCode})` : 'Không có'}</strong></div>
             <div className="flex justify-between"><span>Gửi lúc</span><strong>{new Date(selectedPreference.submittedAt).toLocaleString('vi-VN')}</strong></div>
             <div className="flex justify-between"><span>Trạng thái</span><StatusBadge status={selectedPreference.status} /></div>
             <div className="flex justify-between"><span>Ghi chú</span><strong>{selectedPreference.note || 'Không có'}</strong></div>

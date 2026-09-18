@@ -1,5 +1,6 @@
 import { Eye, EyeOff, LockKeyhole, Mail, ShieldCheck } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -13,6 +14,7 @@ const demoAccounts = [
 
 export function LoginPage() {
   const { login, isLoading } = useAuth()
+  const navigate = useNavigate()
   const [credentials, setCredentials] = useState<LoginCredentials>({ email: '', password: '' })
   const [rememberMe, setRememberMe] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
@@ -159,6 +161,18 @@ export function LoginPage() {
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? 'Đang đăng nhập...' : 'Đăng nhập'}
                 </Button>
+
+                <Button type="button" variant="outline" className="w-full" onClick={() => navigate('/activate-account')}>
+                  Kích hoạt tài khoản
+                </Button>
+
+                {error && error.includes('Tài khoản chưa được kích hoạt.') && (
+                  <div className="text-center text-sm">
+                    <Link to={`/activate-account?username=${encodeURIComponent(credentials.email.trim())}`} className="font-medium text-blue-700 hover:text-blue-800">
+                      Kích hoạt ngay
+                    </Link>
+                  </div>
+                )}
               </form>
             </CardContent>
           </Card>

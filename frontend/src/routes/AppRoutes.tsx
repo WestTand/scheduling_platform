@@ -4,6 +4,7 @@ import { MainLayout } from '@/components/layout/MainLayout'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { useAuth } from '@/contexts/useAuth'
 import { Role, type User } from '@/types/auth'
+import { AccountActivationPage } from '@/pages/auth/AccountActivationPage'
 import { LoginPage } from '@/pages/auth/LoginPage'
 import { EmployeeDashboardPage } from '@/pages/employee/EmployeeDashboardPage'
 import { EmployeeLeaveRequestsPage } from '@/pages/employee/EmployeeLeaveRequestsPage'
@@ -47,6 +48,7 @@ function AppShell() {
           isAuthenticated && user ? <Navigate to={redirectToRoleDashboard(user)} replace /> : <LoginPage />
         }
       />
+      <Route path="/activate-account" element={<AccountActivationPage />} />
 
       <Route
         element={

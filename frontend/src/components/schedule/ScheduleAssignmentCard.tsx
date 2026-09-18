@@ -1,5 +1,6 @@
 import { AlertTriangle, Users } from 'lucide-react'
 
+import { formatShiftRangeLabel, getShiftDefinition } from '@/configs/shiftDefinitions'
 import type { ScheduleAssignment } from '@/types/schedule'
 
 interface ScheduleAssignmentCardProps {
@@ -7,12 +8,18 @@ interface ScheduleAssignmentCardProps {
 }
 
 export function ScheduleAssignmentCard({ assignment }: ScheduleAssignmentCardProps) {
+  const shift = getShiftDefinition(assignment.shiftCode)
+
+  if (!shift) {
+    return null
+  }
+
   return (
-    <article className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm" style={{ borderLeftColor: assignment.color, borderLeftWidth: 4 }}>
+    <article className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm" style={{ borderLeftColor: shift.color, borderLeftWidth: 4 }}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="font-semibold text-slate-900">{assignment.shiftName}</p>
-          <p className="text-xs text-slate-500">{assignment.shiftCode} · {assignment.startTime} - {assignment.endTime}</p>
+          <p className="font-semibold text-slate-900">{shift.name}</p>
+          <p className="text-xs text-slate-500">{assignment.shiftCode} · {formatShiftRangeLabel(shift)}</p>
         </div>
         {assignment.warningCount > 0 && <AlertTriangle className="h-4 w-4 text-amber-500" aria-label="Có cảnh báo" />}
       </div>

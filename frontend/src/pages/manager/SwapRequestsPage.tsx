@@ -14,6 +14,7 @@ import { StatCard } from '@/components/common/StatCard'
 import { StatusBadge } from '@/components/common/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { formatShiftRangeLabel, getShiftDefinition } from '@/configs/shiftDefinitions'
 import { swapRequestService } from '@/services/swapRequestService'
 import type { PaginatedResult, SwapRequest, SwapRequestStatus } from '@/types/management'
 
@@ -144,8 +145,8 @@ export function SwapRequestsPage() {
                 columns={[
                   { key: 'id', label: 'Mã yêu cầu' },
                   { key: 'employeeName', label: 'Nhân viên gửi' },
-                  { key: 'currentShift', label: 'Ca hiện tại' },
-                  { key: 'requestedShift', label: 'Ca muốn đổi' },
+                  { key: 'currentShiftCode', label: 'Ca hiện tại', render: (item: SwapRequest) => { const shift = getShiftDefinition(item.currentShiftCode); return <span>{shift?.name} · {shift && formatShiftRangeLabel(shift)}</span> } },
+                  { key: 'requestedShiftCode', label: 'Ca muốn đổi', render: (item: SwapRequest) => { const shift = getShiftDefinition(item.requestedShiftCode); return <span>{shift?.name} · {shift && formatShiftRangeLabel(shift)}</span> } },
                   { key: 'requestedDate', label: 'Ngày', render: (item: SwapRequest) => <span>{new Date(item.requestedDate).toLocaleDateString('vi-VN')}</span> },
                   { key: 'status', label: 'Trạng thái', render: (item: SwapRequest) => <StatusBadge status={item.status} /> },
                   { key: 'actions', label: 'Thao tác', render: (item: SwapRequest) => (
@@ -187,8 +188,8 @@ export function SwapRequestsPage() {
           <div className="mt-4 space-y-3 text-sm text-slate-600">
             <div className="flex justify-between"><span>Mã yêu cầu</span><strong>{selected.id}</strong></div>
             <div className="flex justify-between"><span>Nhân viên</span><strong>{selected.employeeName}</strong></div>
-            <div className="flex justify-between"><span>Ca hiện tại</span><strong>{selected.currentShift}</strong></div>
-            <div className="flex justify-between"><span>Ca muốn đổi</span><strong>{selected.requestedShift}</strong></div>
+            <div className="flex justify-between"><span>Ca hiện tại</span><strong>{getShiftDefinition(selected.currentShiftCode)?.name}</strong></div>
+            <div className="flex justify-between"><span>Ca muốn đổi</span><strong>{getShiftDefinition(selected.requestedShiftCode)?.name}</strong></div>
             <div className="flex justify-between"><span>Ngày gửi</span><strong>{new Date(selected.requestedDate).toLocaleDateString('vi-VN')}</strong></div>
             <div className="flex justify-between"><span>Nhân viên đổi cùng</span><strong>{selected.partnerName ?? 'Không có'}</strong></div>
             <div className="flex justify-between"><span>Lý do</span><strong>{selected.reason}</strong></div>

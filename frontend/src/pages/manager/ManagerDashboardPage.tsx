@@ -8,6 +8,7 @@ import { currentDateLabel, managerDashboardData } from '@/mocks/dashboardData'
 import { leaveRequestSeed, preferenceSeed, swapRequestSeed } from '@/mocks/managementData'
 import { scheduleDetailSeed, scheduleSeed } from '@/mocks/schedules'
 import { useAuth } from '@/contexts/useAuth'
+import { getShiftDefinition } from '@/configs/shiftDefinitions'
 
 export function ManagerDashboardPage() {
   const { user } = useAuth()
@@ -76,11 +77,11 @@ export function ManagerDashboardPage() {
             <CardDescription>Danh sách ca điều phối trong tuần hiện tại.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 px-5 pb-5">
-            {[{ label: 'Thứ 2 - 17/09', value: 'Ca sáng: 12 nhân viên', status: 'Ổn định', path: '/manager/schedules/schedule-demo-01' }, { label: 'Thứ 3 - 18/09', value: 'Ca chiều: 9 nhân viên', status: 'Thiếu 2', path: '/manager/schedules/schedule-demo-01?tab=warnings' }, { label: 'Thứ 4 - 19/09', value: 'Ca đêm: 11 nhân viên', status: 'Ổn định', path: '/manager/schedules/schedule-demo-01' }].map((item) => (
+            {[{ label: 'Thứ 5 - 17/09', shiftCode: 'NGOAI_GIO_1', employeeCount: 12, status: 'Ổn định', path: '/manager/schedules/schedule-demo-01' }, { label: 'Thứ 6 - 18/09', shiftCode: 'NGOAI_GIO_2', employeeCount: 9, status: 'Thiếu 2', path: '/manager/schedules/schedule-demo-01?tab=warnings' }, { label: 'Thứ 7 - 19/09', shiftLabel: 'Trực đêm · Trực sáng · Trực chiều', employeeCount: 3, status: 'Ổn định', path: '/manager/schedules/schedule-demo-01' }].map((item) => (
               <Link key={item.label} to={item.path} className="flex cursor-pointer items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
                 <div>
                   <p className="font-medium text-slate-800">{item.label}</p>
-                  <p className="text-sm text-slate-500">{item.value}</p>
+                  <p className="text-sm text-slate-500">{item.shiftLabel ?? `${getShiftDefinition(item.shiftCode)?.name}: ${item.employeeCount} nhân viên`}{item.shiftLabel ? ` · ${item.employeeCount} phân công` : ''}</p>
                 </div>
                 <Badge variant={item.status === 'Thiếu 2' ? 'destructive' : 'secondary'}>{item.status}</Badge>
               </Link>
@@ -137,7 +138,7 @@ export function ManagerDashboardPage() {
                     <p className="font-medium text-slate-800">{request.employee}</p>
                     <Badge variant="secondary">{request.type}</Badge>
                   </div>
-                  <p className="text-sm text-slate-500">{request.shift} • {request.date}</p>
+                  <p className="text-sm text-slate-500">{request.shiftCode ? getShiftDefinition(request.shiftCode)?.name : 'Cả ngày'} • {request.date}</p>
                 </div>
                 <Button variant="outline" size="sm" onClick={() => navigate(request.type === 'Nghỉ phép' ? '/manager/leave-requests?status=PENDING' : '/manager/swap-requests?status=PENDING')}>Xem chi tiết</Button>
               </div>

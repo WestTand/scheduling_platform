@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { employeeDashboardData } from '@/mocks/dashboardData'
 import { useAuth } from '@/contexts/useAuth'
+import { formatShiftRangeLabel, getShiftDefinition } from '@/configs/shiftDefinitions'
 
 export function EmployeeDashboardPage() {
   const { user } = useAuth()
@@ -31,14 +32,15 @@ export function EmployeeDashboardPage() {
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {employeeDashboardData.summary.map((item, index) => {
           const paths = ['/employee/schedule?view=today', '/employee/schedule?assignmentId=assignment-05', '/employee/schedule?view=week', '/employee/leave-requests?status=PENDING']
+          const shift = 'shiftCode' in item ? getShiftDefinition(item.shiftCode ?? '') : undefined
           return <Link key={item.label} to={paths[index]} className="block rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
           <Card className="h-full cursor-pointer border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md">
             <CardHeader className="px-4 pb-3 pt-4">
               <CardTitle className="text-sm text-slate-500">{item.label}</CardTitle>
             </CardHeader>
             <CardContent className="px-4 pb-4">
-              <div className="text-2xl font-bold text-slate-900">{item.value}</div>
-              <p className="mt-1 text-xs text-slate-500">{item.detail}</p>
+              <div className="text-2xl font-bold text-slate-900">{shift?.name ?? item.value}</div>
+              <p className="mt-1 text-xs text-slate-500">{shift ? formatShiftRangeLabel(shift) : item.detail}</p>
             </CardContent>
           </Card>
           </Link>
@@ -56,7 +58,7 @@ export function EmployeeDashboardPage() {
               <Link key={shift.date} to={`/employee/schedule?assignmentId=assignment-0${index + 4}`} className="flex cursor-pointer items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
                 <div>
                   <p className="font-medium text-slate-800">{shift.day} • {shift.date}</p>
-                  <p className="text-sm text-slate-500">{shift.shift} • {shift.hours}</p>
+                  <p className="text-sm text-slate-500">{shift.shiftCodes ? shift.shiftCodes.map((code) => getShiftDefinition(code)?.name).join(' · ') : `${getShiftDefinition(shift.shiftCode)?.name} • ${formatShiftRangeLabel(getShiftDefinition(shift.shiftCode)!)}`}</p>
                 </div>
                 <Badge variant="outline">Đã xác nhận</Badge>
               </Link>

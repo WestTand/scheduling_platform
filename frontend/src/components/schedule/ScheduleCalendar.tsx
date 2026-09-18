@@ -43,7 +43,7 @@ export function ScheduleCalendar({ assignments, mode, employeeFilter, shiftFilte
     )
   }
 
-  if (mode === 'DAY') {
+  if (mode === 'DAILY') {
     return <ScheduleDayList assignments={filtered} />
   }
 

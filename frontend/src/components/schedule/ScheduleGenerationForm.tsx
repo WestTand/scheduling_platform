@@ -13,7 +13,6 @@ export interface ScheduleGenerationValues {
   period: 'WEEK' | 'MONTH'
   employeeIds: string[]
   shiftCodes: string[]
-  weights: { fairness: number; consecutiveShift: number; weekend: number; preference: number; workHour: number }
 }
 
 interface ScheduleGenerationFormProps {
@@ -21,7 +20,6 @@ interface ScheduleGenerationFormProps {
   onCancel: () => void
 }
 
-const initialWeights = { fairness: 5, consecutiveShift: 4, weekend: 3, preference: 6, workHour: 4 }
 
 export function ScheduleGenerationForm({ onSubmit, onCancel }: ScheduleGenerationFormProps) {
   const activeEmployees = useMemo(() => employeeSeed.filter((employee) => employee.status === 'ACTIVE'), [])
@@ -34,7 +32,6 @@ export function ScheduleGenerationForm({ onSubmit, onCancel }: ScheduleGeneratio
   const [employeeIds, setEmployeeIds] = useState<string[]>(activeEmployees.map((employee) => employee.id))
   const [employeeSearch, setEmployeeSearch] = useState('')
   const [shiftCodes, setShiftCodes] = useState<string[]>(activeShifts.map((shift) => shift.code))
-  const [weights, setWeights] = useState(initialWeights)
   const [error, setError] = useState('')
   const visibleEmployees = activeEmployees.filter((employee) => [employee.fullName, employee.employeeCode].some((value) => value.toLowerCase().includes(employeeSearch.toLowerCase())))
 
@@ -57,7 +54,7 @@ export function ScheduleGenerationForm({ onSubmit, onCancel }: ScheduleGeneratio
     }
 
     setError('')
-    onSubmit({ name: name.trim(), startDate, endDate, note: note.trim(), period, employeeIds, shiftCodes, weights })
+      onSubmit({ name: name.trim(), startDate, endDate, note: note.trim(), period, employeeIds, shiftCodes })
   }
 
   const resetForm = () => {
@@ -69,7 +66,6 @@ export function ScheduleGenerationForm({ onSubmit, onCancel }: ScheduleGeneratio
     setEmployeeIds(activeEmployees.map((employee) => employee.id))
     setEmployeeSearch('')
     setShiftCodes(activeShifts.map((shift) => shift.code))
-    setWeights(initialWeights)
     setError('')
   }
 
@@ -93,12 +89,7 @@ export function ScheduleGenerationForm({ onSubmit, onCancel }: ScheduleGeneratio
 
       <Card className="border-slate-200 shadow-sm">
         <CardHeader><CardTitle className="text-base">Loại ca áp dụng</CardTitle></CardHeader>
-        <CardContent className="grid gap-3 lg:grid-cols-3">{activeShifts.map((shift) => <label key={shift.code} className="cursor-pointer rounded-xl border p-4" style={{ borderLeftColor: shift.color, borderLeftWidth: 4 }}><div className="flex items-start gap-3"><input type="checkbox" checked={shiftCodes.includes(shift.code)} onChange={() => toggleValue(shiftCodes, shift.code, setShiftCodes)} /><div><p className="font-semibold text-slate-900">{shift.name} <span className="text-xs font-normal text-slate-500">({shift.code})</span></p><p className="mt-1 text-sm text-slate-500">{shift.startTime} - {shift.endTime} · {shift.minEmployees}-{shift.maxEmployees} nhân viên</p></div></div></label>)}</CardContent>
-      </Card>
-
-      <Card className="border-slate-200 shadow-sm">
-        <CardHeader><CardTitle className="text-base">Các ràng buộc và tiêu chí tối ưu</CardTitle></CardHeader>
-        <CardContent className="grid gap-5 lg:grid-cols-2"><div><p className="mb-2 text-sm font-semibold text-red-700">Ràng buộc cứng</p><ul className="list-disc space-y-1 pl-5 text-sm text-slate-600"><li>Không trùng ca.</li><li>Tối đa 12 giờ làm việc/ngày.</li><li>Nghỉ tối thiểu 12 giờ giữa hai ca.</li><li>Ngoài giờ tối đa 1 ngày/tuần.</li><li>Thông tầm tối đa 2 ngày/tuần.</li><li>Không phân công vào ngày nghỉ đã duyệt.</li></ul></div><div><p className="mb-2 text-sm font-semibold text-amber-700">Tiêu chí tối ưu</p><div className="space-y-3">{Object.entries({ fairness: 'Công bằng tổng số ca', consecutiveShift: 'Hạn chế ca nặng liên tiếp', weekend: 'Cân bằng ca cuối tuần', preference: 'Ưu tiên nguyện vọng', workHour: 'Cân bằng tổng giờ làm' }).map(([key, label]) => <label key={key} className="flex items-center justify-between gap-3 text-sm text-slate-700">{label}<input type="number" min={0} value={weights[key as keyof typeof weights]} onChange={(event) => setWeights((current) => ({ ...current, [key]: Number(event.target.value) }))} className="w-20 rounded-lg border border-slate-200 px-2 py-1.5 text-right" /></label>)}</div><p className="mt-3 text-xs text-slate-500">Trọng số chỉ được lưu trong form và sẽ gửi cho dịch vụ lập lịch khi tích hợp backend. Không phải phần trăm.</p></div></CardContent>
+        <CardContent className="grid gap-3 lg:grid-cols-3">{activeShifts.map((shift) => <label key={shift.code} className="cursor-pointer rounded-xl border p-4" style={{ borderLeftColor: shift.color, borderLeftWidth: 4 }}><div className="flex items-start gap-3"><input type="checkbox" checked={shiftCodes.includes(shift.code)} onChange={() => toggleValue(shiftCodes, shift.code, setShiftCodes)} /><div><p className="font-semibold text-slate-900">{shift.name} <span className="text-xs font-normal text-slate-500">({shift.code})</span></p><p className="mt-1 text-sm text-slate-500">{shift.startTime} - {shift.endTime} · {shift.applicableDayType === 'WEEKDAY' ? 'Thứ Hai đến Thứ Sáu' : 'Thứ Bảy, Chủ nhật & ngày lễ'}</p></div></div></label>)}</CardContent>
       </Card>
 
       {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}

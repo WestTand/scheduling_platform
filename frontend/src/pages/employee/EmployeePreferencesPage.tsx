@@ -9,10 +9,11 @@ import { SearchInput } from '@/components/common/SearchInput'
 import { StatusBadge } from '@/components/common/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { getShiftDefinition, shiftDefinitions } from '@/configs/shiftDefinitions'
 
 const seedPreferences = [
-  { id: 'PREF-001', month: '2026-09', type: 'PREFERRED', relatedShiftType: 'Ca sáng', priority: 1, note: 'Ưu tiên làm ca sáng trong tuần đầu', status: 'PENDING' },
-  { id: 'PREF-002', month: '2026-10', type: 'AVOID_SHIFT', relatedShiftType: 'Ca đêm', priority: 2, note: 'Không muốn làm ca đêm nếu có thể', status: 'APPROVED' },
+  { id: 'PREF-001', month: '2026-09', type: 'PREFERRED', relatedShiftCode: 'THONG_TAM', priority: 1, note: 'Ưu tiên làm ca thông tầm trong tuần đầu', status: 'PENDING' },
+  { id: 'PREF-002', month: '2026-10', type: 'AVOID_SHIFT', relatedShiftCode: 'TRUC_DEM', priority: 2, note: 'Không muốn làm trực đêm nếu có thể', status: 'APPROVED' },
 ]
 
 const preferenceLabels: Record<string, string> = {
@@ -30,7 +31,7 @@ export function EmployeePreferencesPage() {
   const [monthFilter, setMonthFilter] = useState('ALL')
   const [statusFilter, setStatusFilter] = useState(() => searchParams.get('status') ?? 'ALL')
   const [preferences, setPreferences] = useState(seedPreferences)
-  const [form, setForm] = useState({ month: '2026-10', type: 'PREFERRED', relatedShiftType: 'Ca sáng', priority: '1', note: '', })
+  const [form, setForm] = useState({ month: '2026-10', type: 'PREFERRED', relatedShiftCode: 'THONG_TAM', priority: '1', note: '', })
 
   useEffect(() => {
     if (searchParams.get('action') !== 'create') {
@@ -43,7 +44,7 @@ export function EmployeePreferencesPage() {
   }, [searchParams, setSearchParams])
 
   const filtered = useMemo(() => preferences.filter((item) => {
-    const matchesSearch = !search || item.note.toLowerCase().includes(search.toLowerCase()) || item.relatedShiftType.toLowerCase().includes(search.toLowerCase())
+    const matchesSearch = !search || item.note.toLowerCase().includes(search.toLowerCase()) || item.relatedShiftCode.toLowerCase().includes(search.toLowerCase())
     const matchesMonth = monthFilter === 'ALL' || item.month === monthFilter
     const matchesStatus = statusFilter === 'ALL' || item.status === statusFilter
     return matchesSearch && matchesMonth && matchesStatus
@@ -59,14 +60,14 @@ export function EmployeePreferencesPage() {
       id: `PREF-${Date.now()}`,
       month: form.month,
       type: form.type,
-      relatedShiftType: form.relatedShiftType,
+      relatedShiftCode: form.relatedShiftCode,
       priority: Number(form.priority),
       note: form.note,
       status: 'PENDING',
     }, ...current])
 
     setShowForm(false)
-    setForm({ month: '2026-10', type: 'PREFERRED', relatedShiftType: 'Ca sáng', priority: '1', note: '' })
+    setForm({ month: '2026-10', type: 'PREFERRED', relatedShiftCode: 'THONG_TAM', priority: '1', note: '' })
     window.alert('Nguyện vọng đã được gửi và đang chờ xem xét.')
   }
 
@@ -101,7 +102,7 @@ export function EmployeePreferencesPage() {
             columns={[
               { key: 'month', label: 'Tháng', render: (item: (typeof seedPreferences)[number]) => <span>{item.month}</span> },
               { key: 'type', label: 'Loại nguyện vọng', render: (item: (typeof seedPreferences)[number]) => <span>{preferenceLabels[item.type]}</span> },
-              { key: 'relatedShiftType', label: 'Ca liên quan' },
+              { key: 'relatedShiftCode', label: 'Ca liên quan', render: (item: (typeof seedPreferences)[number]) => <span>{getShiftDefinition(item.relatedShiftCode)?.name} ({item.relatedShiftCode})</span> },
               { key: 'priority', label: 'Mức ưu tiên' },
               { key: 'status', label: 'Trạng thái', render: (item: (typeof seedPreferences)[number]) => <StatusBadge status={item.status} /> },
               { key: 'actions', label: 'Thao tác', render: (item: (typeof seedPreferences)[number]) => (
@@ -140,10 +141,8 @@ export function EmployeePreferencesPage() {
           </div>
           <div className="space-y-1">
             <label className="text-sm text-slate-700">Loại ca liên quan</label>
-            <select value={form.relatedShiftType} onChange={(event) => setForm((current) => ({ ...current, relatedShiftType: event.target.value }))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm">
-              <option value="Ca sáng">Ca sáng</option>
-              <option value="Ca chiều">Ca chiều</option>
-              <option value="Ca đêm">Ca đêm</option>
+            <select value={form.relatedShiftCode} onChange={(event) => setForm((current) => ({ ...current, relatedShiftCode: event.target.value }))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm">
+              {shiftDefinitions.map((shift) => <option key={shift.code} value={shift.code}>{shift.name}</option>)}
             </select>
           </div>
           <div className="space-y-1">
@@ -169,7 +168,7 @@ export function EmployeePreferencesPage() {
           <div className="mt-4 space-y-3 text-sm text-slate-600">
             <div className="flex justify-between"><span>Tháng</span><strong>{selected.month}</strong></div>
             <div className="flex justify-between"><span>Loại</span><strong>{preferenceLabels[selected.type]}</strong></div>
-            <div className="flex justify-between"><span>Ca liên quan</span><strong>{selected.relatedShiftType}</strong></div>
+            <div className="flex justify-between"><span>Ca liên quan</span><strong>{getShiftDefinition(selected.relatedShiftCode)?.name} ({selected.relatedShiftCode})</strong></div>
             <div className="flex justify-between"><span>Mức ưu tiên</span><strong>{selected.priority}</strong></div>
             <div className="flex justify-between"><span>Trạng thái</span><StatusBadge status={selected.status} /></div>
             <div className="flex justify-between"><span>Ghi chú</span><strong>{selected.note}</strong></div>

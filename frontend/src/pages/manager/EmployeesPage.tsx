@@ -1,6 +1,8 @@
 import { AlertTriangle, Edit3, Eye, Search, Trash2, UserRound } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
+import { AccountStatusBadge } from '@/components/account/AccountStatusBadge'
+import { CreateAccountDialog } from '@/components/account/CreateAccountDialog'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { DataTable } from '@/components/common/DataTable'
 import { EmptyState } from '@/components/common/EmptyState'
@@ -15,7 +17,9 @@ import { StatusBadge } from '@/components/common/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { useAuth } from '@/contexts/useAuth'
+import { accountService } from '@/services/accountService'
 import { employeeService } from '@/services/employeeService'
+import type { UserAccount } from '@/types/account'
 import type { Employee, EmployeeFormValues, PaginatedResult } from '@/types/management'
 
 const emptyForm: EmployeeFormValues = {
@@ -35,6 +39,11 @@ const statusOptions = [
   { value: 'INACTIVE', label: 'Tạm ngưng' },
 ]
 
+const getAccountStatus = (employeeId: string, accounts: UserAccount[]) => {
+  const account = accounts.find((item) => item.employeeId === employeeId)
+  return account ? account.status : 'NO_ACCOUNT'
+}
+
 export function EmployeesPage() {
   const { user } = useAuth()
   const [page, setPage] = useState(1)
@@ -43,21 +52,31 @@ export function EmployeesPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [data, setData] = useState<PaginatedResult<Employee>>({ data: [], page: 1, pageSize: 5, total: 0, totalPages: 1 })
+  const [accounts, setAccounts] = useState<UserAccount[]>([])
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null)
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null)
   const [formOpen, setFormOpen] = useState(false)
+  const [createAccountTarget, setCreateAccountTarget] = useState<Employee | null>(null)
+  const [accountDialogOpen, setAccountDialogOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<Employee | null>(null)
+  const [resendTarget, setResendTarget] = useState<UserAccount | null>(null)
+  const [followUpEmployee, setFollowUpEmployee] = useState<Employee | null>(null)
   const [formState, setFormState] = useState<EmployeeFormValues>(emptyForm)
   const [formError, setFormError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [accountSubmitting, setAccountSubmitting] = useState(false)
 
   const fetchEmployees = async () => {
     setLoading(true)
     setError('')
 
     try {
-      const result = await employeeService.list({ page, pageSize: 5, search, status })
-      setData(result)
+      const [employeeResult, accountResult] = await Promise.all([
+        employeeService.list({ page, pageSize: 5, search, status }),
+        accountService.getAccounts(),
+      ])
+      setData(employeeResult)
+      setAccounts(accountResult)
     } catch (fetchError) {
       setError(fetchError instanceof Error ? fetchError.message : 'Không thể tải danh sách nhân viên.')
     } finally {
@@ -73,9 +92,14 @@ export function EmployeesPage() {
       setError('')
 
       try {
-        const result = await employeeService.list({ page, pageSize: 5, search, status })
+        const [employeeResult, accountResult] = await Promise.all([
+          employeeService.list({ page, pageSize: 5, search, status }),
+          accountService.getAccounts(),
+        ])
+
         if (mounted) {
-          setData(result)
+          setData(employeeResult)
+          setAccounts(accountResult)
         }
       } catch (fetchError) {
         if (mounted) {
@@ -150,15 +174,21 @@ export function EmployeesPage() {
     setFormError('')
 
     try {
+      let createdEmployee: Employee | null = null
+
       if (editingEmployee) {
         await employeeService.update(editingEmployee.id, formState)
       } else {
-        await employeeService.add(formState)
+        createdEmployee = await employeeService.add(formState)
       }
 
       setFormOpen(false)
       setPage(1)
       await fetchEmployees()
+
+      if (!editingEmployee && createdEmployee) {
+        setFollowUpEmployee(createdEmployee)
+      }
     } catch (submitError) {
       setFormError(submitError instanceof Error ? submitError.message : 'Có lỗi xảy ra khi lưu nhân viên.')
     } finally {
@@ -198,6 +228,67 @@ export function EmployeesPage() {
     } catch (deleteError) {
       window.alert(deleteError instanceof Error ? deleteError.message : 'Không thể xóa nhân viên.')
     }
+  }
+
+  const handleCreateAccountSubmit = async (input: { employeeId: string; username: string; email: string; temporaryPassword: string }) => {
+    setAccountSubmitting(true)
+
+    try {
+      await accountService.createEmployeeAccount(input)
+      setAccountDialogOpen(false)
+      setCreateAccountTarget(null)
+      await fetchEmployees()
+    } finally {
+      setAccountSubmitting(false)
+    }
+  }
+
+  const handleResendOtp = async () => {
+    if (!resendTarget) {
+      return
+    }
+
+    try {
+      await accountService.resendActivationOtp(resendTarget.id)
+      setResendTarget(null)
+      await fetchEmployees()
+      window.alert('Mã OTP mới đã được gửi tới email nhân viên. OTP mock đang sử dụng: 123456.')
+    } catch (errorMessage) {
+      window.alert(errorMessage instanceof Error ? errorMessage.message : 'Không thể gửi lại mã OTP.')
+    }
+  }
+
+  const openAccountDialog = (employee: Employee) => {
+    setCreateAccountTarget(employee)
+    setAccountDialogOpen(true)
+  }
+
+  const renderAccountColumn = (employee: Employee) => {
+    const status = getAccountStatus(employee.id, accounts)
+    return <AccountStatusBadge status={status} />
+  }
+
+  const renderAccountAction = (employee: Employee) => {
+    const status = getAccountStatus(employee.id, accounts)
+    const account = accounts.find((item) => item.employeeId === employee.id)
+
+    if (status === 'NO_ACCOUNT') {
+      return <Button variant="outline" size="sm" onClick={() => openAccountDialog(employee)}>Tạo tài khoản</Button>
+    }
+
+    if (status === 'PENDING_ACTIVATION') {
+      return <Button variant="secondary" size="sm" onClick={() => setResendTarget(account ?? null)}>Gửi lại OTP</Button>
+    }
+
+    if (status === 'ACTIVE') {
+      return <Button variant="ghost" size="sm" onClick={() => setSelectedEmployee(employee)}>Xem tài khoản</Button>
+    }
+
+    if (status === 'LOCKED' || status === 'DISABLED') {
+      return <AccountStatusBadge status={status} />
+    }
+
+    return null
   }
 
   return (
@@ -246,10 +337,11 @@ export function EmployeesPage() {
                   { key: 'email', label: 'Email' },
                   { key: 'phone', label: 'Số điện thoại' },
                   { key: 'role', label: 'Vai trò', render: (employee: Employee) => <span>{employee.role === 'MANAGER' ? 'Quản lý' : 'Nhân viên'}</span> },
+                  { key: 'accountStatus', label: 'Trạng thái tài khoản', render: renderAccountColumn },
                   { key: 'status', label: 'Trạng thái', render: (employee: Employee) => <StatusBadge status={employee.status} /> },
                   { key: 'joinDate', label: 'Ngày bắt đầu', render: (employee: Employee) => <span>{new Date(employee.joinDate).toLocaleDateString('vi-VN')}</span> },
                   { key: 'actions', label: 'Thao tác', render: (employee: Employee) => (
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <Button variant="ghost" size="icon" onClick={() => setSelectedEmployee(employee)} aria-label="Xem chi tiết">
                         <Eye className="h-4 w-4" />
                       </Button>
@@ -259,6 +351,7 @@ export function EmployeesPage() {
                       <Button variant="ghost" size="icon" onClick={() => toggleStatus(employee)} aria-label="Thay đổi trạng thái">
                         <AlertTriangle className="h-4 w-4" />
                       </Button>
+                      {renderAccountAction(employee)}
                       <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(employee)} aria-label="Xóa nhân viên">
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -326,12 +419,52 @@ export function EmployeesPage() {
         {formError && <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</div>}
       </FormDialog>
 
+      <CreateAccountDialog
+        employee={createAccountTarget}
+        employees={data.data.filter((employee) => getAccountStatus(employee.id, accounts) === 'NO_ACCOUNT')}
+        open={accountDialogOpen}
+        isSubmitting={accountSubmitting}
+        onClose={() => {
+          setAccountDialogOpen(false)
+          setCreateAccountTarget(null)
+        }}
+        onSubmit={handleCreateAccountSubmit}
+      />
+
       <ConfirmDialog
         open={Boolean(deleteTarget)}
         title="Xóa nhân viên"
         description={`Bạn có chắc chắn muốn xóa ${deleteTarget?.fullName} khỏi danh sách nhân viên?`}
         onCancel={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
+      />
+
+      <ConfirmDialog
+        open={Boolean(resendTarget)}
+        title="Gửi lại OTP"
+        description={`Bạn có muốn gửi lại mã kích hoạt cho tài khoản của ${resendTarget ? (accounts.find((account) => account.id === resendTarget.id)?.username ?? 'nhân viên') : 'nhân viên'}?`}
+        cancelLabel="Hủy"
+        confirmLabel="Gửi lại OTP"
+        onCancel={() => setResendTarget(null)}
+        onConfirm={handleResendOtp}
+      >
+        <p className="mt-3 text-sm text-slate-500">Email nhận mã: {resendTarget ? accounts.find((account) => account.id === resendTarget.id)?.email ? accounts.find((account) => account.id === resendTarget.id)?.email?.replace(/(.{2})(.*)(@.*)/, '$1***$3') : '' : ''}</p>
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={Boolean(followUpEmployee)}
+        title="Đã thêm nhân viên thành công"
+        description={`Bạn có muốn tạo tài khoản cho nhân viên ${followUpEmployee?.fullName} ngay không?`}
+        cancelLabel="Để sau"
+        confirmLabel="Tạo tài khoản"
+        onCancel={() => setFollowUpEmployee(null)}
+        onConfirm={() => {
+          if (followUpEmployee) {
+            setAccountDialogOpen(true)
+            setCreateAccountTarget(followUpEmployee)
+          }
+          setFollowUpEmployee(null)
+        }}
       />
 
       {selectedEmployee && (
@@ -345,6 +478,7 @@ export function EmployeesPage() {
             <div className="flex justify-between"><span>Trạng thái</span><StatusBadge status={selectedEmployee.status} /></div>
             <div className="flex justify-between"><span>Ngày bắt đầu</span><strong>{new Date(selectedEmployee.joinDate).toLocaleDateString('vi-VN')}</strong></div>
             <div className="flex justify-between"><span>Ghi chú</span><strong>{selectedEmployee.note || 'Không có'}</strong></div>
+            <div className="flex justify-between"><span>Trạng thái tài khoản</span><AccountStatusBadge status={getAccountStatus(selectedEmployee.id, accounts)} /></div>
           </div>
         </FormDialog>
       )}

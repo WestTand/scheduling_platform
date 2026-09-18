@@ -6,12 +6,14 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { PageHeader } from '@/components/common/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { formatShiftRangeLabel, getShiftDefinition, getShiftDefinitionsForDate } from '@/configs/shiftDefinitions'
 import { scheduleDetailSeed, scheduleStatusLabels } from '@/mocks/schedules'
+import type { ShiftCode } from '@/configs/shiftDefinitions'
 import type { ScheduleAssignment } from '@/types/schedule'
 
 const emptyAssignmentForm = {
   date: '2026-09-17',
-  shiftCode: 'DAY',
+  shiftCode: 'THONG_TAM' as ShiftCode,
   employeeName: 'Trần Văn Nam',
   note: '',
 }
@@ -29,11 +31,7 @@ export function ScheduleEditPage() {
   const detail = scheduleId === scheduleDetailSeed.id ? scheduleDetailSeed : null
 
   const employeeOptions = useMemo(() => ['Trần Văn Nam', 'Lê Thị Hòa', 'Hoàng Văn Tâm', 'Phạm Minh Khoa'], [])
-  const shiftOptions = useMemo(() => [
-    { value: 'DAY', label: 'Ca ngày • 07:00 - 12:00' },
-    { value: 'EVENING', label: 'Ca chiều • 13:00 - 18:00' },
-    { value: 'NIGHT', label: 'Ca đêm • 19:00 - 23:00' },
-  ], [])
+  const shiftOptions = useMemo(() => getShiftDefinitionsForDate(formState.date).map((shift) => ({ value: shift.code, label: `${shift.name} • ${formatShiftRangeLabel(shift)}` })), [formState.date])
 
   if (!detail) {
     return (
@@ -47,6 +45,8 @@ export function ScheduleEditPage() {
       </div>
     )
   }
+
+  const selectedShift = getShiftDefinition(formState.shiftCode)
 
   const openCreate = () => {
     setEditingId(null)
@@ -66,10 +66,6 @@ export function ScheduleEditPage() {
   }
 
   const handleSave = () => {
-    const selectedShift = shiftOptions.find((shift) => shift.value === formState.shiftCode)
-    const startTime = selectedShift?.label.split('•')[1]?.trim().split(' - ')[0] ?? '07:00'
-    const endTime = selectedShift?.label.split('•')[1]?.trim().split(' - ')[1] ?? '12:00'
-
     if (!formState.date || !formState.employeeName || !formState.shiftCode) {
       setNotice('Vui lòng điền đầy đủ thông tin phân công.')
       return
@@ -80,9 +76,6 @@ export function ScheduleEditPage() {
         ...assignment,
         date: formState.date,
         shiftCode: formState.shiftCode,
-        shiftName: selectedShift?.label.split('•')[0].trim() ?? assignment.shiftName,
-        startTime,
-        endTime,
         employeeNames: [formState.employeeName],
         warningCount: assignment.warningCount,
       } : assignment))
@@ -93,10 +86,6 @@ export function ScheduleEditPage() {
         scheduleId: detail.id,
         date: formState.date,
         shiftCode: formState.shiftCode,
-        shiftName: selectedShift?.label.split('•')[0].trim() ?? 'Ca ngày',
-        startTime,
-        endTime,
-        color: formState.shiftCode === 'EVENING' ? '#f59e0b' : formState.shiftCode === 'NIGHT' ? '#8b5cf6' : '#2563eb',
         employeeNames: [formState.employeeName],
         warningCount: formState.note ? 1 : 0,
       }
@@ -169,8 +158,8 @@ export function ScheduleEditPage() {
             {assignments.map((assignment) => (
               <div key={assignment.id} className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 md:flex-row md:items-center md:justify-between">
                 <div>
-                  <p className="font-medium text-slate-900">{assignment.shiftName} • {assignment.date}</p>
-                  <p className="text-sm text-slate-500">{assignment.startTime} - {assignment.endTime} • {assignment.employeeNames.join(', ')}</p>
+                  <p className="font-medium text-slate-900">{getShiftDefinition(assignment.shiftCode)?.name} • {assignment.date}</p>
+                  <p className="text-sm text-slate-500">{getShiftDefinition(assignment.shiftCode) && formatShiftRangeLabel(getShiftDefinition(assignment.shiftCode)!)} • {assignment.employeeNames.join(', ')}</p>
                   {assignment.warningCount > 0 && <p className="mt-1 inline-flex items-center gap-2 text-xs text-amber-700"><AlertTriangle className="h-3.5 w-3.5" />Có cảnh báo mẫu</p>}
                 </div>
                 <div className="flex gap-2">
@@ -202,11 +191,11 @@ export function ScheduleEditPage() {
         <div className="mt-4 grid gap-4">
           <div className="space-y-1">
             <label className="text-sm text-slate-700">Ngày làm việc</label>
-            <input type="date" value={formState.date} onChange={(event) => setFormState((current) => ({ ...current, date: event.target.value }))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none" />
+            <input type="date" value={formState.date} onChange={(event) => { const date = event.target.value; const availableShifts = getShiftDefinitionsForDate(date); setFormState((current) => ({ ...current, date, shiftCode: availableShifts.some((shift) => shift.code === current.shiftCode) ? current.shiftCode : availableShifts[0].code })) }} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none" />
           </div>
           <div className="space-y-1">
             <label className="text-sm text-slate-700">Loại ca</label>
-            <select value={formState.shiftCode} onChange={(event) => setFormState((current) => ({ ...current, shiftCode: event.target.value }))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none">
+            <select value={formState.shiftCode} onChange={(event) => setFormState((current) => ({ ...current, shiftCode: event.target.value as ShiftCode }))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none">
               {shiftOptions.map((shift) => <option key={shift.value} value={shift.value}>{shift.label}</option>)}
             </select>
           </div>
@@ -219,7 +208,7 @@ export function ScheduleEditPage() {
           <div className="space-y-1">
             <label className="text-sm text-slate-700">Giờ bắt đầu / kết thúc</label>
             <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-600">
-              {shiftOptions.find((shift) => shift.value === formState.shiftCode)?.label.split('•')[1]?.trim() ?? '07:00 - 12:00'}
+              {selectedShift && formatShiftRangeLabel(selectedShift)}
             </div>
           </div>
           <div className="space-y-1">

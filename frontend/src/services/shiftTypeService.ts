@@ -1,4 +1,5 @@
 import { shiftTypeSeed } from '@/mocks/managementData'
+import { getWorkMinutes } from '@/configs/shiftDefinitions'
 import type { PaginatedResult, ShiftType, ShiftTypeFormValues } from '@/types/management'
 
 const delay = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms))
@@ -43,17 +44,20 @@ export const shiftTypeService = {
       throw new Error('Mã ca trực đã tồn tại trong hệ thống.')
     }
 
-    const durationHours = calculateDuration(data.startTime, data.endTime)
     const newShiftType: ShiftType = {
       id: `shift-${Date.now()}`,
       code: data.code.trim(),
       name: data.name.trim(),
+      group: data.group,
       startTime: data.startTime,
       endTime: data.endTime,
-      durationHours,
+      crossesMidnight: data.crossesMidnight,
+      breakStart: data.breakStart,
+      breakEnd: data.breakEnd,
+      breakMinutes: data.breakMinutes,
+      workMinutes: data.workMinutes || getWorkMinutes(data.startTime, data.endTime),
+      applicableDayType: data.applicableDayType,
       color: data.color,
-      minEmployees: data.minEmployees,
-      maxEmployees: data.maxEmployees,
       description: data.description.trim(),
       status: data.status,
     }
@@ -82,12 +86,16 @@ export const shiftTypeService = {
       ...shiftTypes[index],
       code: data.code.trim(),
       name: data.name.trim(),
+      group: data.group,
       startTime: data.startTime,
       endTime: data.endTime,
-      durationHours: calculateDuration(data.startTime, data.endTime),
+      crossesMidnight: data.crossesMidnight,
+      breakStart: data.breakStart,
+      breakEnd: data.breakEnd,
+      breakMinutes: data.breakMinutes,
+      workMinutes: data.workMinutes || getWorkMinutes(data.startTime, data.endTime),
+      applicableDayType: data.applicableDayType,
       color: data.color,
-      minEmployees: data.minEmployees,
-      maxEmployees: data.maxEmployees,
       description: data.description.trim(),
       status: data.status,
     }
@@ -115,7 +123,7 @@ export const shiftTypeService = {
       throw new Error('Loại ca trực không tồn tại.')
     }
 
-    const isInUse = current.code === 'DAY' || current.code === 'EVENING' || current.code === 'NIGHT'
+    const isInUse = current.code === 'THONG_TAM' || current.code === 'NGOAI_GIO_1' || current.code === 'NGOAI_GIO_2' || current.code === 'TRUC_SANG' || current.code === 'TRUC_CHIEU' || current.code === 'TRUC_DEM'
     if (isInUse) {
       throw new Error('Loại ca này đang được dùng trong mock schedule, không thể xóa ngay. Hãy tạm ngưng hoặc thay đổi lịch sử dụng.')
     }
@@ -129,13 +137,3 @@ export const shiftTypeService = {
   },
 }
 
-function calculateDuration(startTime: string, endTime: string) {
-  const [startHour, startMinute] = startTime.split(':').map(Number)
-  const [endHour, endMinute] = endTime.split(':').map(Number)
-
-  const start = startHour * 60 + startMinute
-  const end = endHour * 60 + endMinute
-  const duration = end >= start ? end - start : 24 * 60 - start + end
-
-  return Number((duration / 60).toFixed(1))
-}

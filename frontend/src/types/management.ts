@@ -1,3 +1,5 @@
+import type { ShiftCode } from '@/configs/shiftDefinitions'
+
 export const EmployeeStatus = {
   ACTIVE: 'ACTIVE',
   INACTIVE: 'INACTIVE',
@@ -81,12 +83,16 @@ export interface ShiftType {
   id: string
   code: string
   name: string
+  group: 'THONG_TAM' | 'NGOAI_GIO' | 'CA_TRUC'
   startTime: string
   endTime: string
-  durationHours: number
+  crossesMidnight: boolean
+  breakStart?: string
+  breakEnd?: string
+  breakMinutes: number
+  workMinutes: number
+  applicableDayType: 'WEEKDAY' | 'WEEKEND_OR_HOLIDAY'
   color: string
-  minEmployees: number
-  maxEmployees: number
   description: string
   status: ShiftTypeStatus
 }
@@ -112,7 +118,7 @@ export interface WorkPreference {
   employeeEmail?: string
   month: string
   type: PreferenceType
-  relatedShiftType?: string
+  relatedShiftCode?: ShiftCode
   note: string
   priority: number
   submittedAt: string
@@ -152,9 +158,14 @@ export interface ShiftTypeFormValues {
   name: string
   startTime: string
   endTime: string
+  group: 'THONG_TAM' | 'NGOAI_GIO' | 'CA_TRUC'
+  crossesMidnight: boolean
+  breakStart?: string
+  breakEnd?: string
+  breakMinutes: number
+  workMinutes: number
+  applicableDayType: 'WEEKDAY' | 'WEEKEND_OR_HOLIDAY'
   color: string
-  minEmployees: number
-  maxEmployees: number
   description: string
   status: ShiftTypeStatus
 }
@@ -168,8 +179,8 @@ export interface SwapRequest {
   id: string
   employeeName: string
   employeeEmail: string
-  currentShift: string
-  requestedShift: string
+  currentShiftCode: ShiftCode
+  requestedShiftCode: ShiftCode
   partnerName?: string
   requestedDate: string
   reason: string

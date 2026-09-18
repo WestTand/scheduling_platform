@@ -1,4 +1,5 @@
 import { Role } from '@/types/auth'
+import type { ShiftCode } from '@/configs/shiftDefinitions'
 
 export const currentDateLabel = '16/09/2026'
 
@@ -10,28 +11,28 @@ export const managerDashboardData = {
     { label: 'Cảnh báo xung đột', value: '3', trend: '2 thiếu nhân sự', tone: 'red' },
   ],
   requests: [
-    { id: 'REQ-101', type: 'Đổi ca', employee: 'Lê Thị Hòa', shift: 'Ca chiều', date: '17/09', status: 'Chờ duyệt' },
+    { id: 'REQ-101', type: 'Đổi ca', employee: 'Lê Thị Hòa', shiftCode: 'NGOAI_GIO_1' as ShiftCode, date: '17/09', status: 'Chờ duyệt' },
     { id: 'REQ-102', type: 'Nghỉ phép', employee: 'Hoàng Văn Tâm', shift: 'Cả ngày', date: '18/09', status: 'Chờ duyệt' },
-    { id: 'REQ-103', type: 'Yêu cầu thay ca', employee: 'Phạm Minh Khoa', shift: 'Ca đêm', date: '19/09', status: 'Chờ duyệt' },
+    { id: 'REQ-103', type: 'Yêu cầu thay ca', employee: 'Phạm Minh Khoa', shiftCode: 'TRUC_DEM' as ShiftCode, date: '19/09', status: 'Chờ duyệt' },
   ],
   alerts: [
-    { title: 'Thiếu nhân sự', detail: 'Ca sáng ngày 18/09 thiếu 2 nhân viên tại khu vực A', severity: 'Cao' },
-    { title: 'Trùng lịch', detail: '2 yêu cầu đổi ca cùng thời điểm về ca chiều', severity: 'Trung bình' },
+    { title: 'Thiếu nhân sự', detail: 'Ca ngoài giờ 2 ngày 18/09 thiếu 2 nhân viên tại khu vực A', severity: 'Cao' },
+    { title: 'Trùng lịch', detail: '2 yêu cầu đổi ca cùng thời điểm về ca ngoài giờ 1', severity: 'Trung bình' },
     { title: 'Nghỉ không hợp lệ', detail: '1 nhân viên đã đăng ký 3 ngày nghỉ liền trong tuần', severity: 'Thấp' },
   ],
 }
 
 export const employeeDashboardData = {
   summary: [
-    { label: 'Ca làm hôm nay', value: 'Ca sáng', detail: '07:00 - 12:00' },
-    { label: 'Ca làm tiếp theo', value: 'Ca chiều', detail: '13:00 - 18:00' },
+    { label: 'Ca làm hôm nay', shiftCode: 'NGOAI_GIO_2' as ShiftCode },
+    { label: 'Ca làm tiếp theo', shiftCode: 'TRUC_SANG' as ShiftCode },
     { label: 'Tổng giờ làm', value: '42h', detail: 'Tuần này' },
     { label: 'Yêu cầu chờ xử lý', value: '2', detail: '1 đổi ca, 1 nghỉ phép' },
   ],
   nextShifts: [
-    { day: 'Thứ 5', date: '17/09', shift: 'Ca sáng', hours: '07:00 - 12:00' },
-    { day: 'Thứ 6', date: '18/09', shift: 'Ca chiều', hours: '13:00 - 18:00' },
-    { day: 'Thứ 7', date: '19/09', shift: 'Ca đêm', hours: '19:00 - 23:00' },
+    { day: 'Thứ 5', date: '17/09', shiftCode: 'NGOAI_GIO_1' as ShiftCode },
+    { day: 'Thứ 6', date: '18/09', shiftCode: 'NGOAI_GIO_2' as ShiftCode },
+    { day: 'Thứ 7', date: '19/09', shiftCodes: ['TRUC_DEM', 'TRUC_SANG', 'TRUC_CHIEU'] as ShiftCode[] },
   ],
   notifications: [
     'Lịch làm việc tuần tới đã được cập nhật.',

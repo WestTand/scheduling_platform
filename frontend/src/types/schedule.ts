@@ -1,3 +1,5 @@
+import type { ShiftCode } from '@/configs/shiftDefinitions'
+
 export const ScheduleStatus = {
   DRAFT: 'DRAFT',
   PENDING_APPROVAL: 'PENDING_APPROVAL',
@@ -9,7 +11,7 @@ export type ScheduleStatus = (typeof ScheduleStatus)[keyof typeof ScheduleStatus
 
 export const ScheduleViewMode = {
   WEEK: 'WEEK',
-  DAY: 'DAY',
+  DAILY: 'DAILY',
   LIST: 'LIST',
 } as const
 
@@ -33,11 +35,7 @@ export interface ScheduleAssignment {
   id: string
   scheduleId: string
   date: string
-  shiftCode: string
-  shiftName: string
-  startTime: string
-  endTime: string
-  color: string
+  shiftCode: ShiftCode
   employeeNames: string[]
   warningCount: number
 }
@@ -48,32 +46,12 @@ export interface ScheduleWarning {
   severity: 'HIGH' | 'MEDIUM' | 'LOW'
   employeeName: string
   date: string
-  shift: string
+  shiftCode: ShiftCode | ''
   content: string
   suggestion: string
-}
-
-export interface ScheduleEvaluation {
-  totalPenalty: number
-  fairnessPenalty: number
-  consecutiveShiftPenalty: number
-  weekendPenalty: number
-  preferencePenalty: number
-  workHourImbalance: number
-  shiftCountGap: number
-  workHourGap: number
-  fulfilledPreferences: number
-  weights: {
-    fairness: number
-    consecutiveShift: number
-    weekend: number
-    preference: number
-    workHour: number
-  }
 }
 
 export interface ScheduleDetail extends WorkSchedule {
   assignments: ScheduleAssignment[]
   warnings: ScheduleWarning[]
-  evaluation: ScheduleEvaluation
 }
