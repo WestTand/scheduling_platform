@@ -1,0 +1,56 @@
+[
+  {
+    "date": "2026-01-01",
+    "name": "Tet Duong lich",
+    "type": "PUBLIC_HOLIDAY",
+    "sourceReference": "Lich nghi co dinh"
+  },
+  {
+    "date": "2026-02-16",
+    "name": "Nghi Tet Nguyen dan",
+    "type": "LUNAR_HOLIDAY",
+    "sourceReference": "Thong bao lich nghi nam 2026"
+  },
+  {
+    "date": "2026-02-17",
+    "name": "Nghi Tet Nguyen dan",
+    "type": "LUNAR_HOLIDAY",
+    "sourceReference": "Thong bao lich nghi nam 2026"
+  },
+  {
+    "date": "2026-04-26",
+    "name": "Gio To Hung Vuong",
+    "type": "LUNAR_HOLIDAY",
+    "sourceReference": "Thong bao lich nghi nam 2026"
+  },
+  {
+    "date": "2026-04-30",
+    "name": "Ngay Giai phong mien Nam",
+    "type": "PUBLIC_HOLIDAY",
+    "sourceReference": "Lich nghi co dinh"
+  },
+  {
+    "date": "2026-05-01",
+    "name": "Ngay Quoc te Lao dong",
+    "type": "PUBLIC_HOLIDAY",
+    "sourceReference": "Lich nghi co dinh"
+  },
+  {
+    "date": "2026-09-01",
+    "name": "Ngay nghi lien ke Quoc khanh",
+    "type": "PUBLIC_HOLIDAY",
+    "sourceReference": "Thong bao lich nghi nam 2026"
+  },
+  {
+    "date": "2026-09-02",
+    "name": "Quoc khanh",
+    "type": "PUBLIC_HOLIDAY",
+    "sourceReference": "Lich nghi co dinh"
+  },
+  {
+    "date": "2026-09-03",
+    "name": "Ngay nghi bu",
+    "type": "SUBSTITUTE_HOLIDAY",
+    "sourceReference": "Thong bao lich nghi nam 2026"
+  }
+]

@@ -31,16 +31,19 @@ public class AdminWorkShiftService {
     private final SchedulePeriodRepository schedulePeriodRepository;
     private final ShiftTypeRepository shiftTypeRepository;
     private final AccountRepository accountRepository;
+    private final DayClassificationService dayClassificationService;
 
     public AdminWorkShiftService(
             WorkShiftRepository workShiftRepository,
             SchedulePeriodRepository schedulePeriodRepository,
             ShiftTypeRepository shiftTypeRepository,
-            AccountRepository accountRepository) {
+            AccountRepository accountRepository,
+            DayClassificationService dayClassificationService) {
         this.workShiftRepository = workShiftRepository;
         this.schedulePeriodRepository = schedulePeriodRepository;
         this.shiftTypeRepository = shiftTypeRepository;
         this.accountRepository = accountRepository;
+        this.dayClassificationService = dayClassificationService;
     }
 
     @Transactional
@@ -52,6 +55,7 @@ public class AdminWorkShiftService {
         ShiftType shiftType = findShiftType(request.shiftTypeId());
         requireActiveShiftType(shiftType);
         validateDateInPeriod(request.workDate(), period);
+        validateShiftApplicability(request.workDate(), shiftType);
         int requiredStaff = normalizeRequiredStaff(request.requiredStaff(), shiftType);
         String note = normalizeNote(request.note());
 
@@ -117,6 +121,21 @@ public class AdminWorkShiftService {
     private static void requireActiveShiftType(ShiftType shiftType) {
         if (!ACTIVE.equals(shiftType.getStatus())) {
             throw invalidRequest();
+        }
+    }
+
+    private void validateShiftApplicability(LocalDate workDate, ShiftType shiftType) {
+        DayClassificationService.DayType dayType = dayClassificationService.classify(workDate);
+        if (dayType == DayClassificationService.DayType.HOLIDAY) {
+            if (!Boolean.TRUE.equals(shiftType.getAppliesOnHolidays())) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST, "Shift type is not applicable on this date");
+            }
+            return;
+        }
+        if (!ShiftTypeRules.includesWeekday(shiftType.getApplicableWeekdays(), workDate.getDayOfWeek())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Shift type is not applicable on this date");
         }
     }
 

@@ -15,7 +15,11 @@ public record AdminShiftTypeResponse(
         Integer minStaff,
         Integer maxStaff,
         String quotaCategory,
-        String status) {
+        String status,
+        String shiftCode,
+        String applicableWeekdays,
+        Boolean appliesOnHolidays,
+        BigDecimal penaltyWeightMultiplier) {
 
     public static AdminShiftTypeResponse from(ShiftType shiftType) {
         return new AdminShiftTypeResponse(
@@ -29,6 +33,10 @@ public record AdminShiftTypeResponse(
                 shiftType.getMinStaff(),
                 shiftType.getMaxStaff(),
                 shiftType.getQuotaCategory(),
-                shiftType.getStatus());
+                shiftType.getStatus(),
+                shiftType.getShiftCode(),
+                shiftType.getApplicableWeekdays(),
+                shiftType.getAppliesOnHolidays(),
+                shiftType.getPenaltyWeightMultiplier());
     }
 }

@@ -12,6 +12,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
@@ -35,8 +36,20 @@ class AdminWorkShiftServiceTest {
     private final SchedulePeriodRepository schedulePeriodRepository = org.mockito.Mockito.mock(SchedulePeriodRepository.class);
     private final ShiftTypeRepository shiftTypeRepository = org.mockito.Mockito.mock(ShiftTypeRepository.class);
     private final AccountRepository accountRepository = org.mockito.Mockito.mock(AccountRepository.class);
+    private final DayClassificationService dayClassificationService =
+            org.mockito.Mockito.mock(DayClassificationService.class);
     private final AdminWorkShiftService service = new AdminWorkShiftService(
-            workShiftRepository, schedulePeriodRepository, shiftTypeRepository, accountRepository);
+            workShiftRepository,
+            schedulePeriodRepository,
+            shiftTypeRepository,
+            accountRepository,
+            dayClassificationService);
+
+    @BeforeEach
+    void stubDefaultDayClassification() {
+        when(dayClassificationService.classify(any(LocalDate.class)))
+                .thenReturn(DayClassificationService.DayType.WEEKDAY);
+    }
 
     @Test
     void createWorkShiftCreatesShiftInDraftPeriod() {
@@ -175,6 +188,123 @@ class AdminWorkShiftServiceTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
                 .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void createWorkShiftAllowsWeekdayShiftOnWeekday() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(draftPeriod()));
+        when(shiftTypeRepository.findById(100L)).thenReturn(Optional.of(weekdayShiftType()));
+        when(dayClassificationService.classify(LocalDate.of(2026, 9, 14)))
+                .thenReturn(DayClassificationService.DayType.WEEKDAY);
+        when(workShiftRepository.save(any(WorkShift.class))).thenAnswer(invocation -> {
+            WorkShift workShift = invocation.getArgument(0);
+            workShift.setId(200L);
+            return workShift;
+        });
+
+        AdminWorkShiftResponse response = service.createWorkShift(principal, 20L, new CreateWorkShiftRequest(
+                100L, LocalDate.of(2026, 9, 14), 1, null));
+
+        assertThat(response.workDate()).isEqualTo(LocalDate.of(2026, 9, 14));
+    }
+
+    @Test
+    void createWorkShiftRejectsWeekdayShiftOnWeekend() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(draftPeriod()));
+        when(shiftTypeRepository.findById(100L)).thenReturn(Optional.of(weekdayShiftType()));
+        when(dayClassificationService.classify(LocalDate.of(2026, 9, 19)))
+                .thenReturn(DayClassificationService.DayType.WEEKEND);
+
+        assertThatThrownBy(() -> service.createWorkShift(principal, 20L, new CreateWorkShiftRequest(
+                100L, LocalDate.of(2026, 9, 19), 1, null)))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Shift type is not applicable on this date")
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(workShiftRepository, never()).save(any());
+    }
+
+    @Test
+    void createWorkShiftAllowsOnCallShiftOnWeekend() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(draftPeriod()));
+        when(shiftTypeRepository.findById(100L)).thenReturn(Optional.of(onCallShiftType()));
+        when(dayClassificationService.classify(LocalDate.of(2026, 9, 19)))
+                .thenReturn(DayClassificationService.DayType.WEEKEND);
+        when(workShiftRepository.save(any(WorkShift.class))).thenAnswer(invocation -> {
+            WorkShift workShift = invocation.getArgument(0);
+            workShift.setId(200L);
+            return workShift;
+        });
+
+        AdminWorkShiftResponse response = service.createWorkShift(principal, 20L, new CreateWorkShiftRequest(
+                100L, LocalDate.of(2026, 9, 19), 1, null));
+
+        assertThat(response.workDate()).isEqualTo(LocalDate.of(2026, 9, 19));
+    }
+
+    @Test
+    void createWorkShiftAllowsOnCallShiftOnActiveHolidayWeekday() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(draftPeriod()));
+        when(shiftTypeRepository.findById(100L)).thenReturn(Optional.of(onCallShiftType()));
+        when(dayClassificationService.classify(LocalDate.of(2026, 9, 14)))
+                .thenReturn(DayClassificationService.DayType.HOLIDAY);
+        when(workShiftRepository.save(any(WorkShift.class))).thenAnswer(invocation -> {
+            WorkShift workShift = invocation.getArgument(0);
+            workShift.setId(200L);
+            return workShift;
+        });
+
+        AdminWorkShiftResponse response = service.createWorkShift(principal, 20L, new CreateWorkShiftRequest(
+                100L, LocalDate.of(2026, 9, 14), 1, null));
+
+        assertThat(response.workDate()).isEqualTo(LocalDate.of(2026, 9, 14));
+    }
+
+    @Test
+    void createWorkShiftRejectsOnCallShiftOnNormalWeekday() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(draftPeriod()));
+        when(shiftTypeRepository.findById(100L)).thenReturn(Optional.of(onCallShiftType()));
+        when(dayClassificationService.classify(LocalDate.of(2026, 9, 14)))
+                .thenReturn(DayClassificationService.DayType.WEEKDAY);
+
+        assertThatThrownBy(() -> service.createWorkShift(principal, 20L, new CreateWorkShiftRequest(
+                100L, LocalDate.of(2026, 9, 14), 1, null)))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Shift type is not applicable on this date")
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(workShiftRepository, never()).save(any());
+    }
+
+    @Test
+    void createWorkShiftRejectsWeekdayShiftOnHolidayWithoutHolidayFlag() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(draftPeriod()));
+        when(shiftTypeRepository.findById(100L)).thenReturn(Optional.of(weekdayShiftType()));
+        when(dayClassificationService.classify(LocalDate.of(2026, 9, 14)))
+                .thenReturn(DayClassificationService.DayType.HOLIDAY);
+
+        assertThatThrownBy(() -> service.createWorkShift(principal, 20L, new CreateWorkShiftRequest(
+                100L, LocalDate.of(2026, 9, 14), 1, null)))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Shift type is not applicable on this date")
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(workShiftRepository, never()).save(any());
     }
 
     @Test
@@ -361,8 +491,26 @@ class AdminWorkShiftServiceTest {
                 .maxStaff(2)
                 .quotaCategory("REGULAR")
                 .status("ACTIVE")
+                .applicableWeekdays("MON,TUE,WED,THU,FRI,SAT,SUN")
+                .appliesOnHolidays(false)
+                .penaltyWeightMultiplier(new BigDecimal("1.00"))
                 .build();
         shiftType.setId(100L);
+        return shiftType;
+    }
+
+    private static ShiftType weekdayShiftType() {
+        ShiftType shiftType = activeShiftType();
+        shiftType.setApplicableWeekdays("MON,TUE,WED,THU,FRI");
+        shiftType.setAppliesOnHolidays(false);
+        return shiftType;
+    }
+
+    private static ShiftType onCallShiftType() {
+        ShiftType shiftType = activeShiftType();
+        shiftType.setShiftName("Truc sang");
+        shiftType.setApplicableWeekdays("SAT,SUN");
+        shiftType.setAppliesOnHolidays(true);
         return shiftType;
     }
 

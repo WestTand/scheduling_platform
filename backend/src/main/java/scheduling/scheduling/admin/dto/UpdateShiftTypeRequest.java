@@ -20,5 +20,9 @@ public record UpdateShiftTypeRequest(
         @NotNull @Min(1) Integer minStaff,
         @NotNull @Min(1) Integer maxStaff,
         @NotBlank @Size(max = 20) @Pattern(regexp = "ACTIVE|INACTIVE") String status,
-        @NotBlank @Size(max = 20) String quotaCategory) {
+        @NotBlank @Size(max = 20) String quotaCategory,
+        @NotBlank @Size(max = 30) String shiftCode,
+        @NotNull String applicableWeekdays,
+        @NotNull Boolean appliesOnHolidays,
+        @NotNull BigDecimal penaltyWeightMultiplier) {
 }

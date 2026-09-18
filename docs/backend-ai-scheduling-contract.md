@@ -82,6 +82,8 @@ Literal string. Current value:
 
 Tang version khi co breaking change trong payload hoac response.
 
+> Shift-rule foundation slice khong doi schema: `schemaVersion` giu `"1.0"`. Backend chi luu `shiftCode` + `penaltyWeightMultiplier` trong DB, chua gui multiplier sang AI service.
+
 ### `runId`
 
 Backend `optimization_runs.run_id`.
@@ -151,6 +153,7 @@ Important:
 
 - `quotaCategory` phai la stable enum do backend map tu cau hinh, khong infer tu display name.
 - Current solver dem quota `OVERTIME` va `BATHING` theo so work shift/ISO week. Neu nghiep vu bat buoc dem theo ngay/tuần, can follow-up chinh solver thanh distinct day count.
+- Shift calendar foundation (backend-only, chua gui sang AI): backend luu `shiftCode` (canonical key, khong key logic theo display name) va `penaltyWeightMultiplier` (da persist, AI schema `1.0` chua nhan multiplier). Quota category contract (`OVERTIME`, `BATHING`, `ON_CALL`, hoac `null`) giu nguyen trong slice nay.
 
 ### `workShifts`
 

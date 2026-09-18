@@ -1,5 +1,6 @@
 package scheduling.scheduling.admin;
 
+import java.math.BigDecimal;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -45,18 +46,30 @@ public class AdminShiftTypeService {
         if (shiftTypeRepository.existsByShiftName(request.shiftName())) {
             throw new DuplicateResourceException("Shift type name already exists");
         }
+        String shiftCode = ShiftTypeRules.validateShiftCode(request.shiftCode());
+        if (shiftTypeRepository.existsByShiftCode(shiftCode)) {
+            throw new DuplicateResourceException("Shift code already exists");
+        }
+        BigDecimal duration = ShiftTypeRules.validateDuration(request.durationHours());
+        boolean appliesOnHolidays = Boolean.TRUE.equals(request.appliesOnHolidays());
+        String weekdays = ShiftTypeRules.normalizeWeekdays(request.applicableWeekdays(), appliesOnHolidays);
+        BigDecimal multiplier = ShiftTypeRules.normalizeMultiplier(request.penaltyWeightMultiplier());
 
         ShiftType shiftType = ShiftType.builder()
                 .shiftName(request.shiftName())
                 .startTime(request.startTime())
                 .endTime(request.endTime())
-                .durationHours(request.durationHours())
+                .durationHours(duration)
                 .overnight(Boolean.TRUE.equals(request.overnight()))
                 .heavy(Boolean.TRUE.equals(request.heavy()))
                 .minStaff(request.minStaff())
                 .maxStaff(request.maxStaff())
                 .quotaCategory(quotaCategory)
                 .status(ACTIVE)
+                .shiftCode(shiftCode)
+                .applicableWeekdays(weekdays)
+                .appliesOnHolidays(appliesOnHolidays)
+                .penaltyWeightMultiplier(multiplier)
                 .build();
         return AdminShiftTypeResponse.from(shiftTypeRepository.save(shiftType));
     }
@@ -70,17 +83,29 @@ public class AdminShiftTypeService {
         if (shiftTypeRepository.existsByShiftNameAndIdNot(request.shiftName(), shiftTypeId)) {
             throw new DuplicateResourceException("Shift type name already exists");
         }
+        String shiftCode = ShiftTypeRules.validateShiftCode(request.shiftCode());
+        if (shiftTypeRepository.existsByShiftCodeAndIdNot(shiftCode, shiftTypeId)) {
+            throw new DuplicateResourceException("Shift code already exists");
+        }
+        BigDecimal duration = ShiftTypeRules.validateDuration(request.durationHours());
+        boolean appliesOnHolidays = Boolean.TRUE.equals(request.appliesOnHolidays());
+        String weekdays = ShiftTypeRules.normalizeWeekdays(request.applicableWeekdays(), appliesOnHolidays);
+        BigDecimal multiplier = ShiftTypeRules.normalizeMultiplier(request.penaltyWeightMultiplier());
 
         shiftType.setShiftName(request.shiftName());
         shiftType.setStartTime(request.startTime());
         shiftType.setEndTime(request.endTime());
-        shiftType.setDurationHours(request.durationHours());
+        shiftType.setDurationHours(duration);
         shiftType.setOvernight(request.overnight());
         shiftType.setHeavy(request.heavy());
         shiftType.setMinStaff(request.minStaff());
         shiftType.setMaxStaff(request.maxStaff());
         shiftType.setQuotaCategory(quotaCategory);
         shiftType.setStatus(status);
+        shiftType.setShiftCode(shiftCode);
+        shiftType.setApplicableWeekdays(weekdays);
+        shiftType.setAppliesOnHolidays(appliesOnHolidays);
+        shiftType.setPenaltyWeightMultiplier(multiplier);
         return AdminShiftTypeResponse.from(shiftTypeRepository.save(shiftType));
     }
 
