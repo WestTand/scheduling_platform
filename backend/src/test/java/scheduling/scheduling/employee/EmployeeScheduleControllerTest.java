@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -72,7 +73,11 @@ class EmployeeScheduleControllerTest {
                         .header(HttpHeaders.AUTHORIZATION, "Bearer employee-token"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].assignmentId").value(300))
-                .andExpect(jsonPath("$[0].periodStatus").value("PUBLISHED"));
+                .andExpect(jsonPath("$[0].periodStatus").value("PUBLISHED"))
+                .andExpect(jsonPath("$[0].startsAt").value("2026-09-17T08:00:00+07:00"))
+                .andExpect(jsonPath("$[0].endsAt").value("2026-09-17T16:00:00+07:00"))
+                .andExpect(jsonPath("$[0].workMinutes").value(480))
+                .andExpect(jsonPath("$[0].isTransitionShift").value(false));
 
         ArgumentCaptor<CurrentAccountPrincipal> principalCaptor =
                 ArgumentCaptor.forClass(CurrentAccountPrincipal.class);
@@ -142,18 +147,6 @@ class EmployeeScheduleControllerTest {
     }
 
     private static EmployeeScheduleItemResponse response() {
-        return new EmployeeScheduleItemResponse(
-                300L,
-                "ASSIGNED",
-                "MANUAL",
-                false,
-                LocalDate.of(2026, 9, 17),
-                100L,
-                "Day",
-                LocalTime.of(8, 0),
-                LocalTime.of(16, 0),
-                20L,
-                "Week 38",
-                "PUBLISHED");
+        return new EmployeeScheduleItemResponse(300L,"ASSIGNED","MANUAL",false,LocalDate.of(2026,9,17),100L,"Day",LocalTime.of(8,0),LocalTime.of(16,0),OffsetDateTime.parse("2026-09-17T08:00:00+07:00"),OffsetDateTime.parse("2026-09-17T16:00:00+07:00"),480,false,20L,"Week 38","PUBLISHED");
     }
 }

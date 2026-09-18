@@ -13,6 +13,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
@@ -505,6 +506,10 @@ class AdminShiftAssignmentServiceTest {
         assertThat(response.workShifts().get(1).shiftStartTime()).isEqualTo(LocalTime.of(14, 0));
         assertThat(response.workShifts().get(1).maxStaff()).isEqualTo(3);
         assertThat(response.workShifts().get(1).assignments().get(0).locked()).isTrue();
+        assertThat(response.workShifts().get(0).startsAt()).isEqualTo(OffsetDateTime.parse("2026-09-14T08:00:00+07:00"));
+        assertThat(response.workShifts().get(0).endsAt()).isEqualTo(OffsetDateTime.parse("2026-09-14T16:00:00+07:00"));
+        assertThat(response.workShifts().get(0).workMinutes()).isEqualTo(480);
+        assertThat(response.workShifts().get(0).isTransitionShift()).isFalse();
     }
 
     @Test

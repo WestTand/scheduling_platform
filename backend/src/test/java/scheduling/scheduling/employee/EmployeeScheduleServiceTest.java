@@ -13,6 +13,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
@@ -62,6 +63,10 @@ class EmployeeScheduleServiceTest {
         assertThat(response.get(0).periodStatus()).isEqualTo("PUBLISHED");
         assertThat(response.get(0).workDate()).isEqualTo(LocalDate.of(2026, 9, 17));
         assertThat(response.get(0).shiftTypeName()).isEqualTo("Day");
+        assertThat(response.get(0).startsAt()).isEqualTo(OffsetDateTime.parse("2026-09-17T08:00:00+07:00"));
+        assertThat(response.get(0).endsAt()).isEqualTo(OffsetDateTime.parse("2026-09-17T16:00:00+07:00"));
+        assertThat(response.get(0).workMinutes()).isEqualTo(240);
+        assertThat(response.get(0).isTransitionShift()).isFalse();
     }
 
     @Test
