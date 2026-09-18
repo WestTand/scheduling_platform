@@ -15,6 +15,8 @@ public interface ShiftTypeRepository extends JpaRepository<ShiftType, Long> {
 
     Optional<ShiftType> findByShiftCode(String shiftCode);
 
+    Optional<ShiftType> findByShiftName(String shiftName);
+
     boolean existsByShiftCode(String shiftCode);
 
     boolean existsByShiftCodeAndIdNot(String shiftCode, Long id);
