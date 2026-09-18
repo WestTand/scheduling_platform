@@ -10,6 +10,7 @@ This slice covers backend persistence, derivation, admin responses, tests, and d
 
 - `ShiftType.startTime`, `ShiftType.endTime`, and `ShiftType.durationHours` remain the source of truth for a work shift's time window.
 - `CreateWorkShiftRequest` does not accept `startsAt`, `endsAt`, `workMinutes`, or `isTransitionShift`. Backend derives them.
+- Persist `startsAt` and `endsAt` as Java `OffsetDateTime` values with the Vietnam offset from `Asia/Ho_Chi_Minh`.
 - Use the Vietnam scheduling zone `Asia/Ho_Chi_Minh` when converting `workDate + LocalTime` into persisted date-times.
 - A transition shift means the derived `endsAt` local date is after the derived `startsAt` local date.
 - Existing rows may have null persisted window fields after `ddl-auto=update`; responses should compute fallback window values from `workDate + shiftType` instead of failing.
@@ -28,8 +29,8 @@ This slice covers backend persistence, derivation, admin responses, tests, and d
 
 Extend `WorkShift` with nullable persisted fields:
 
-- `startsAt`: exact shift start datetime.
-- `endsAt`: exact shift end datetime.
+- `startsAt`: exact shift start datetime, Java type `OffsetDateTime`.
+- `endsAt`: exact shift end datetime, Java type `OffsetDateTime`.
 - `workMinutes`: integer number of planned working minutes.
 - `isTransitionShift`: boolean, true when the shift crosses into the next local date.
 
@@ -77,7 +78,13 @@ After validation, backend derives the window and persists the four new fields on
 
 ### Responses
 
-Update `AdminWorkShiftResponse` to include:
+Update all backend schedule/work-shift responses that currently expose shift local start/end times to also include exact persisted windows:
+
+- `AdminWorkShiftResponse`
+- `AdminPeriodScheduleResponse.ScheduledShift`
+- `EmployeeScheduleItemResponse`
+
+Each response should include:
 
 - `startsAt`
 - `endsAt`
@@ -86,8 +93,8 @@ Update `AdminWorkShiftResponse` to include:
 
 Response mapping rules:
 
-- Prefer persisted values when present.
-- If any of the persisted window fields are null and `workDate + shiftType` are available, compute fallback values for the response.
+- If all four persisted window fields are non-null, use persisted values.
+- If any persisted window field is null and `workDate + shiftType` are available, compute the full window from `workDate + shiftType`; do not mix persisted and computed fields in the same response.
 - Keep existing `shiftStartTime` and `shiftEndTime` fields for compatibility with current frontend/mock expectations.
 
 This fallback exists only for old DB rows. New creates must persist all four fields.
@@ -97,7 +104,7 @@ This fallback exists only for old DB rows. New creates must persist all four fie
 Update:
 
 - `docs/database-design-v2.md` with new `work_shifts` columns and nullable/backfill note.
-- `docs/backend-ai-scheduling-contract.md` to note backend now persists exact work-shift windows, but AI schema/version changes are deferred unless existing backend AI snapshot code already maps these fields.
+- `docs/backend-ai-scheduling-contract.md` to note backend now persists exact work-shift windows for later AI payload work. Do not change the AI request/response schema or schema version in this slice.
 
 ## Out Of Scope
 
@@ -120,6 +127,8 @@ Add/extend backend tests:
 - Window helper tests for early-morning `00:30-08:00` not being transition.
 - Admin work-shift service test that create persists `startsAt`, `endsAt`, `workMinutes`, and `isTransitionShift`.
 - Admin work-shift response tests for persisted values and fallback values when persisted fields are null.
+- Manager period schedule response tests for the exact window fields.
+- Employee schedule response tests for the exact window fields.
 - Existing work-shift controller/service tests updated for the new response fields where JSON shape is asserted.
 - Full backend suite must pass.
 
