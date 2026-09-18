@@ -510,6 +510,10 @@ class AdminShiftAssignmentServiceTest {
         assertThat(response.workShifts().get(0).endsAt()).isEqualTo(OffsetDateTime.parse("2026-09-14T16:00:00+07:00"));
         assertThat(response.workShifts().get(0).workMinutes()).isEqualTo(480);
         assertThat(response.workShifts().get(0).isTransitionShift()).isFalse();
+        assertThat(response.workShifts().get(1).startsAt()).isEqualTo(OffsetDateTime.parse("2026-09-14T14:00:00+07:00"));
+        assertThat(response.workShifts().get(1).endsAt()).isEqualTo(OffsetDateTime.parse("2026-09-14T22:00:00+07:00"));
+        assertThat(response.workShifts().get(1).workMinutes()).isEqualTo(480);
+        assertThat(response.workShifts().get(1).isTransitionShift()).isFalse();
     }
 
     @Test

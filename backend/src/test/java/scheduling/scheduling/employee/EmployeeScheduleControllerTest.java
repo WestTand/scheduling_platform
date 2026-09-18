@@ -147,6 +147,22 @@ class EmployeeScheduleControllerTest {
     }
 
     private static EmployeeScheduleItemResponse response() {
-        return new EmployeeScheduleItemResponse(300L,"ASSIGNED","MANUAL",false,LocalDate.of(2026,9,17),100L,"Day",LocalTime.of(8,0),LocalTime.of(16,0),OffsetDateTime.parse("2026-09-17T08:00:00+07:00"),OffsetDateTime.parse("2026-09-17T16:00:00+07:00"),480,false,20L,"Week 38","PUBLISHED");
+        return new EmployeeScheduleItemResponse(
+                300L,
+                "ASSIGNED",
+                "MANUAL",
+                false,
+                LocalDate.of(2026, 9, 17),
+                100L,
+                "Day",
+                LocalTime.of(8, 0),
+                LocalTime.of(16, 0),
+                OffsetDateTime.parse("2026-09-17T08:00:00+07:00"),
+                OffsetDateTime.parse("2026-09-17T16:00:00+07:00"),
+                480,
+                false,
+                20L,
+                "Week 38",
+                "PUBLISHED");
     }
 }

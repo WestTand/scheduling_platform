@@ -65,7 +65,7 @@ class EmployeeScheduleServiceTest {
         assertThat(response.get(0).shiftTypeName()).isEqualTo("Day");
         assertThat(response.get(0).startsAt()).isEqualTo(OffsetDateTime.parse("2026-09-17T08:00:00+07:00"));
         assertThat(response.get(0).endsAt()).isEqualTo(OffsetDateTime.parse("2026-09-17T16:00:00+07:00"));
-        assertThat(response.get(0).workMinutes()).isEqualTo(240);
+        assertThat(response.get(0).workMinutes()).isEqualTo(480);
         assertThat(response.get(0).isTransitionShift()).isFalse();
     }
 
@@ -158,7 +158,7 @@ class EmployeeScheduleServiceTest {
                 .shiftName("Day")
                 .startTime(LocalTime.of(8, 0))
                 .endTime(LocalTime.of(16, 0))
-                .durationHours(BigDecimal.valueOf(4.0))
+                .durationHours(BigDecimal.valueOf(8.0))
                 .overnight(false)
                 .heavy(false)
                 .minStaff(1)

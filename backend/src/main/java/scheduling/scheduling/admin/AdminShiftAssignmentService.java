@@ -129,7 +129,24 @@ public class AdminShiftAssignmentService {
         }
         WorkShiftWindowService windowService = new WorkShiftWindowService();
         List<AdminPeriodScheduleResponse.ScheduledShift> scheduled = shifts.stream()
-                .map(shift -> { WorkShiftWindowService.Window window = windowService.resolve(shift); return new AdminPeriodScheduleResponse.ScheduledShift(shift.getId(), shift.getWorkDate(), shift.getShiftType().getId(), shift.getShiftType().getShiftName(), shift.getShiftType().getStartTime(), shift.getShiftType().getEndTime(), window.startsAt(), window.endsAt(), window.workMinutes(), window.transitionShift(), shift.getShiftType().getOvernight(), shift.getRequiredStaff(), shift.getShiftType().getMaxStaff(), byShift.getOrDefault(shift.getId(), List.of())); })
+                .map(shift -> {
+                    WorkShiftWindowService.Window window = windowService.resolve(shift);
+                    return new AdminPeriodScheduleResponse.ScheduledShift(
+                            shift.getId(),
+                            shift.getWorkDate(),
+                            shift.getShiftType().getId(),
+                            shift.getShiftType().getShiftName(),
+                            shift.getShiftType().getStartTime(),
+                            shift.getShiftType().getEndTime(),
+                            window.startsAt(),
+                            window.endsAt(),
+                            window.workMinutes(),
+                            window.transitionShift(),
+                            shift.getShiftType().getOvernight(),
+                            shift.getRequiredStaff(),
+                            shift.getShiftType().getMaxStaff(),
+                            byShift.getOrDefault(shift.getId(), List.of()));
+                })
                 .toList();
         return new AdminPeriodScheduleResponse(
                 period.getId(),
