@@ -1,6 +1,7 @@
 package scheduling.scheduling.admin;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
@@ -59,7 +60,7 @@ class StandardShiftTypeSeederTest {
     void createsSixMissingRowsByShiftCode() throws Exception {
         stubAllMissing();
 
-        seeder.run((ApplicationArguments) null);
+        seeder.run(mock(ApplicationArguments.class));
 
         ArgumentCaptor<ShiftType> captor = ArgumentCaptor.forClass(ShiftType.class);
         verify(shiftTypeRepository, times(6)).save(captor.capture());
@@ -89,6 +90,7 @@ class StandardShiftTypeSeederTest {
                 .penaltyWeightMultiplier(new BigDecimal("9.99"))
                 .build();
         when(shiftTypeRepository.findByShiftCode("THONG_TAM")).thenReturn(Optional.of(existing));
+        when(shiftTypeRepository.findByShiftName("Thong tam")).thenReturn(Optional.empty());
         for (String code : CODES) {
             if (!code.equals("THONG_TAM")) {
                 when(shiftTypeRepository.findByShiftCode(code)).thenReturn(Optional.empty());
@@ -96,7 +98,7 @@ class StandardShiftTypeSeederTest {
             }
         }
 
-        seeder.run((ApplicationArguments) null);
+        seeder.run(mock(ApplicationArguments.class));
 
         assertThat(existing.getStartTime()).isEqualTo(LocalTime.of(8, 0));
         assertThat(existing.getEndTime()).isEqualTo(LocalTime.of(17, 0));
@@ -110,7 +112,7 @@ class StandardShiftTypeSeederTest {
         assertThat(existing.getStatus()).isEqualTo("ACTIVE");
         assertThat(existing.getMinStaff()).isEqualTo(1);
         assertThat(existing.getMaxStaff()).isEqualTo(20);
-        verify(shiftTypeRepository, never()).findByShiftName("Thong tam");
+        verify(shiftTypeRepository).save(existing);
     }
 
     @Test
@@ -139,7 +141,7 @@ class StandardShiftTypeSeederTest {
             }
         }
 
-        seeder.run((ApplicationArguments) null);
+        seeder.run(mock(ApplicationArguments.class));
 
         assertThat(legacy.getShiftCode()).isEqualTo("THONG_TAM");
         assertThat(legacy.getShiftName()).isEqualTo("Thong tam");
@@ -154,7 +156,7 @@ class StandardShiftTypeSeederTest {
     void seedsAllRequiredColumns() throws Exception {
         stubAllMissing();
 
-        seeder.run((ApplicationArguments) null);
+        seeder.run(mock(ApplicationArguments.class));
 
         ArgumentCaptor<ShiftType> captor = ArgumentCaptor.forClass(ShiftType.class);
         verify(shiftTypeRepository, times(6)).save(captor.capture());
@@ -203,7 +205,7 @@ class StandardShiftTypeSeederTest {
     void seedsExactMultipliers() throws Exception {
         stubAllMissing();
 
-        seeder.run((ApplicationArguments) null);
+        seeder.run(mock(ApplicationArguments.class));
 
         ArgumentCaptor<ShiftType> captor = ArgumentCaptor.forClass(ShiftType.class);
         verify(shiftTypeRepository, times(6)).save(captor.capture());
@@ -223,27 +225,94 @@ class StandardShiftTypeSeederTest {
     void isIdempotentOnRepeatedRun() throws Exception {
         stubAllMissing();
 
-        seeder.run((ApplicationArguments) null);
+        seeder.run(mock(ApplicationArguments.class));
         ArgumentCaptor<ShiftType> firstCaptor = ArgumentCaptor.forClass(ShiftType.class);
         verify(shiftTypeRepository, times(6)).save(firstCaptor.capture());
         List<ShiftType> firstSaved = List.copyOf(firstCaptor.getAllValues());
 
         for (ShiftType saved : firstSaved) {
             when(shiftTypeRepository.findByShiftCode(saved.getShiftCode())).thenReturn(Optional.of(saved));
+            when(shiftTypeRepository.findByShiftName(saved.getShiftName())).thenReturn(Optional.of(saved));
         }
         clearInvocations(shiftTypeRepository);
         when(shiftTypeRepository.save(any(ShiftType.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
-        seeder.run((ApplicationArguments) null);
+        seeder.run(mock(ApplicationArguments.class));
 
         verify(shiftTypeRepository, times(6)).save(any(ShiftType.class));
-        verify(shiftTypeRepository, never()).findByShiftName(any());
         // No duplicates: every save after second run reuses the same six codes
         ArgumentCaptor<ShiftType> allCaptor = ArgumentCaptor.forClass(ShiftType.class);
         verify(shiftTypeRepository, times(6)).save(allCaptor.capture());
         assertThat(allCaptor.getAllValues())
                 .extracting(ShiftType::getShiftCode)
                 .containsExactlyInAnyOrderElementsOf(CODES);
+    }
+
+    @Test
+    void skipsLegacyRowWhenShiftCodeAndShiftNameCollideOnDifferentRows() throws Exception {
+        ShiftType byCodeRow = ShiftType.builder()
+                .shiftName("Thong tam")
+                .shiftCode("THONG_TAM")
+                .startTime(LocalTime.of(9, 0))
+                .endTime(LocalTime.of(10, 0))
+                .durationHours(new BigDecimal("1.0"))
+                .overnight(true)
+                .heavy(false)
+                .minStaff(5)
+                .maxStaff(6)
+                .quotaCategory("REGULAR")
+                .status("INACTIVE")
+                .applicableWeekdays("SAT,SUN")
+                .appliesOnHolidays(true)
+                .penaltyWeightMultiplier(new BigDecimal("9.99"))
+                .build();
+        byCodeRow.setId(1L);
+        ShiftType legacyRow = ShiftType.builder()
+                .shiftName("Thong tam")
+                .startTime(LocalTime.of(9, 0))
+                .endTime(LocalTime.of(10, 0))
+                .durationHours(new BigDecimal("1.0"))
+                .overnight(true)
+                .heavy(false)
+                .minStaff(5)
+                .maxStaff(6)
+                .quotaCategory("REGULAR")
+                .status("INACTIVE")
+                .applicableWeekdays("SAT,SUN")
+                .appliesOnHolidays(true)
+                .penaltyWeightMultiplier(new BigDecimal("9.99"))
+                .build();
+        legacyRow.setId(2L);
+
+        when(shiftTypeRepository.findByShiftCode("THONG_TAM")).thenReturn(Optional.of(byCodeRow));
+        when(shiftTypeRepository.findByShiftName("Thong tam")).thenReturn(Optional.of(legacyRow));
+        for (String code : CODES) {
+            if (!code.equals("THONG_TAM")) {
+                when(shiftTypeRepository.findByShiftCode(code)).thenReturn(Optional.empty());
+                when(shiftTypeRepository.findByShiftName(NAMES.get(code))).thenReturn(Optional.empty());
+            }
+        }
+
+        seeder.run(mock(ApplicationArguments.class));
+
+        assertThat(byCodeRow.getStartTime()).isEqualTo(LocalTime.of(8, 0));
+        assertThat(byCodeRow.getQuotaCategory()).isEqualTo("BATHING");
+        assertThat(byCodeRow.getStatus()).isEqualTo("ACTIVE");
+        verify(shiftTypeRepository).save(byCodeRow);
+        verify(shiftTypeRepository, never()).save(legacyRow);
+        assertThat(legacyRow.getShiftCode()).isNull();
+    }
+
+    @Test
+    void doesNotAbortBootOnConcurrentInsertConflict() throws Exception {
+        stubAllMissing();
+        when(shiftTypeRepository.save(any(ShiftType.class)))
+                .thenThrow(new org.springframework.dao.DataIntegrityViolationException("duplicate"))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        assertThatNoException().isThrownBy(() -> seeder.run(mock(ApplicationArguments.class)));
+
+        verify(shiftTypeRepository, times(6)).save(any(ShiftType.class));
     }
 }
