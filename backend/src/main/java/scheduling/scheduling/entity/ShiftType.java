@@ -52,6 +52,21 @@ public class ShiftType extends BaseEntity {
     @Builder.Default
     private String status = "ACTIVE";
 
+    @Column(name = "shift_code", length = 30, unique = true)
+    private String shiftCode;
+
+    @Column(name = "applicable_weekdays", nullable = false, length = 40)
+    @Builder.Default
+    private String applicableWeekdays = "MON,TUE,WED,THU,FRI,SAT,SUN";
+
+    @Column(name = "applies_on_holidays", nullable = false)
+    @Builder.Default
+    private Boolean appliesOnHolidays = false;
+
+    @Column(name = "penalty_weight_multiplier", nullable = false, precision = 3, scale = 2)
+    @Builder.Default
+    private java.math.BigDecimal penaltyWeightMultiplier = java.math.BigDecimal.valueOf(1.00).setScale(2);
+
     @OneToMany(mappedBy = "shiftType", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     private Set<WorkShift> workShifts;
 

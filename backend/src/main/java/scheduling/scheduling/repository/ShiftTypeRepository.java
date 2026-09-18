@@ -1,6 +1,7 @@
 package scheduling.scheduling.repository;
 
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -11,6 +12,12 @@ public interface ShiftTypeRepository extends JpaRepository<ShiftType, Long> {
     boolean existsByShiftName(String shiftName);
 
     boolean existsByShiftNameAndIdNot(String shiftName, Long id);
+
+    Optional<ShiftType> findByShiftCode(String shiftCode);
+
+    boolean existsByShiftCode(String shiftCode);
+
+    boolean existsByShiftCodeAndIdNot(String shiftCode, Long id);
 
     @Query("""
             select s

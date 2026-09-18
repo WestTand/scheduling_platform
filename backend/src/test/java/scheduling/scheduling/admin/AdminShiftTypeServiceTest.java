@@ -43,6 +43,7 @@ class AdminShiftTypeServiceTest {
     void createShiftTypeDefaultsBooleansAndSavesActive() {
         CreateShiftTypeRequest request = createRequest("Ngoai gio", null, null, 1, 3, null);
         when(shiftTypeRepository.existsByShiftName("Ngoai gio")).thenReturn(false);
+        when(shiftTypeRepository.existsByShiftCode("NGOAI_GIO")).thenReturn(false);
         when(shiftTypeRepository.save(org.mockito.ArgumentMatchers.any(ShiftType.class)))
                 .thenAnswer(invocation -> {
                     ShiftType saved = invocation.getArgument(0);
@@ -59,11 +60,245 @@ class AdminShiftTypeServiceTest {
         assertThat(response.status()).isEqualTo("ACTIVE");
     }
 
+    @Test
+    void createShiftTypeAppliesDefaultsForNewRuleFields() {
+        CreateShiftTypeRequest request = new CreateShiftTypeRequest(
+                "Ngoai gio",
+                LocalTime.of(8, 0),
+                LocalTime.of(12, 0),
+                BigDecimal.valueOf(4.0),
+                null,
+                null,
+                1,
+                3,
+                null,
+                "NGOAI_GIO",
+                null,
+                null,
+                null);
+        when(shiftTypeRepository.existsByShiftName("Ngoai gio")).thenReturn(false);
+        when(shiftTypeRepository.existsByShiftCode("NGOAI_GIO")).thenReturn(false);
+        when(shiftTypeRepository.save(org.mockito.ArgumentMatchers.any(ShiftType.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        AdminShiftTypeResponse response = service.createShiftType(request);
+
+        assertThat(response.shiftCode()).isEqualTo("NGOAI_GIO");
+        assertThat(response.applicableWeekdays()).isEqualTo("MON,TUE,WED,THU,FRI,SAT,SUN");
+        assertThat(response.appliesOnHolidays()).isFalse();
+        assertThat(response.penaltyWeightMultiplier()).isEqualByComparingTo(new BigDecimal("1.00"));
+    }
+
+    @Test
+    void createShiftTypeAcceptsAndReturnsShiftCode() {
+        CreateShiftTypeRequest request = createRequestWithCode(
+                "Ngoai gio", "THONG_TAM", "MON,TUE", false, new BigDecimal("1.20"));
+        when(shiftTypeRepository.existsByShiftName("Ngoai gio")).thenReturn(false);
+        when(shiftTypeRepository.existsByShiftCode("THONG_TAM")).thenReturn(false);
+        when(shiftTypeRepository.save(org.mockito.ArgumentMatchers.any(ShiftType.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        AdminShiftTypeResponse response = service.createShiftType(request);
+
+        assertThat(response.shiftCode()).isEqualTo("THONG_TAM");
+        assertThat(response.applicableWeekdays()).isEqualTo("MON,TUE");
+        assertThat(response.appliesOnHolidays()).isFalse();
+        assertThat(response.penaltyWeightMultiplier()).isEqualByComparingTo(new BigDecimal("1.20"));
+    }
+
+    @Test
+    void updateShiftTypeAcceptsAndReturnsShiftCode() {
+        ShiftType shiftType = shiftType(10L, "Old", "ACTIVE");
+        UpdateShiftTypeRequest request = updateRequestWithCode(
+                "New", "TRUC_SANG", "SAT,SUN", true, new BigDecimal("1.50"), "ACTIVE", "ON_CALL");
+        when(shiftTypeRepository.findById(10L)).thenReturn(Optional.of(shiftType));
+        when(shiftTypeRepository.existsByShiftNameAndIdNot("New", 10L)).thenReturn(false);
+        when(shiftTypeRepository.existsByShiftCodeAndIdNot("TRUC_SANG", 10L)).thenReturn(false);
+        when(shiftTypeRepository.save(shiftType)).thenReturn(shiftType);
+
+        AdminShiftTypeResponse response = service.updateShiftType(10L, request);
+
+        assertThat(response.shiftCode()).isEqualTo("TRUC_SANG");
+        assertThat(response.applicableWeekdays()).isEqualTo("SAT,SUN");
+        assertThat(response.appliesOnHolidays()).isTrue();
+        assertThat(response.penaltyWeightMultiplier()).isEqualByComparingTo(new BigDecimal("1.50"));
+    }
+
+    @Test
+    void createShiftTypeRejectsDuplicateShiftCode() {
+        CreateShiftTypeRequest request = createRequestWithCode(
+                "Ngoai gio", "THONG_TAM", null, null, null);
+        when(shiftTypeRepository.existsByShiftName("Ngoai gio")).thenReturn(false);
+        when(shiftTypeRepository.existsByShiftCode("THONG_TAM")).thenReturn(true);
+
+        assertThatThrownBy(() -> service.createShiftType(request))
+                .isInstanceOf(DuplicateResourceException.class)
+                .hasMessage("Shift code already exists");
+
+        verify(shiftTypeRepository, never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void updateShiftTypeRejectsDuplicateShiftCode() {
+        ShiftType shiftType = shiftType(10L, "Old", "ACTIVE");
+        shiftType.setShiftCode("OLD_CODE");
+        UpdateShiftTypeRequest request = updateRequestWithCode(
+                "New", "THONG_TAM", "MON", false, new BigDecimal("1.00"), "ACTIVE", "REGULAR");
+        when(shiftTypeRepository.findById(10L)).thenReturn(Optional.of(shiftType));
+        when(shiftTypeRepository.existsByShiftNameAndIdNot("New", 10L)).thenReturn(false);
+        when(shiftTypeRepository.existsByShiftCodeAndIdNot("THONG_TAM", 10L)).thenReturn(true);
+
+        assertThatThrownBy(() -> service.updateShiftType(10L, request))
+                .isInstanceOf(DuplicateResourceException.class)
+                .hasMessage("Shift code already exists");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = { "thong_tam", "THONG-TAM", "THONG TAM", "ABCDEFGHIJKLMNOPQRSTUVWXYZ12345" })
+    void createShiftTypeRejectsInvalidShiftCode(String shiftCode) {
+        CreateShiftTypeRequest request = createRequestWithCode(
+                "Ngoai gio", shiftCode, null, null, null);
+        when(shiftTypeRepository.existsByShiftName("Ngoai gio")).thenReturn(false);
+        when(shiftTypeRepository.existsByShiftCode(shiftCode)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.createShiftType(request))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = { "thong_tam", "THONG-TAM", "THONG TAM" })
+    void updateShiftTypeRejectsInvalidShiftCode(String shiftCode) {
+        ShiftType shiftType = shiftType(10L, "Old", "ACTIVE");
+        UpdateShiftTypeRequest request = updateRequestWithCode(
+                "New", shiftCode, "MON", false, new BigDecimal("1.00"), "ACTIVE", "REGULAR");
+        when(shiftTypeRepository.findById(10L)).thenReturn(Optional.of(shiftType));
+        when(shiftTypeRepository.existsByShiftNameAndIdNot("New", 10L)).thenReturn(false);
+        when(shiftTypeRepository.existsByShiftCodeAndIdNot(shiftCode, 10L)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.updateShiftType(10L, request))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void createShiftTypeNormalizesWeekdays() {
+        CreateShiftTypeRequest request = createRequestWithCode(
+                "Ngoai gio", "NGOAI_GIO", "fri,mon,mon", false, null);
+        when(shiftTypeRepository.existsByShiftName("Ngoai gio")).thenReturn(false);
+        when(shiftTypeRepository.existsByShiftCode("NGOAI_GIO")).thenReturn(false);
+        when(shiftTypeRepository.save(org.mockito.ArgumentMatchers.any(ShiftType.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        AdminShiftTypeResponse response = service.createShiftType(request);
+
+        assertThat(response.applicableWeekdays()).isEqualTo("MON,FRI");
+    }
+
+    @Test
+    void createShiftTypeRejectsInvalidWeekdayToken() {
+        CreateShiftTypeRequest request = createRequestWithCode(
+                "Ngoai gio", "NGOAI_GIO", "MON,FUNDAY", false, null);
+        when(shiftTypeRepository.existsByShiftName("Ngoai gio")).thenReturn(false);
+        when(shiftTypeRepository.existsByShiftCode("NGOAI_GIO")).thenReturn(false);
+
+        assertThatThrownBy(() -> service.createShiftType(request))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void createShiftTypeRejectsBlankWeekdaysUnlessAppliesOnHolidays() {
+        CreateShiftTypeRequest request = createRequestWithCode(
+                "Ngoai gio", "NGOAI_GIO", "  ", false, null);
+        when(shiftTypeRepository.existsByShiftName("Ngoai gio")).thenReturn(false);
+        when(shiftTypeRepository.existsByShiftCode("NGOAI_GIO")).thenReturn(false);
+
+        assertThatThrownBy(() -> service.createShiftType(request))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void createShiftTypeAllowsBlankWeekdaysWhenAppliesOnHolidays() {
+        CreateShiftTypeRequest request = createRequestWithCode(
+                "Truc Tet", "TRUC_TET", "", true, null);
+        when(shiftTypeRepository.existsByShiftName("Truc Tet")).thenReturn(false);
+        when(shiftTypeRepository.existsByShiftCode("TRUC_TET")).thenReturn(false);
+        when(shiftTypeRepository.save(org.mockito.ArgumentMatchers.any(ShiftType.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        AdminShiftTypeResponse response = service.createShiftType(request);
+
+        assertThat(response.applicableWeekdays()).isEqualTo("");
+        assertThat(response.appliesOnHolidays()).isTrue();
+    }
+
+    @Test
+    void createShiftTypeRejectsDurationOverEightHours() {
+        CreateShiftTypeRequest request = new CreateShiftTypeRequest(
+                "Ngoai gio",
+                LocalTime.of(8, 0),
+                LocalTime.of(18, 0),
+                BigDecimal.valueOf(8.5),
+                false,
+                false,
+                1,
+                3,
+                "REGULAR",
+                "NGOAI_GIO",
+                "MON",
+                false,
+                BigDecimal.valueOf(1.0));
+        when(shiftTypeRepository.existsByShiftName("Ngoai gio")).thenReturn(false);
+        when(shiftTypeRepository.existsByShiftCode("NGOAI_GIO")).thenReturn(false);
+
+        assertThatThrownBy(() -> service.createShiftType(request))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = { "-0.01", "10.00" })
+    void createShiftTypeRejectsMultiplierOutsideRange(String multiplier) {
+        CreateShiftTypeRequest request = createRequestWithCode(
+                "Ngoai gio", "NGOAI_GIO", "MON", false, new BigDecimal(multiplier));
+        when(shiftTypeRepository.existsByShiftName("Ngoai gio")).thenReturn(false);
+        when(shiftTypeRepository.existsByShiftCode("NGOAI_GIO")).thenReturn(false);
+
+        assertThatThrownBy(() -> service.createShiftType(request))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = { "-1.00", "10.00" })
+    void updateShiftTypeRejectsMultiplierOutsideRange(String multiplier) {
+        ShiftType shiftType = shiftType(10L, "Old", "ACTIVE");
+        UpdateShiftTypeRequest request = updateRequestWithCode(
+                "New", "NEW_CODE", "MON", false, new BigDecimal(multiplier), "ACTIVE", "REGULAR");
+        when(shiftTypeRepository.findById(10L)).thenReturn(Optional.of(shiftType));
+        when(shiftTypeRepository.existsByShiftNameAndIdNot("New", 10L)).thenReturn(false);
+        when(shiftTypeRepository.existsByShiftCodeAndIdNot("NEW_CODE", 10L)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.updateShiftType(10L, request))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
     @ParameterizedTest
     @ValueSource(strings = { "REGULAR", "OVERTIME", "BATHING", "ON_CALL" })
     void createShiftTypeAcceptsQuotaCategory(String quotaCategory) {
         CreateShiftTypeRequest request = createRequest("Ngoai gio", false, false, 1, 3, quotaCategory);
         when(shiftTypeRepository.existsByShiftName("Ngoai gio")).thenReturn(false);
+        when(shiftTypeRepository.existsByShiftCode("NGOAI_GIO")).thenReturn(false);
         when(shiftTypeRepository.save(org.mockito.ArgumentMatchers.any(ShiftType.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -79,6 +314,7 @@ class AdminShiftTypeServiceTest {
         UpdateShiftTypeRequest request = updateRequest("Old", false, false, 1, 3, "ACTIVE", quotaCategory);
         when(shiftTypeRepository.findById(10L)).thenReturn(Optional.of(shiftType));
         when(shiftTypeRepository.existsByShiftNameAndIdNot("Old", 10L)).thenReturn(false);
+        when(shiftTypeRepository.existsByShiftCodeAndIdNot("OLD_CODE", 10L)).thenReturn(false);
         when(shiftTypeRepository.save(shiftType)).thenReturn(shiftType);
 
         AdminShiftTypeResponse response = service.updateShiftType(10L, request);
@@ -114,6 +350,7 @@ class AdminShiftTypeServiceTest {
         UpdateShiftTypeRequest request = updateRequest("New", true, true, 2, 4, "INACTIVE", "BATHING");
         when(shiftTypeRepository.findById(10L)).thenReturn(Optional.of(shiftType));
         when(shiftTypeRepository.existsByShiftNameAndIdNot("New", 10L)).thenReturn(false);
+        when(shiftTypeRepository.existsByShiftCodeAndIdNot("OLD_CODE", 10L)).thenReturn(false);
         when(shiftTypeRepository.save(shiftType)).thenReturn(shiftType);
 
         AdminShiftTypeResponse response = service.updateShiftType(10L, request);
@@ -204,7 +441,29 @@ class AdminShiftTypeServiceTest {
                 heavy,
                 minStaff,
                 maxStaff,
-                quotaCategory);
+                quotaCategory,
+                "NGOAI_GIO",
+                null,
+                null,
+                null);
+    }
+
+    private static CreateShiftTypeRequest createRequestWithCode(
+            String name, String shiftCode, String applicableWeekdays, Boolean appliesOnHolidays, BigDecimal multiplier) {
+        return new CreateShiftTypeRequest(
+                name,
+                LocalTime.of(8, 0),
+                LocalTime.of(12, 0),
+                BigDecimal.valueOf(4.0),
+                false,
+                false,
+                1,
+                3,
+                "REGULAR",
+                shiftCode,
+                applicableWeekdays,
+                appliesOnHolidays,
+                multiplier);
     }
 
     private static UpdateShiftTypeRequest updateRequest(String name, Boolean overnight, Boolean heavy, int minStaff, int maxStaff, String status, String quotaCategory) {
@@ -218,12 +477,36 @@ class AdminShiftTypeServiceTest {
                 minStaff,
                 maxStaff,
                 status,
-                quotaCategory);
+                quotaCategory,
+                "OLD_CODE",
+                "MON,TUE,WED,THU,FRI,SAT,SUN",
+                false,
+                BigDecimal.valueOf(1.0));
+    }
+
+    private static UpdateShiftTypeRequest updateRequestWithCode(
+            String name, String shiftCode, String applicableWeekdays, Boolean appliesOnHolidays, BigDecimal multiplier, String status, String quotaCategory) {
+        return new UpdateShiftTypeRequest(
+                name,
+                LocalTime.of(8, 0),
+                LocalTime.of(12, 0),
+                BigDecimal.valueOf(4.0),
+                false,
+                false,
+                1,
+                3,
+                status,
+                quotaCategory,
+                shiftCode,
+                applicableWeekdays,
+                appliesOnHolidays,
+                multiplier);
     }
 
     private static ShiftType shiftType(Long id, String name, String status) {
         ShiftType shiftType = ShiftType.builder()
                 .shiftName(name)
+                .shiftCode("OLD_CODE")
                 .startTime(LocalTime.of(8, 0))
                 .endTime(LocalTime.of(12, 0))
                 .durationHours(BigDecimal.valueOf(4.0))
@@ -233,6 +516,9 @@ class AdminShiftTypeServiceTest {
                 .maxStaff(3)
                 .quotaCategory("REGULAR")
                 .status(status)
+                .applicableWeekdays("MON,TUE,WED,THU,FRI,SAT,SUN")
+                .appliesOnHolidays(false)
+                .penaltyWeightMultiplier(new BigDecimal("1.00"))
                 .build();
         shiftType.setId(id);
         return shiftType;

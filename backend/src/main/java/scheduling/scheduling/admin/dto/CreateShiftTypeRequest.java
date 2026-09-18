@@ -18,5 +18,9 @@ public record CreateShiftTypeRequest(
         Boolean heavy,
         @NotNull @Min(1) Integer minStaff,
         @NotNull @Min(1) Integer maxStaff,
-        @Size(max = 20) String quotaCategory) {
+        @Size(max = 20) String quotaCategory,
+        @NotBlank @Size(max = 30) String shiftCode,
+        String applicableWeekdays,
+        Boolean appliesOnHolidays,
+        BigDecimal penaltyWeightMultiplier) {
 }

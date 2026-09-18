@@ -93,7 +93,8 @@ class AdminShiftTypeControllerTest {
                                   "endTime": "12:00:00",
                                   "durationHours": 4.0,
                                   "minStaff": 1,
-                                  "maxStaff": 3
+                                  "maxStaff": 3,
+                                  "shiftCode": "NGOAI_GIO"
                                 }
                                 """))
                 .andExpect(status().isCreated())
@@ -109,6 +110,7 @@ class AdminShiftTypeControllerTest {
         assertThat(request.durationHours()).isEqualByComparingTo(BigDecimal.valueOf(4.0));
         assertThat(request.minStaff()).isEqualTo(1);
         assertThat(request.maxStaff()).isEqualTo(3);
+        assertThat(request.shiftCode()).isEqualTo("NGOAI_GIO");
     }
 
     @Test
@@ -150,7 +152,11 @@ class AdminShiftTypeControllerTest {
                                   "minStaff": 1,
                                   "maxStaff": 3,
                                   "status": "ACTIVE",
-                                  "quotaCategory": "OVERTIME"
+                                  "quotaCategory": "OVERTIME",
+                                  "shiftCode": "NGOAI_GIO",
+                                  "applicableWeekdays": "MON,TUE,WED,THU,FRI",
+                                  "appliesOnHolidays": false,
+                                  "penaltyWeightMultiplier": 1.20
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -172,6 +178,10 @@ class AdminShiftTypeControllerTest {
         assertThat(request.maxStaff()).isEqualTo(3);
         assertThat(request.status()).isEqualTo("ACTIVE");
         assertThat(request.quotaCategory()).isEqualTo("OVERTIME");
+        assertThat(request.shiftCode()).isEqualTo("NGOAI_GIO");
+        assertThat(request.applicableWeekdays()).isEqualTo("MON,TUE,WED,THU,FRI");
+        assertThat(request.appliesOnHolidays()).isFalse();
+        assertThat(request.penaltyWeightMultiplier()).isEqualByComparingTo(new BigDecimal("1.20"));
     }
 
     @Test
@@ -261,6 +271,10 @@ class AdminShiftTypeControllerTest {
                 1,
                 3,
                 "OVERTIME",
-                "ACTIVE");
+                "ACTIVE",
+                "NGOAI_GIO",
+                "MON,TUE,WED,THU,FRI",
+                false,
+                new BigDecimal("1.20"));
     }
 }
