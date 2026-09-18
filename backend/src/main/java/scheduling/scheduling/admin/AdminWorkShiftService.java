@@ -58,6 +58,7 @@ public class AdminWorkShiftService {
         validateShiftApplicability(request.workDate(), shiftType);
         int requiredStaff = normalizeRequiredStaff(request.requiredStaff(), shiftType);
         String note = normalizeNote(request.note());
+        WorkShiftWindowService.Window window = new WorkShiftWindowService().derive(request.workDate(), shiftType);
 
         WorkShift workShift = WorkShift.builder()
                 .schedulePeriod(period)
@@ -65,6 +66,10 @@ public class AdminWorkShiftService {
                 .workDate(request.workDate())
                 .requiredStaff(requiredStaff)
                 .note(note)
+                .startsAt(window.startsAt())
+                .endsAt(window.endsAt())
+                .workMinutes(window.workMinutes())
+                .transitionShift(window.transitionShift())
                 .build();
         return AdminWorkShiftResponse.from(workShiftRepository.save(workShift));
     }

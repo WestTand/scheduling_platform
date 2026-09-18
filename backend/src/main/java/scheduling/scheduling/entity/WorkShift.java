@@ -3,6 +3,7 @@ package scheduling.scheduling.entity;
 import lombok.*;
 import jakarta.persistence.*;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.Set;
 
 /**
@@ -36,6 +37,18 @@ public class WorkShift extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "shift_type_id", nullable = false)
     private ShiftType shiftType;
+
+    @Column(name = "starts_at")
+    private OffsetDateTime startsAt;
+
+    @Column(name = "ends_at")
+    private OffsetDateTime endsAt;
+
+    @Column(name = "work_minutes")
+    private Integer workMinutes;
+
+    @Column(name = "is_transition_shift")
+    private Boolean transitionShift;
 
     @OneToMany(mappedBy = "workShift", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     private Set<ShiftAssignment> shiftAssignments;

@@ -15,6 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -284,6 +285,10 @@ class AdminShiftAssignmentControllerTest {
                 "Day",
                 LocalTime.of(8, 0),
                 LocalTime.of(16, 0),
+                OffsetDateTime.parse("2026-09-17T08:00:00+07:00"),
+                OffsetDateTime.parse("2026-09-17T16:00:00+07:00"),
+                480,
+                false,
                 20L,
                 "Week 38",
                 "PUBLISHED");
