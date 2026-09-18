@@ -42,7 +42,7 @@ class HolidaySeedServiceTest {
         resourceResolver = mock(ResourcePatternResolver.class);
         objectMapper = new ObjectMapper();
         seedService = new HolidaySeedService(holidayRepository, resourceResolver, objectMapper);
-        when(holidayRepository.save(any(Holiday.class)))
+        when(holidayRepository.saveAndFlush(any(Holiday.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
     }
 
@@ -72,7 +72,7 @@ class HolidaySeedServiceTest {
         seedService.seedFixedHolidaysForYear(2026);
 
         ArgumentCaptor<Holiday> captor = ArgumentCaptor.forClass(Holiday.class);
-        verify(holidayRepository, times(4)).save(captor.capture());
+        verify(holidayRepository, times(4)).saveAndFlush(captor.capture());
         List<LocalDate> dates = captor.getAllValues().stream().map(Holiday::getHolidayDate).toList();
         assertThat(dates).containsExactlyInAnyOrder(
                 LocalDate.of(2026, 1, 1),
@@ -101,7 +101,7 @@ class HolidaySeedServiceTest {
         seedService.importAnnualHolidayResource("holidays-2026.json", jsonResource(json));
 
         ArgumentCaptor<Holiday> captor = ArgumentCaptor.forClass(Holiday.class);
-        verify(holidayRepository, times(2)).save(captor.capture());
+        verify(holidayRepository, times(2)).saveAndFlush(captor.capture());
         List<LocalDate> dates = captor.getAllValues().stream().map(Holiday::getHolidayDate).toList();
         assertThat(dates).containsExactlyInAnyOrder(LocalDate.of(2026, 2, 16), LocalDate.of(2026, 4, 26));
         for (Holiday saved : captor.getAllValues()) {
@@ -131,7 +131,7 @@ class HolidaySeedServiceTest {
 
         seedService.importAnnualHolidayResource("holidays-2026.json", jsonResource(json));
 
-        verify(holidayRepository, times(1)).save(existing);
+        verify(holidayRepository, times(1)).saveAndFlush(existing);
         assertThat(existing.getHolidayName()).isEqualTo("Quoc khanh (updated)");
         // FIXED_RULE is canonical and must be preserved on JSON overlap.
         assertThat(existing.getSourceType()).isEqualTo("FIXED_RULE");
@@ -158,7 +158,7 @@ class HolidaySeedServiceTest {
 
         seedService.importAnnualHolidayResource("holidays-2026.json", jsonResource(json));
 
-        verify(holidayRepository, times(1)).save(existing);
+        verify(holidayRepository, times(1)).saveAndFlush(existing);
         assertThat(existing.getSourceType()).isEqualTo("FIXED_RULE");
         assertThat(existing.getHolidayName()).isEqualTo("Tet Duong lich");
         assertThat(existing.getHolidayType()).isEqualTo("PUBLIC_HOLIDAY");
@@ -214,7 +214,7 @@ class HolidaySeedServiceTest {
         when(holidayRepository.findByHolidayDate(any(LocalDate.class))).thenReturn(Optional.empty());
 
         seedService.seedFixedHolidaysForYear(2026);
-        verify(holidayRepository, times(4)).save(any(Holiday.class));
+        verify(holidayRepository, times(4)).saveAndFlush(any(Holiday.class));
 
         // Second run finds existing rows and updates them instead of creating new ones.
         when(holidayRepository.findByHolidayDate(any(LocalDate.class)))
@@ -234,7 +234,7 @@ class HolidaySeedServiceTest {
         seedService.seedFixedHolidaysForYear(2026);
 
         // Total 8 saves (4 create + 4 upsert), no extra rows beyond the 4 dates.
-        verify(holidayRepository, times(8)).save(any(Holiday.class));
+        verify(holidayRepository, times(8)).saveAndFlush(any(Holiday.class));
         ArgumentCaptor<LocalDate> dateCaptor = ArgumentCaptor.forClass(LocalDate.class);
         verify(holidayRepository, times(8)).findByHolidayDate(dateCaptor.capture());
         // Only ever queried the 4 fixed dates.
@@ -281,7 +281,7 @@ class HolidaySeedServiceTest {
         seedService.run(mock(ApplicationArguments.class));
 
         // Fixed holidays for current+next year (8 saves) + 1 good annual row; bad file skipped.
-        verify(holidayRepository, times(9)).save(any(Holiday.class));
+        verify(holidayRepository, times(9)).saveAndFlush(any(Holiday.class));
     }
 
     @Test
@@ -295,7 +295,7 @@ class HolidaySeedServiceTest {
                 .sourceType("ANNUAL_SEED")
                 .active(true)
                 .build();
-        when(holidayRepository.save(any(Holiday.class)))
+        when(holidayRepository.saveAndFlush(any(Holiday.class)))
                 .thenThrow(new DataIntegrityViolationException("duplicate key"))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         when(holidayRepository.findByHolidayDate(LocalDate.of(2026, 2, 16)))
@@ -311,6 +311,23 @@ class HolidaySeedServiceTest {
         seedService.importAnnualHolidayResource("holidays-2026.json", jsonResource(json));
 
         verify(holidayRepository, times(2)).findByHolidayDate(LocalDate.of(2026, 2, 16));
+    }
+
+    @Test
+    void runSkipsResourceWithMissingFilenameAndContinues() throws Exception {
+        when(holidayRepository.findByHolidayDate(any(LocalDate.class))).thenReturn(Optional.empty());
+        Resource unnamed = namedJsonResource(null, "[]");
+        Resource named = namedJsonResource("holidays-2026.json", """
+                [
+                  {"date": "2026-02-16", "name": "Nghi Tet", "type": "LUNAR_HOLIDAY"}
+                ]
+                """);
+        when(resourceResolver.getResources("classpath*:holidays/holidays-*.json"))
+                .thenReturn(new Resource[]{unnamed, named});
+
+        seedService.run(mock(ApplicationArguments.class));
+
+        verify(holidayRepository, times(9)).saveAndFlush(any(Holiday.class));
     }
 
     @Test

@@ -45,7 +45,7 @@ class StandardShiftTypeSeederTest {
     void setUp() {
         shiftTypeRepository = mock(ShiftTypeRepository.class);
         seeder = new StandardShiftTypeSeeder(shiftTypeRepository);
-        when(shiftTypeRepository.save(any(ShiftType.class)))
+        when(shiftTypeRepository.saveAndFlush(any(ShiftType.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
     }
 
@@ -63,7 +63,7 @@ class StandardShiftTypeSeederTest {
         seeder.run(mock(ApplicationArguments.class));
 
         ArgumentCaptor<ShiftType> captor = ArgumentCaptor.forClass(ShiftType.class);
-        verify(shiftTypeRepository, times(6)).save(captor.capture());
+        verify(shiftTypeRepository, times(6)).saveAndFlush(captor.capture());
         List<String> savedCodes = captor.getAllValues().stream().map(ShiftType::getShiftCode).toList();
         assertThat(savedCodes).containsExactlyInAnyOrderElementsOf(CODES);
         for (String code : CODES) {
@@ -112,7 +112,7 @@ class StandardShiftTypeSeederTest {
         assertThat(existing.getStatus()).isEqualTo("ACTIVE");
         assertThat(existing.getMinStaff()).isEqualTo(1);
         assertThat(existing.getMaxStaff()).isEqualTo(20);
-        verify(shiftTypeRepository).save(existing);
+        verify(shiftTypeRepository).saveAndFlush(existing);
     }
 
     @Test
@@ -149,7 +149,7 @@ class StandardShiftTypeSeederTest {
         assertThat(legacy.getEndTime()).isEqualTo(LocalTime.of(17, 0));
         assertThat(legacy.getQuotaCategory()).isEqualTo("BATHING");
         assertThat(legacy.getStatus()).isEqualTo("ACTIVE");
-        verify(shiftTypeRepository).save(legacy);
+        verify(shiftTypeRepository).saveAndFlush(legacy);
     }
 
     @Test
@@ -159,7 +159,7 @@ class StandardShiftTypeSeederTest {
         seeder.run(mock(ApplicationArguments.class));
 
         ArgumentCaptor<ShiftType> captor = ArgumentCaptor.forClass(ShiftType.class);
-        verify(shiftTypeRepository, times(6)).save(captor.capture());
+        verify(shiftTypeRepository, times(6)).saveAndFlush(captor.capture());
         Map<String, ShiftType> byCode = new HashMap<>();
         for (ShiftType saved : captor.getAllValues()) {
             byCode.put(saved.getShiftCode(), saved);
@@ -208,7 +208,7 @@ class StandardShiftTypeSeederTest {
         seeder.run(mock(ApplicationArguments.class));
 
         ArgumentCaptor<ShiftType> captor = ArgumentCaptor.forClass(ShiftType.class);
-        verify(shiftTypeRepository, times(6)).save(captor.capture());
+        verify(shiftTypeRepository, times(6)).saveAndFlush(captor.capture());
         Map<String, ShiftType> byCode = new HashMap<>();
         for (ShiftType saved : captor.getAllValues()) {
             byCode.put(saved.getShiftCode(), saved);
@@ -227,7 +227,7 @@ class StandardShiftTypeSeederTest {
 
         seeder.run(mock(ApplicationArguments.class));
         ArgumentCaptor<ShiftType> firstCaptor = ArgumentCaptor.forClass(ShiftType.class);
-        verify(shiftTypeRepository, times(6)).save(firstCaptor.capture());
+        verify(shiftTypeRepository, times(6)).saveAndFlush(firstCaptor.capture());
         List<ShiftType> firstSaved = List.copyOf(firstCaptor.getAllValues());
 
         for (ShiftType saved : firstSaved) {
@@ -235,15 +235,15 @@ class StandardShiftTypeSeederTest {
             when(shiftTypeRepository.findByShiftName(saved.getShiftName())).thenReturn(Optional.of(saved));
         }
         clearInvocations(shiftTypeRepository);
-        when(shiftTypeRepository.save(any(ShiftType.class)))
+        when(shiftTypeRepository.saveAndFlush(any(ShiftType.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         seeder.run(mock(ApplicationArguments.class));
 
-        verify(shiftTypeRepository, times(6)).save(any(ShiftType.class));
+        verify(shiftTypeRepository, times(6)).saveAndFlush(any(ShiftType.class));
         // No duplicates: every save after second run reuses the same six codes
         ArgumentCaptor<ShiftType> allCaptor = ArgumentCaptor.forClass(ShiftType.class);
-        verify(shiftTypeRepository, times(6)).save(allCaptor.capture());
+        verify(shiftTypeRepository, times(6)).saveAndFlush(allCaptor.capture());
         assertThat(allCaptor.getAllValues())
                 .extracting(ShiftType::getShiftCode)
                 .containsExactlyInAnyOrderElementsOf(CODES);
@@ -252,7 +252,7 @@ class StandardShiftTypeSeederTest {
     @Test
     void skipsLegacyRowWhenShiftCodeAndShiftNameCollideOnDifferentRows() throws Exception {
         ShiftType byCodeRow = ShiftType.builder()
-                .shiftName("Thong tam")
+                .shiftName("Old thong tam")
                 .shiftCode("THONG_TAM")
                 .startTime(LocalTime.of(9, 0))
                 .endTime(LocalTime.of(10, 0))
@@ -296,23 +296,24 @@ class StandardShiftTypeSeederTest {
 
         seeder.run(mock(ApplicationArguments.class));
 
+        assertThat(byCodeRow.getShiftName()).isEqualTo("Old thong tam");
         assertThat(byCodeRow.getStartTime()).isEqualTo(LocalTime.of(8, 0));
         assertThat(byCodeRow.getQuotaCategory()).isEqualTo("BATHING");
         assertThat(byCodeRow.getStatus()).isEqualTo("ACTIVE");
-        verify(shiftTypeRepository).save(byCodeRow);
-        verify(shiftTypeRepository, never()).save(legacyRow);
+        verify(shiftTypeRepository).saveAndFlush(byCodeRow);
+        verify(shiftTypeRepository, never()).saveAndFlush(legacyRow);
         assertThat(legacyRow.getShiftCode()).isNull();
     }
 
     @Test
     void doesNotAbortBootOnConcurrentInsertConflict() throws Exception {
         stubAllMissing();
-        when(shiftTypeRepository.save(any(ShiftType.class)))
+        when(shiftTypeRepository.saveAndFlush(any(ShiftType.class)))
                 .thenThrow(new org.springframework.dao.DataIntegrityViolationException("duplicate"))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         assertThatNoException().isThrownBy(() -> seeder.run(mock(ApplicationArguments.class)));
 
-        verify(shiftTypeRepository, times(6)).save(any(ShiftType.class));
+        verify(shiftTypeRepository, times(6)).saveAndFlush(any(ShiftType.class));
     }
 }

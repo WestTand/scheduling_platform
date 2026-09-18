@@ -24,7 +24,6 @@ import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.ResourcePatternResolver;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -85,10 +84,10 @@ public class HolidaySeedService implements ApplicationRunner {
         }));
         for (Resource resource : resources) {
             String filename = resource.getFilename();
-            if (filename == null) {
-                throw new IllegalStateException("Holiday resource has no filename");
-            }
             try {
+                if (filename == null) {
+                    throw new IllegalStateException("Holiday resource has no filename");
+                }
                 importAnnualHolidayResource(filename, resource);
             } catch (IllegalStateException ex) {
                 // Non-fatal per-file: one bad file must not rollback fixed holidays or other files.
@@ -97,14 +96,12 @@ public class HolidaySeedService implements ApplicationRunner {
         }
     }
 
-    @Transactional
     void seedFixedHolidaysForYear(int year) {
         for (FixedHoliday fixed : fixedHolidays(year)) {
             upsert(fixed.date(), fixed.name(), year, FIXED_TYPE, FIXED_SOURCE, null);
         }
     }
 
-    @Transactional
     void importAnnualHolidayResource(String filename, Resource resource) {
         int fileYear = parseFilenameYear(filename);
         JsonNode root = readJsonArray(filename, resource);
@@ -166,7 +163,7 @@ public class HolidaySeedService implements ApplicationRunner {
         }
         holiday.setActive(true);
         try {
-            holidayRepository.save(holiday);
+            holidayRepository.saveAndFlush(holiday);
         } catch (DataIntegrityViolationException ex) {
             // Concurrency-safe upsert (same pattern as StandardShiftTypeSeeder.saveSafely):
             // another instance inserted the same date concurrently; re-fetch and skip create.

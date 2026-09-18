@@ -13,7 +13,6 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.annotation.Order;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import scheduling.scheduling.entity.ShiftType;
 import scheduling.scheduling.repository.ShiftTypeRepository;
@@ -35,7 +34,6 @@ public class StandardShiftTypeSeeder implements ApplicationRunner {
     }
 
     @Override
-    @Transactional
     public void run(ApplicationArguments args) {
         for (CanonicalShift definition : definitions()) {
             seedOne(definition);
@@ -53,6 +51,9 @@ public class StandardShiftTypeSeeder implements ApplicationRunner {
                                 + "while updating shiftCode '{}' id={}",
                         definition.shiftName, byName.get().getId(),
                         definition.shiftCode, existing.getId());
+                applyCanonical(existing, definition, false);
+                saveSafely(existing, definition, "updated");
+                return;
             }
             applyCanonical(existing, definition);
             saveSafely(existing, definition, "updated");
@@ -70,7 +71,7 @@ public class StandardShiftTypeSeeder implements ApplicationRunner {
 
     private void saveSafely(ShiftType entity, CanonicalShift definition, String outcome) {
         try {
-            shiftTypeRepository.save(entity);
+            shiftTypeRepository.saveAndFlush(entity);
             log.info("Seeded canonical shift {}: shiftCode={}", outcome, definition.shiftCode);
         } catch (DataIntegrityViolationException ex) {
             log.warn("Concurrent seeding conflict for shiftCode {}: {}. Re-fetching existing row.",
@@ -92,8 +93,14 @@ public class StandardShiftTypeSeeder implements ApplicationRunner {
     }
 
     private static void applyCanonical(ShiftType target, CanonicalShift definition) {
+        applyCanonical(target, definition, true);
+    }
+
+    private static void applyCanonical(ShiftType target, CanonicalShift definition, boolean updateName) {
         target.setShiftCode(definition.shiftCode);
-        target.setShiftName(definition.shiftName);
+        if (updateName) {
+            target.setShiftName(definition.shiftName);
+        }
         target.setStartTime(definition.startTime);
         target.setEndTime(definition.endTime);
         target.setDurationHours(definition.durationHours);
