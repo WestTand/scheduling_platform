@@ -11,7 +11,7 @@ This slice is backend/database foundation only. It does not change the AI solver
 - `shift_types` can store start/end time and duration, but does not store which weekdays a shift type is allowed on.
 - There is no holiday model. The approved scope uses a built-in fixed-date holiday calendar instead of manager-entered holiday rows.
 - `duration_hours` is not capped at 8 hours by service validation.
-- There is no field for future per-shift penalty weighting. Night-shift multiplier is stored now but remains `1.00` until an AI-service slice uses it.
+- There is no field for future per-shift penalty weighting. The backend should store the agreed multipliers now, but AI-service will not consume them until a later slice.
 - The six standard shift types are not seeded automatically.
 
 ## Scope
@@ -22,7 +22,7 @@ Add backend support for:
 - Shift type applicability fields:
   - `applicableWeekdays`: comma-separated ISO day codes such as `MON,TUE,WED,THU,FRI`.
   - `appliesOnHolidays`: boolean.
-  - `penaltyWeightMultiplier`: `BigDecimal`, default `1.00`.
+- `penaltyWeightMultiplier`: `BigDecimal`, default `1.00`, used to store relative workload/penalty weight for future AI scoring.
 - Idempotent startup seed for the six standard shift types.
 - Validation that shift types cannot exceed 8 work hours per shift.
 - Validation that work shifts are only created for dates allowed by the shift type.
@@ -99,18 +99,18 @@ Canonical rows:
 | Shift name | Start | End | Duration | Overnight | Heavy | Quota category | Applicable weekdays | Applies holidays | Penalty multiplier |
 |---|---:|---:|---:|---|---|---|---|---|---:|
 | Thong tam | 08:00 | 17:00 | 8.0 | false | true | BATHING | MON,TUE,WED,THU,FRI | false | 1.00 |
-| Ngoai gio 1 | 17:00 | 00:30 | 7.5 | true | false | OVERTIME | MON,TUE,WED,THU,FRI | false | 1.00 |
-| Ngoai gio 2 | 00:30 | 08:00 | 7.5 | false | true | OVERTIME | MON,TUE,WED,THU,FRI | false | 1.00 |
+| Ngoai gio 1 | 17:00 | 00:30 | 7.5 | true | false | OVERTIME | MON,TUE,WED,THU,FRI | false | 1.20 |
+| Ngoai gio 2 | 00:30 | 08:00 | 7.5 | false | true | OVERTIME | MON,TUE,WED,THU,FRI | false | 1.50 |
 | Truc sang | 08:00 | 16:00 | 8.0 | false | false | ON_CALL | SAT,SUN | true | 1.00 |
-| Truc chieu | 16:00 | 00:00 | 8.0 | true | false | ON_CALL | SAT,SUN | true | 1.00 |
-| Truc dem | 00:00 | 08:00 | 8.0 | false | true | ON_CALL | SAT,SUN | true | 1.00 |
+| Truc chieu | 16:00 | 00:00 | 8.0 | true | false | ON_CALL | SAT,SUN | true | 1.20 |
+| Truc dem | 00:00 | 08:00 | 8.0 | false | true | ON_CALL | SAT,SUN | true | 1.50 |
 
 Notes:
 
 - ASCII names are used in seed data to stay consistent with existing ASCII-oriented code and test fixtures. Display localization can be handled later.
 - `Thong tam` is marked `heavy=true` because existing project docs mention avoiding consecutive heavy shifts such as `Truc` and `Thong tam`.
 - `Ngoai gio 2` and `Truc dem` are also marked `heavy=true` to preserve a backend signal for night-like burden until AI scoring uses `penaltyWeightMultiplier`.
-- `penaltyWeightMultiplier` remains `1.00` for all six rows in this slice.
+- `penaltyWeightMultiplier` stores the agreed relative weight: day shifts `1.00`, shifts ending around midnight `1.20`, and late-night/early-morning shifts `1.50`. AI-service does not consume it in this slice.
 - If a row with the same `shiftName` already exists, the seeder updates the canonical fields above so repeated startup is idempotent.
 
 ## Work Shift Date Validation
