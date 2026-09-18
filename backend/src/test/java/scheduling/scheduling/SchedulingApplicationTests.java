@@ -18,6 +18,7 @@ import scheduling.scheduling.repository.SchedulingRuleRepository;
 import scheduling.scheduling.repository.SchedulePeriodRepository;
 import scheduling.scheduling.repository.ShiftAssignmentRepository;
 import scheduling.scheduling.repository.ShiftTypeRepository;
+import scheduling.scheduling.repository.HolidayRepository;
 import scheduling.scheduling.repository.WorkShiftRepository;
 
 @SpringBootTest(properties = {
@@ -59,6 +60,9 @@ class SchedulingApplicationTests {
 
 	@MockitoBean
 	private ShiftAssignmentRepository shiftAssignmentRepository;
+
+	@MockitoBean
+	private HolidayRepository holidayRepository;
 
 	@Autowired
 	private JavaMailSender mailSender;
