@@ -4,7 +4,7 @@
 
 **Goal:** Add backend support for canonical shift codes, standard shift seeding, DB-backed holiday seeding/import, and work-shift date applicability validation.
 
-**Architecture:** Extend `ShiftType` and add `Holiday` as JPA entities managed by existing Spring Data repositories. Keep validation in small backend helpers (`ShiftTypeRules`, `DayClassificationService`) so shift type APIs, seeders, and work-shift creation share the same rules. Seed standard shifts and holidays idempotently at startup; do not add frontend/API holiday management or AI-service scoring changes.
+**Architecture:** Extend `ShiftType` and add `Holiday` as JPA entities managed by existing Spring Data repositories. Keep validation in small backend helpers (`ShiftTypeRules`, `DayClassificationService`) so shift type APIs, seeders, and work-shift creation share the same rules. Because this project currently uses `spring.jpa.hibernate.ddl-auto=update` and not Flyway/Liquibase, add new persisted fields in a way that does not break existing databases; enforce required `shiftCode` at the service/API layer in this slice and make DB `NOT NULL` a later migration task. Seed standard shifts and holidays idempotently at startup; do not add frontend/API holiday management or AI-service scoring changes.
 
 **Tech Stack:** Java 17, Spring Boot WebMVC/Data JPA, JUnit 5, AssertJ, Mockito, MockMvc.
 
@@ -16,7 +16,7 @@
 
 ## File Map
 
-- Modify: `backend/src/main/java/scheduling/scheduling/entity/ShiftType.java` — add `shiftCode`, applicability fields, multiplier.
+- Modify: `backend/src/main/java/scheduling/scheduling/entity/ShiftType.java` — add `shiftCode`, applicability fields, multiplier with ddl-auto-safe column nullability.
 - Create: `backend/src/main/java/scheduling/scheduling/entity/Holiday.java` — holiday rows imported from fixed rules/JSON.
 - Modify/Create repositories: `ShiftTypeRepository`, `HolidayRepository`.
 - Modify shift type DTO/service/controller tests for new fields.
@@ -39,6 +39,7 @@ Add tests covering:
 - create defaults `applicableWeekdays=MON,TUE,WED,THU,FRI,SAT,SUN`, `appliesOnHolidays=false`, `penaltyWeightMultiplier=1.00`;
 - create/update accepts and returns `shiftCode`;
 - duplicate `shiftCode` rejects with `DuplicateResourceException`;
+- lowercase, hyphenated, spaced, or over-30-character `shiftCode` rejects with `400`;
 - weekday normalization (`fri,mon,mon` -> `MON,FRI`);
 - invalid weekday token rejects `400`;
 - blank weekday rejects unless `appliesOnHolidays=true`;
@@ -53,19 +54,50 @@ Expected: FAIL due missing fields/accessors.
 Add to `ShiftType`:
 
 ```java
-@Column(name = "shift_code", nullable = false, length = 30, unique = true)
+@Column(name = "shift_code", length = 30, unique = true)
 private String shiftCode;
+
+@Column(name = "applicable_weekdays", nullable = false, length = 40)
+@Builder.Default
+private String applicableWeekdays = "MON,TUE,WED,THU,FRI,SAT,SUN";
+
+@Column(name = "applies_on_holidays", nullable = false)
+@Builder.Default
+private Boolean appliesOnHolidays = false;
+
+@Column(name = "penalty_weight_multiplier", nullable = false, precision = 3, scale = 2)
+@Builder.Default
+private BigDecimal penaltyWeightMultiplier = BigDecimal.valueOf(1.00).setScale(2);
 ```
 
-and applicability/multiplier fields from the spec.
+Do not mark `shift_code` `nullable=false` in this slice. Existing databases can already contain `shift_types` rows; with `ddl-auto=update`, adding a non-null column without a migration/backfill can fail startup. Enforce nonblank `shiftCode` in service/API validation for new writes, and document DB `NOT NULL` as a follow-up migration.
 
 Update DTOs:
 
-- `CreateShiftTypeRequest`: optional `shiftCode`, `applicableWeekdays`, `appliesOnHolidays`, `penaltyWeightMultiplier` except `shiftCode` should be `@NotBlank`.
+- `CreateShiftTypeRequest`: required `shiftCode` with `@NotBlank @Size(max = 30)`, optional `applicableWeekdays`, `appliesOnHolidays`, `penaltyWeightMultiplier` with service defaults.
 - `UpdateShiftTypeRequest`: required new fields.
 - `AdminShiftTypeResponse`: include new fields.
 
-Add `ShiftTypeRules` helper to normalize weekdays, validate duration and multiplier, and check weekday membership.
+Add `ShiftTypeRules` helper to normalize weekdays, validate duration and multiplier, validate `shiftCode`, and check weekday membership.
+
+Validation details:
+
+- `shiftCode` must match `^[A-Z][A-Z0-9_]{0,29}$`.
+- `durationHours` must be `> 0` and `<= 8.0`.
+- `penaltyWeightMultiplier` must be `>= 0.00` and `<= 9.99`.
+- `penaltyWeightMultiplier` should be normalized to scale 2 before saving.
+- `applicableWeekdays` should accept comma-separated tokens case-insensitively, trim spaces, remove duplicates, and output ISO order `MON,TUE,WED,THU,FRI,SAT,SUN`.
+- Empty normalized weekdays are allowed only when `appliesOnHolidays=true`.
+
+Update `ShiftTypeRepository` with:
+
+```java
+Optional<ShiftType> findByShiftCode(String shiftCode);
+
+boolean existsByShiftCode(String shiftCode);
+
+boolean existsByShiftCodeAndIdNot(String shiftCode, Long id);
+```
 
 Update `AdminShiftTypeService`:
 
@@ -82,6 +114,8 @@ Run service and controller tests until PASS:
 - [ ] **Step 3: Commit**
 
 ```bash
+git status --short
+git diff -- backend/src/main/java/scheduling/scheduling/entity/ShiftType.java backend/src/main/java/scheduling/scheduling/admin/dto/CreateShiftTypeRequest.java backend/src/main/java/scheduling/scheduling/admin/dto/UpdateShiftTypeRequest.java backend/src/main/java/scheduling/scheduling/admin/dto/AdminShiftTypeResponse.java backend/src/main/java/scheduling/scheduling/admin/ShiftTypeRules.java backend/src/main/java/scheduling/scheduling/admin/AdminShiftTypeService.java backend/src/main/java/scheduling/scheduling/repository/ShiftTypeRepository.java backend/src/test/java/scheduling/scheduling/admin/AdminShiftTypeServiceTest.java backend/src/test/java/scheduling/scheduling/admin/AdminShiftTypeControllerTest.java
 git add backend/src/main/java/scheduling/scheduling/entity/ShiftType.java backend/src/main/java/scheduling/scheduling/admin/dto/CreateShiftTypeRequest.java backend/src/main/java/scheduling/scheduling/admin/dto/UpdateShiftTypeRequest.java backend/src/main/java/scheduling/scheduling/admin/dto/AdminShiftTypeResponse.java backend/src/main/java/scheduling/scheduling/admin/ShiftTypeRules.java backend/src/main/java/scheduling/scheduling/admin/AdminShiftTypeService.java backend/src/main/java/scheduling/scheduling/repository/ShiftTypeRepository.java backend/src/test/java/scheduling/scheduling/admin/AdminShiftTypeServiceTest.java backend/src/test/java/scheduling/scheduling/admin/AdminShiftTypeControllerTest.java
 git commit -m "feat: add shift type canonical rule fields"
 ```
@@ -92,6 +126,7 @@ git commit -m "feat: add shift type canonical rule fields"
 
 **Files:**
 - Create: `StandardShiftTypeSeeder.java`
+- Modify: `ShiftTypeRepository.java`
 - Test: `StandardShiftTypeSeederTest.java`
 
 - [ ] **Step 1: Write failing seeder tests**
@@ -100,6 +135,8 @@ Test that startup seeder:
 
 - creates six missing rows by `shiftCode`;
 - updates an existing row by `shiftCode`;
+- backfills a matching legacy row by `shiftName` when `shiftCode` is null;
+- seeds all required `ShiftType` columns: `shiftName`, `startTime`, `endTime`, `durationHours`, `overnight`, `heavy`, `minStaff`, `maxStaff`, `quotaCategory`, `status`, `applicableWeekdays`, `appliesOnHolidays`, `penaltyWeightMultiplier`;
 - seeds exact multipliers: `1.00`, `1.20`, `1.50`, `1.00`, `1.20`, `1.50`;
 - is idempotent on repeated `run()`.
 
@@ -108,16 +145,31 @@ Expected: FAIL because seeder does not exist.
 
 - [ ] **Step 2: Implement seeder**
 
-Implement `ApplicationRunner` seeder using `ShiftTypeRepository.findByShiftCode(String shiftCode)`.
+Implement `ApplicationRunner` seeder using `ShiftTypeRepository.findByShiftCode(String shiftCode)` first. If not found, look for a legacy standard row by exact `shiftName` before creating a new row; this backfills existing local/dev databases without a migration.
 
-Canonical definitions must match spec exactly:
+Add to `ShiftTypeRepository` if it does not already exist:
 
-- `THONG_TAM`: `BATHING`, `1.00`, weekdays `MON,TUE,WED,THU,FRI`.
-- `NGOAI_GIO_1`: `OVERTIME`, `1.20`, weekdays `MON,TUE,WED,THU,FRI`.
-- `NGOAI_GIO_2`: `OVERTIME`, `1.50`, weekdays `MON,TUE,WED,THU,FRI`.
-- `TRUC_SANG`: `ON_CALL`, `1.00`, weekdays `SAT,SUN`, holidays true.
-- `TRUC_CHIEU`: `ON_CALL`, `1.20`, weekdays `SAT,SUN`, holidays true.
-- `TRUC_DEM`: `ON_CALL`, `1.50`, weekdays `SAT,SUN`, holidays true.
+```java
+Optional<ShiftType> findByShiftName(String shiftName);
+```
+
+Canonical definitions must match the spec for shift-code/business-rule fields, plus explicit staffing defaults required by the existing `ShiftType` entity:
+
+| Shift code | Shift name | Category | Start | End | Duration | Overnight | Heavy | Weekdays | Holidays | Multiplier | Min staff | Max staff | Status |
+|---|---|---|---:|---:|---:|---|---|---|---|---:|---:|---:|---|
+| `THONG_TAM` | `Thong tam` | `BATHING` | `08:00` | `17:00` | `8.0` | `false` | `true` | `MON,TUE,WED,THU,FRI` | `false` | `1.00` | `1` | `20` | `ACTIVE` |
+| `NGOAI_GIO_1` | `Ngoai gio 1` | `OVERTIME` | `17:00` | `00:30` | `7.5` | `true` | `false` | `MON,TUE,WED,THU,FRI` | `false` | `1.20` | `1` | `20` | `ACTIVE` |
+| `NGOAI_GIO_2` | `Ngoai gio 2` | `OVERTIME` | `00:30` | `08:00` | `7.5` | `false` | `true` | `MON,TUE,WED,THU,FRI` | `false` | `1.50` | `1` | `20` | `ACTIVE` |
+| `TRUC_SANG` | `Truc sang` | `ON_CALL` | `08:00` | `16:00` | `8.0` | `false` | `false` | `SAT,SUN` | `true` | `1.00` | `1` | `20` | `ACTIVE` |
+| `TRUC_CHIEU` | `Truc chieu` | `ON_CALL` | `16:00` | `00:00` | `8.0` | `true` | `false` | `SAT,SUN` | `true` | `1.20` | `1` | `20` | `ACTIVE` |
+| `TRUC_DEM` | `Truc dem` | `ON_CALL` | `00:00` | `08:00` | `8.0` | `false` | `true` | `SAT,SUN` | `true` | `1.50` | `1` | `20` | `ACTIVE` |
+
+Seeder update behavior:
+
+- For rows found by `shiftCode`, update every canonical field in the table above.
+- For legacy rows found by exact `shiftName`, set `shiftCode` and update every canonical field in the table above.
+- For missing rows, create a new `ShiftType` with every field in the table above.
+- Keep `minStaff=1` and `maxStaff=20` for all seeded rows in this slice; specific daily staffing remains controlled by `WorkShift.requiredStaff`.
 
 Run: `.\backend\mvnw.cmd -f backend/pom.xml -q test "-Dtest=StandardShiftTypeSeederTest,SchedulingApplicationTests" "-Dsurefire.failIfNoSpecifiedTests=true"`
 Expected: PASS.
@@ -125,7 +177,9 @@ Expected: PASS.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add backend/src/main/java/scheduling/scheduling/admin/StandardShiftTypeSeeder.java backend/src/test/java/scheduling/scheduling/admin/StandardShiftTypeSeederTest.java
+git status --short
+git diff -- backend/src/main/java/scheduling/scheduling/admin/StandardShiftTypeSeeder.java backend/src/main/java/scheduling/scheduling/repository/ShiftTypeRepository.java backend/src/test/java/scheduling/scheduling/admin/StandardShiftTypeSeederTest.java
+git add backend/src/main/java/scheduling/scheduling/admin/StandardShiftTypeSeeder.java backend/src/main/java/scheduling/scheduling/repository/ShiftTypeRepository.java backend/src/test/java/scheduling/scheduling/admin/StandardShiftTypeSeederTest.java
 git commit -m "feat: seed canonical shift types"
 ```
 
@@ -145,7 +199,7 @@ Tests cover:
 - fixed holidays are generated for a requested year;
 - JSON file `holidays-2026.json` imports annual holidays;
 - duplicate date upserts existing row;
-- invalid year/date in JSON rejects or skips with a deterministic exception;
+- invalid year/date in JSON rejects with `IllegalStateException`;
 - repeated seed does not create duplicate rows.
 
 Run: `.\backend\mvnw.cmd -f backend/pom.xml -q test "-Dtest=HolidaySeedServiceTest" "-Dsurefire.failIfNoSpecifiedTests=true"`
@@ -160,9 +214,11 @@ Create `Holiday` entity with fields from spec and `HolidayRepository` methods:
 
 Implement `HolidaySeedService` as `ApplicationRunner`:
 
-- seed fixed holidays for the current year and next year;
+- expose package-private methods for tests: `seedFixedHolidaysForYear(int year)` and `importAnnualHolidayResource(String filename, Resource resource)`;
+- `run(ApplicationArguments args)` seeds fixed holidays for the current year and next year;
 - read all matching `classpath:holidays/holidays-*.json` files;
 - validate JSON date year matches filename;
+- throw `IllegalStateException` when filename year cannot be parsed, a JSON date cannot be parsed, JSON date year differs from filename year, or holiday type is unknown;
 - upsert by `holidayDate`;
 - set `active=true`.
 
@@ -174,6 +230,8 @@ Expected: PASS.
 - [ ] **Step 3: Commit**
 
 ```bash
+git status --short
+git diff -- backend/src/main/java/scheduling/scheduling/entity/Holiday.java backend/src/main/java/scheduling/scheduling/repository/HolidayRepository.java backend/src/main/java/scheduling/scheduling/admin/HolidaySeedService.java backend/src/test/java/scheduling/scheduling/admin/HolidaySeedServiceTest.java backend/src/main/resources/holidays/holidays-2026.json
 git add backend/src/main/java/scheduling/scheduling/entity/Holiday.java backend/src/main/java/scheduling/scheduling/repository/HolidayRepository.java backend/src/main/java/scheduling/scheduling/admin/HolidaySeedService.java backend/src/test/java/scheduling/scheduling/admin/HolidaySeedServiceTest.java backend/src/main/resources/holidays/holidays-2026.json
 git commit -m "feat: seed holiday calendar from json"
 ```
@@ -217,6 +275,8 @@ Expected: PASS.
 - [ ] **Step 3: Commit**
 
 ```bash
+git status --short
+git diff -- backend/src/main/java/scheduling/scheduling/admin/DayClassificationService.java backend/src/main/java/scheduling/scheduling/admin/AdminWorkShiftService.java backend/src/test/java/scheduling/scheduling/admin/AdminWorkShiftServiceTest.java
 git add backend/src/main/java/scheduling/scheduling/admin/DayClassificationService.java backend/src/main/java/scheduling/scheduling/admin/AdminWorkShiftService.java backend/src/test/java/scheduling/scheduling/admin/AdminWorkShiftServiceTest.java
 git commit -m "feat: validate work shift day applicability"
 ```
@@ -234,6 +294,7 @@ git commit -m "feat: validate work shift day applicability"
 Update database docs for:
 
 - `shift_code`, applicability fields, multiplier;
+- note that `shift_code` is application-required now but DB-nullable until a later migration can safely backfill and add `NOT NULL`;
 - `holidays` table.
 
 Update AI contract docs:
@@ -250,9 +311,13 @@ Expected: all backend tests PASS.
 Run: `git diff --check`
 Expected: no output.
 
+Run: `git status --short`
+Expected: only intentional documentation changes are shown before staging. Do not stage unrelated untracked files such as external source documents unless the user explicitly asks.
+
 - [ ] **Step 3: Commit docs**
 
 ```bash
+git diff -- docs/database-design-v2.md docs/backend-ai-scheduling-contract.md
 git add docs/database-design-v2.md docs/backend-ai-scheduling-contract.md
 git commit -m "docs: update shift calendar data model"
 ```
