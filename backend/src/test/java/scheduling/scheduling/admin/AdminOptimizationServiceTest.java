@@ -295,6 +295,36 @@ class AdminOptimizationServiceTest {
     }
 
     @Test
+    void optimizeRecordsFailedRunOnUnexpectedRuntimeException() {
+        CurrentAccountPrincipal principal = new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
+        Account manager = managerAccount(principal);
+        SchedulePeriod period = draftPeriod(5L, manager);
+        Map<String, Object> weights = Map.of("fairness", BigDecimal.ONE);
+        AiSchedulingRequestDto payload = testPayload();
+        OptimizationRun startedRun = startedRun(900L, period, manager);
+        OptimizationRun failedRun = finishedRun(900L, period, manager, "FAILED");
+
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
+        when(schedulePeriodRepository.findDetailById(5L)).thenReturn(Optional.of(period));
+        when(payloadBuilder.prepareSnapshot(eq(period), eq(null))).thenReturn(testSnapshot());
+        when(payloadBuilder.weightsSnapshotFrom(any())).thenReturn(weights);
+        when(optimizationRunRecorder.start(eq(period), eq(manager), eq(weights))).thenReturn(startedRun);
+        when(payloadBuilder.buildFrom(any(), eq(period), eq(900L))).thenReturn(payload);
+        when(aiSchedulingClient.optimize(eq(payload))).thenThrow(new IllegalStateException("boom"));
+        when(optimizationRunRecorder.finishFailure(eq(900L), eq("FAILED"), contains("Unexpected optimization failure"), isNull()))
+                .thenReturn(failedRun);
+
+        assertThatThrownBy(() -> service.optimize(principal, 5L, new OptimizeScheduleRequest(null)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_GATEWAY);
+
+        verify(optimizationRunRecorder)
+                .finishFailure(eq(900L), eq("FAILED"), contains("Unexpected optimization failure"), isNull());
+        verify(optimizationRunRecorder, never()).finishSuccess(any(), any());
+    }
+
+    @Test
     void optimizeThrows502AndRecordsFailedRunWhenAiResponseIsInvalid() {
         CurrentAccountPrincipal principal = new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
         Account manager = managerAccount(principal);

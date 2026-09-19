@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -26,6 +28,8 @@ import scheduling.scheduling.repository.SchedulePeriodRepository;
 
 @Service
 public class AdminOptimizationService {
+
+    private static final Logger log = LoggerFactory.getLogger(AdminOptimizationService.class);
 
     private static final Set<String> ALLOWED_STATUSES = Set.of("SUCCESS", "INFEASIBLE", "FAILED");
     private static final Set<String> ALLOWED_SOLVER_STATUSES =
@@ -72,46 +76,57 @@ public class AdminOptimizationService {
         AiSchedulingResponseDto response;
         try {
             response = aiSchedulingClient.optimize(payload);
-        } catch (AiServiceException ex) {
-            optimizationRunRecorder.finishFailure(run.getId(), "FAILED", ex.getMessage(), null);
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "AI service unavailable");
-        }
 
-        String violation = validateProtocol(response, run, period);
-        if (violation != null) {
-            optimizationRunRecorder.finishFailure(run.getId(), "FAILED", "Invalid AI response: " + violation, null);
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Invalid AI response");
-        }
+            String violation = validateProtocol(response, run, period);
+            if (violation != null) {
+                optimizationRunRecorder.finishFailure(run.getId(), "FAILED", "Invalid AI response: " + violation, null);
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Invalid AI response");
+            }
 
-        if ("SUCCESS".equals(response.status())) {
-            OptimizationRun finished = optimizationRunRecorder.finishSuccess(run.getId(), response);
+            if ("SUCCESS".equals(response.status())) {
+                OptimizationRun finished = optimizationRunRecorder.finishSuccess(run.getId(), response);
+                return new OptimizeScheduleResponse(
+                        finished.getId(),
+                        period.getId(),
+                        "SUCCESS",
+                        response.solverStatus(),
+                        response.totalPenalty(),
+                        response.assignments().size(),
+                        response.warnings(),
+                        null,
+                        finished.getStartedAt(),
+                        finished.getFinishedAt());
+            }
+
+            String errorMessage = combineErrorMessage(response);
+            OptimizationRun finished =
+                    optimizationRunRecorder.finishFailure(run.getId(), response.status(), errorMessage, response);
             return new OptimizeScheduleResponse(
                     finished.getId(),
                     period.getId(),
-                    "SUCCESS",
+                    response.status(),
                     response.solverStatus(),
                     response.totalPenalty(),
                     response.assignments().size(),
                     response.warnings(),
-                    null,
+                    errorMessage,
                     finished.getStartedAt(),
                     finished.getFinishedAt());
+        } catch (AiServiceException ex) {
+            optimizationRunRecorder.finishFailure(run.getId(), "FAILED", ex.getMessage(), null);
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "AI service unavailable");
+        } catch (ResponseStatusException ex) {
+            throw ex;
+        } catch (RuntimeException ex) {
+            try {
+                optimizationRunRecorder.finishFailure(
+                        run.getId(), "FAILED", "Unexpected optimization failure: " + ex, null);
+            } catch (RuntimeException recordingFailure) {
+                // Do not mask the original failure if the safety-net recording itself fails.
+                log.warn("Failed to record failed optimization run {}", run.getId(), recordingFailure);
+            }
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "AI service unavailable");
         }
-
-        String errorMessage = combineErrorMessage(response);
-        OptimizationRun finished =
-                optimizationRunRecorder.finishFailure(run.getId(), response.status(), errorMessage, response);
-        return new OptimizeScheduleResponse(
-                finished.getId(),
-                period.getId(),
-                response.status(),
-                response.solverStatus(),
-                response.totalPenalty(),
-                response.assignments().size(),
-                response.warnings(),
-                errorMessage,
-                finished.getStartedAt(),
-                finished.getFinishedAt());
     }
 
     private static String validateProtocol(
