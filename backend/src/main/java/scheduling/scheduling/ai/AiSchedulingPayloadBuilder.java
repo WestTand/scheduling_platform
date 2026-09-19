@@ -267,6 +267,13 @@ public class AiSchedulingPayloadBuilder {
     }
 
     private AiSchedulingRequestDto.ShiftTypeDto toShiftTypeDto(ShiftType shiftType) {
+        if (shiftType.getDurationHours() == null
+                || shiftType.getOvernight() == null
+                || shiftType.getHeavy() == null
+                || shiftType.getMinStaff() == null
+                || shiftType.getMaxStaff() == null) {
+            throw badRequest("Shift type " + shiftType.getId() + " has incomplete scheduling data");
+        }
         int durationMinutes = (int) Math.round(
                 shiftType.getDurationHours().multiply(BigDecimal.valueOf(60)).doubleValue());
         String quotaCategory =

@@ -1,6 +1,7 @@
 package scheduling.scheduling.ai;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -61,14 +62,74 @@ class AiSchedulingPayloadBuilderTest {
 
         assertThat(payload.schemaVersion()).isEqualTo("1.0");
         assertThat(payload.runId()).isEqualTo(900L);
+        assertThat(payload.period().periodId()).isEqualTo(5L);
+        assertThat(payload.period().startDate()).isEqualTo(LocalDate.of(2026, 9, 14));
+        assertThat(payload.period().endDate()).isEqualTo(LocalDate.of(2026, 9, 20));
+        assertThat(payload.period().versionNo()).isEqualTo(1);
         assertThat(payload.period().timezone()).isEqualTo("Asia/Ho_Chi_Minh");
+        assertThat(payload.employees())
+                .extracting(AiSchedulingRequestDto.EmployeeDto::employeeId)
+                .containsExactly(10L);
         assertThat(payload.shiftTypes()).extracting(AiSchedulingRequestDto.ShiftTypeDto::quotaCategory).containsExactly((String) null);
+        assertThat(payload.shiftTypes())
+                .extracting(AiSchedulingRequestDto.ShiftTypeDto::durationMinutes)
+                .containsExactly(480);
+        assertThat(payload.shiftTypes())
+                .extracting(AiSchedulingRequestDto.ShiftTypeDto::overnight)
+                .containsExactly(false);
+        assertThat(payload.shiftTypes())
+                .extracting(AiSchedulingRequestDto.ShiftTypeDto::heavy)
+                .containsExactly(false);
+        assertThat(payload.shiftTypes())
+                .extracting(AiSchedulingRequestDto.ShiftTypeDto::minStaff)
+                .containsExactly(1);
+        assertThat(payload.shiftTypes())
+                .extracting(AiSchedulingRequestDto.ShiftTypeDto::maxStaff)
+                .containsExactly(2);
         assertThat(payload.workShifts()).extracting(AiSchedulingRequestDto.WorkShiftDto::startsAt).containsExactly(fixture.startsAt());
         assertThat(payload.approvedLeaves()).extracting(AiSchedulingRequestDto.ApprovedLeaveDto::leaveRequestId).containsExactly(700L);
+        assertThat(payload.approvedLeaves())
+                .extracting(AiSchedulingRequestDto.ApprovedLeaveDto::employeeId)
+                .containsExactly(10L);
+        assertThat(payload.approvedLeaves())
+                .extracting(AiSchedulingRequestDto.ApprovedLeaveDto::startDate)
+                .containsExactly(LocalDate.of(2026, 9, 15));
+        assertThat(payload.approvedLeaves())
+                .extracting(AiSchedulingRequestDto.ApprovedLeaveDto::endDate)
+                .containsExactly(LocalDate.of(2026, 9, 16));
         assertThat(payload.preferences()).extracting(AiSchedulingRequestDto.PreferenceDto::preferenceId).containsExactly(800L);
+        assertThat(payload.preferences())
+                .extracting(AiSchedulingRequestDto.PreferenceDto::employeeId)
+                .containsExactly(10L);
+        assertThat(payload.preferences())
+                .extracting(AiSchedulingRequestDto.PreferenceDto::shiftTypeId)
+                .containsExactly(20L);
+        assertThat(payload.preferences())
+                .extracting(AiSchedulingRequestDto.PreferenceDto::preferenceDate)
+                .containsExactly(LocalDate.of(2026, 9, 15));
+        assertThat(payload.preferences())
+                .extracting(AiSchedulingRequestDto.PreferenceDto::preferenceType)
+                .containsExactly("WANT");
+        assertThat(payload.preferences())
+                .extracting(AiSchedulingRequestDto.PreferenceDto::priority)
+                .containsExactly(1);
+        assertThat(payload.lockedAssignments())
+                .containsExactly(new AiSchedulingRequestDto.LockedAssignmentDto(600L, 10L, 30L));
         assertThat(payload.boundaryAssignments()).isEmpty();
+        assertThat(payload.rules().hardRules().minRestHoursBetweenShifts()).isEqualTo(12);
         assertThat(payload.rules().hardRules().maxWorkHoursPerDay()).isEqualTo(12);
+        assertThat(payload.rules().hardRules().maxShiftsPerWeek()).isEqualTo(6);
+        assertThat(payload.rules().quotas().overtimeShiftsPerWeek()).isEqualTo(1);
+        assertThat(payload.rules().quotas().bathingShiftsPerWeek()).isEqualTo(2);
+        assertThat(payload.rules().quotas().onCallEveryNDays()).isEqualTo(6);
+        assertThat(payload.rules().softWeights().fairness()).isEqualByComparingTo(new BigDecimal("10.00"));
+        assertThat(payload.rules().softWeights().preference()).isEqualByComparingTo(new BigDecimal("5.00"));
+        assertThat(payload.rules().softWeights().weekend()).isEqualByComparingTo(new BigDecimal("5.00"));
+        assertThat(payload.rules().softWeights().heavyShift()).isEqualByComparingTo(new BigDecimal("8.00"));
+        assertThat(payload.rules().softWeights().workHourBalance()).isEqualByComparingTo(new BigDecimal("10.00"));
         assertThat(payload.solverOptions().timeLimitSeconds()).isEqualTo(30);
+        assertThat(payload.solverOptions().randomSeed()).isEqualTo(1);
+        assertThat(payload.solverOptions().numWorkers()).isEqualTo(8);
     }
 
     @Test
@@ -78,8 +139,11 @@ class AiSchedulingPayloadBuilderTest {
         assertThatThrownBy(() -> builder.build(
                         fixture.period(), 900L, new AiSchedulingRequestDto.SolverOptionsDto(0, 1, 8)))
                 .isInstanceOf(ResponseStatusException.class)
-                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
-                .isEqualTo(HttpStatus.BAD_REQUEST);
+                .satisfies(ex -> {
+                    ResponseStatusException rse = (ResponseStatusException) ex;
+                    assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(rse.getReason()).isEqualTo("Invalid solver options");
+                });
     }
 
     @Test
@@ -113,8 +177,11 @@ class AiSchedulingPayloadBuilderTest {
 
         assertThatThrownBy(() -> builder.build(fixture.period(), 900L, null))
                 .isInstanceOf(ResponseStatusException.class)
-                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
-                .isEqualTo(HttpStatus.BAD_REQUEST);
+                .satisfies(ex -> {
+                    ResponseStatusException rse = (ResponseStatusException) ex;
+                    assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(rse.getReason()).isEqualTo("Work shift 31 uses inactive shift type 21");
+                });
     }
 
     @Test
@@ -138,8 +205,12 @@ class AiSchedulingPayloadBuilderTest {
 
         assertThatThrownBy(() -> builder.build(fixture.period(), 900L, null))
                 .isInstanceOf(ResponseStatusException.class)
-                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
-                .isEqualTo(HttpStatus.BAD_REQUEST);
+                .satisfies(ex -> {
+                    ResponseStatusException rse = (ResponseStatusException) ex;
+                    assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(rse.getReason())
+                            .isEqualTo("Locked assignment 601 references inactive scheduling data");
+                });
     }
 
     @Test
@@ -180,8 +251,158 @@ class AiSchedulingPayloadBuilderTest {
 
         assertThatThrownBy(() -> builder.build(fixture.period(), 900L, null))
                 .isInstanceOf(ResponseStatusException.class)
-                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
-                .isEqualTo(HttpStatus.BAD_REQUEST);
+                .satisfies(ex -> {
+                    ResponseStatusException rse = (ResponseStatusException) ex;
+                    assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(rse.getReason())
+                            .isEqualTo("Missing scheduling rule: MAX_WORK_HOURS_PER_DAY");
+                });
+    }
+
+    @Test
+    void validateInputsAcceptsValidPeriodData() {
+        Fixture fixture = happyPath();
+
+        assertThatCode(() -> builder.validateInputs(fixture.period(), null)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void weightsSnapshotMatchesBuiltPayload() {
+        Fixture fixture = happyPath();
+
+        AiSchedulingRequestDto payload = builder.build(fixture.period(), 900L, null);
+        java.util.Map<String, Object> snapshot = builder.weightsSnapshot(fixture.period(), null);
+
+        assertThat(snapshot).containsKeys("rules", "solverOptions");
+        assertThat(snapshot.get("rules")).isEqualTo(payload.rules());
+        assertThat(snapshot.get("solverOptions")).isEqualTo(payload.solverOptions());
+    }
+
+    @Test
+    void rejectsShiftTypeWithMissingSchedulingData() {
+        Fixture fixture = happyPath();
+        ShiftType badType = ShiftType.builder()
+                .shiftName("Ca ngay")
+                .startTime(LocalTime.of(8, 0))
+                .endTime(LocalTime.of(16, 0))
+                .durationHours(null)
+                .overnight(false)
+                .heavy(false)
+                .minStaff(1)
+                .maxStaff(2)
+                .quotaCategory("REGULAR")
+                .status("ACTIVE")
+                .shiftCode("DAY")
+                .build();
+        badType.setId(20L);
+        when(shiftTypeRepository.findByStatus("ACTIVE")).thenReturn(List.of(badType));
+
+        assertThatThrownBy(() -> builder.build(fixture.period(), 900L, null))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> {
+                    ResponseStatusException rse = (ResponseStatusException) ex;
+                    assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(rse.getReason())
+                            .isEqualTo("Shift type 20 has incomplete scheduling data");
+                });
+    }
+
+    @Test
+    void rejectsWorkShiftWithMissingTimeWindow() {
+        Fixture fixture = happyPath();
+        WorkShift badShift = WorkShift.builder()
+                .workDate(LocalDate.of(2026, 9, 16))
+                .requiredStaff(1)
+                .schedulePeriod(fixture.period())
+                .shiftType(fixture.shiftType())
+                .startsAt(null)
+                .endsAt(fixture.startsAt().plusHours(8))
+                .build();
+        badShift.setId(32L);
+        when(workShiftRepository.findForAiPayload(5L)).thenReturn(List.of(badShift));
+        when(shiftAssignmentRepository.findLockedForPeriod(5L)).thenReturn(List.of());
+
+        assertThatThrownBy(() -> builder.build(fixture.period(), 900L, null))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> {
+                    ResponseStatusException rse = (ResponseStatusException) ex;
+                    assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(rse.getReason()).isEqualTo("Work shift 32 is missing time window");
+                });
+    }
+
+    @Test
+    void rejectsLockedAssignmentReferencingInvalidWorkShift() {
+        Fixture fixture = happyPath();
+        WorkShift unknownShift = WorkShift.builder()
+                .workDate(LocalDate.of(2026, 9, 17))
+                .requiredStaff(1)
+                .schedulePeriod(fixture.period())
+                .shiftType(fixture.shiftType())
+                .startsAt(fixture.startsAt())
+                .endsAt(fixture.startsAt().plusHours(8))
+                .build();
+        unknownShift.setId(999L);
+        ShiftAssignment badLock = ShiftAssignment.builder()
+                .workShift(unknownShift)
+                .employee(fixture.employee())
+                .assignmentStatus("ASSIGNED")
+                .assignedSource("MANUAL")
+                .locked(true)
+                .build();
+        badLock.setId(602L);
+        when(shiftAssignmentRepository.findLockedForPeriod(5L)).thenReturn(List.of(badLock));
+
+        assertThatThrownBy(() -> builder.build(fixture.period(), 900L, null))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> {
+                    ResponseStatusException rse = (ResponseStatusException) ex;
+                    assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(rse.getReason())
+                            .isEqualTo("Locked assignment 602 references inactive scheduling data");
+                });
+    }
+
+    @Test
+    void dropsLeavesAndPreferencesForInactiveEmployees() {
+        Fixture fixture = happyPath();
+        Employee outsider = Employee.builder()
+                .employeeCode("EMP099")
+                .fullName("Inactive Employee")
+                .status("INACTIVE")
+                .build();
+        outsider.setId(11L);
+        LeaveRequest strangerLeave = LeaveRequest.builder()
+                .employee(outsider)
+                .startDate(LocalDate.of(2026, 9, 15))
+                .endDate(LocalDate.of(2026, 9, 16))
+                .status("APPROVED")
+                .build();
+        strangerLeave.setId(701L);
+        Preference strangerPreference = Preference.builder()
+                .employee(outsider)
+                .shiftType(fixture.shiftType())
+                .preferenceDate(LocalDate.of(2026, 9, 15))
+                .preferenceType("WANT")
+                .priority(1)
+                .status("PENDING")
+                .build();
+        strangerPreference.setId(803L);
+        when(leaveRequestRepository.findApprovedOverlapping(
+                        LocalDate.of(2026, 9, 14), LocalDate.of(2026, 9, 20)))
+                .thenReturn(List.of(fixture.leave(), strangerLeave));
+        when(preferenceRepository.findActiveInRange(
+                        LocalDate.of(2026, 9, 14), LocalDate.of(2026, 9, 20)))
+                .thenReturn(List.of(fixture.preference(), strangerPreference));
+
+        AiSchedulingRequestDto payload = builder.build(fixture.period(), 900L, null);
+
+        assertThat(payload.approvedLeaves())
+                .extracting(AiSchedulingRequestDto.ApprovedLeaveDto::leaveRequestId)
+                .containsExactly(700L);
+        assertThat(payload.preferences())
+                .extracting(AiSchedulingRequestDto.PreferenceDto::preferenceId)
+                .containsExactly(800L);
     }
 
     private Fixture happyPath() {
