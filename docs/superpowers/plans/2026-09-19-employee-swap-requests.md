@@ -317,11 +317,13 @@ class EmployeeSwapRequestServiceTest {
     private final EmployeeSwapRequestService service = new EmployeeSwapRequestService(
             employeeAccess, swapRequestRepository, shiftAssignmentRepository, employeeRepository);
 
-    // tests + helpers go here
+    // INSERT all tests + helpers from Step 1 BEFORE this closing brace
 }
 ```
 
-- [ ] **Step 1: Write failing tests for create (happy path + 6 error cases)**
+Start from the skeleton above, then insert every test/helper from Step 1 before the final closing brace. Do not close the class before the tests.
+
+- [ ] **Step 1: Write failing tests for create (happy path + 7 error cases)**
 
 Happy path test:
 
@@ -1046,7 +1048,7 @@ class EmployeeSwapRequestControllerTest {
         givenToken("employee-token", employee());
         when(employeeSwapRequestService.respondSwapRequest(
                 any(CurrentAccountPrincipal.class), eq(50L), any(RespondSwapRequestRequest.class)))
-                .thenReturn(response());
+                .thenReturn(pendingApprovalResponse());
 
         mockMvc.perform(post("/api/employee/swap-requests/50/respond")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer employee-token")
@@ -1057,7 +1059,7 @@ class EmployeeSwapRequestControllerTest {
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("PENDING_TARGET"));
+                .andExpect(jsonPath("$.status").value("PENDING_APPROVAL"));
 
         ArgumentCaptor<RespondSwapRequestRequest> requestCaptor =
                 ArgumentCaptor.forClass(RespondSwapRequestRequest.class);
@@ -1138,6 +1140,20 @@ class EmployeeSwapRequestControllerTest {
                 new SwapRequestResponse.EmployeeSummary(9L, "NV9", "Nhan vien 9"),
                 "Cover me",
                 "CANCELLED",
+                null,
+                null,
+                null);
+    }
+
+    private static SwapRequestResponse pendingApprovalResponse() {
+        return new SwapRequestResponse(
+                50L,
+                100L,
+                new SwapRequestResponse.EmployeeSummary(7L, "NV7", "Nhan vien 7"),
+                null,
+                new SwapRequestResponse.EmployeeSummary(9L, "NV9", "Nhan vien 9"),
+                "Cover me",
+                "PENDING_APPROVAL",
                 null,
                 null,
                 null);
@@ -1281,9 +1297,11 @@ class AdminSwapRequestServiceTest {
     private final AdminSwapRequestService service =
             new AdminSwapRequestService(swapRequestRepository, accountRepository, FIXED_CLOCK);
 
-    // tests + helpers go here
+    // INSERT all tests + helpers from Step 1 BEFORE this closing brace
 }
 ```
+
+Start from the skeleton above, then insert every test/helper from Step 1 before the final closing brace. Do not close the class before the tests.
 
 Helpers (same style as Task 3, plus manager fixtures):
 
@@ -1854,7 +1872,8 @@ git commit -m "feat: add manager swap request controller"
 
 **Files:**
 - Modify: `backend/src/main/java/scheduling/scheduling/entity/SwapRequest.java` (comment only)
-- Modify: `backend/src/test/java/scheduling/scheduling/auth/AuthControllerTest.java` (append test)
+- Modify: `backend/src/test/java/scheduling/scheduling/auth/AuthControllerTest.java`
+- Modify: `backend/src/test/java/scheduling/scheduling/SchedulingApplicationTests.java` (append test)
 
 - [ ] **Step 1: Update the entity JavaDoc status flow**
 
@@ -1871,7 +1890,7 @@ New:
  *   PENDING_TARGET / PENDING_APPROVAL → REJECTED (target declines or manager rejects)
 ```
 
-- [ ] **Step 2: Add the failing /me profile test first**
+- [ ] **Step 2: Add contract coverage for the existing /me profile behavior (no RED here: endpoint exists, no production change intended)**
 
 Append to `AuthControllerTest.java` (add `import scheduling.scheduling.auth.dto.EmployeeResponse;` to imports):
 
@@ -1901,7 +1920,7 @@ void meReturnsEmployeeProfileForEmployee() throws Exception {
 
 Note: the `account(...)` helper with this 5-arg signature already exists in `AuthControllerTest` (used by the existing `/me` tests); reuse it, do not add a duplicate.
 
-- [ ] **Step 3: Run the auth tests, verify GREEN (production `/me` code already exists; this test documents the profile contract)**
+- [ ] **Step 3: Run the auth tests, verify GREEN (documents the existing profile contract; do not change `AuthService.me`)**
 
 Run: `.\backend\mvnw.cmd -f backend/pom.xml test "-Dtest=AuthControllerTest"`
 Expected: all tests PASS including the new one. If the new test fails, fix the test expectation first (the endpoint is existing behavior; do not change `AuthService.me`).
@@ -1911,6 +1930,40 @@ Expected: all tests PASS including the new one. If the new test fails, fix the t
 ```bash
 git add backend/src/main/java/scheduling/scheduling/entity/SwapRequest.java backend/src/test/java/scheduling/scheduling/auth/AuthControllerTest.java
 git commit -m "test: cover employee profile via me endpoint"
+```
+
+---
+
+### Task 8b: SchedulingApplicationTests SwapRequestRepository mock
+
+**Files:**
+- Modify: `backend/src/test/java/scheduling/scheduling/SchedulingApplicationTests.java`
+
+Why: Tasks 3–7 add service beans that inject `SwapRequestRepository`. The smoke test excludes JPA auto-config and mocks every repository manually, so the context would fail without this mock. No TDD cycle here (test-infra wiring, no behavior).
+
+- [ ] **Step 1: Add the import + mock field**
+
+```java
+import scheduling.scheduling.repository.SwapRequestRepository;
+```
+
+```java
+@MockitoBean
+private SwapRequestRepository swapRequestRepository;
+```
+
+Place the import after the `ShiftTypeRepository` import and the field after the `shiftAssignmentRepository` field, matching existing ordering.
+
+- [ ] **Step 2: Run the smoke test, verify GREEN**
+
+Run: `.\backend\mvnw.cmd -f backend/pom.xml test "-Dtest=SchedulingApplicationTests"`
+Expected: PASS (`contextLoads`, `configuresJavaMailSender`).
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add backend/src/test/java/scheduling/scheduling/SchedulingApplicationTests.java
+git commit -m "test: mock swap request repository in smoke test"
 ```
 
 ---
