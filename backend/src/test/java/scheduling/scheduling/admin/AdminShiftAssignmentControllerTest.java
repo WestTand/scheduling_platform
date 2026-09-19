@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -31,6 +32,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import scheduling.scheduling.admin.dto.AdminPeriodScheduleResponse;
 import scheduling.scheduling.admin.dto.AdminShiftAssignmentResponse;
 import scheduling.scheduling.admin.dto.CreateShiftAssignmentRequest;
+import scheduling.scheduling.admin.dto.UpdateShiftAssignmentRequest;
 import scheduling.scheduling.auth.AuthExceptionHandler;
 import scheduling.scheduling.auth.AuthService;
 import scheduling.scheduling.auth.CurrentAccountPrincipal;
@@ -118,6 +120,30 @@ class AdminShiftAssignmentControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(adminShiftAssignmentService).deleteAssignment(any(CurrentAccountPrincipal.class), eq(500L));
+    }
+
+    @Test
+    void managerUpdatesAssignmentEmployee() throws Exception {
+        givenToken("manager-token", manager());
+        when(adminShiftAssignmentService.updateAssignment(
+                any(CurrentAccountPrincipal.class), eq(500L), any(UpdateShiftAssignmentRequest.class)))
+                .thenReturn(assignment(false));
+
+        mockMvc.perform(put("/api/admin/assignments/500")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer manager-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"employeeId": 8}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(500))
+                .andExpect(jsonPath("$.employeeId").value(7));
+
+        ArgumentCaptor<UpdateShiftAssignmentRequest> requestCaptor =
+                ArgumentCaptor.forClass(UpdateShiftAssignmentRequest.class);
+        verify(adminShiftAssignmentService)
+                .updateAssignment(any(CurrentAccountPrincipal.class), eq(500L), requestCaptor.capture());
+        assertThat(requestCaptor.getValue().employeeId()).isEqualTo(8L);
     }
 
     @Test

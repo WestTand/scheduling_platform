@@ -18,6 +18,7 @@ import org.springframework.web.server.ResponseStatusException;
 import scheduling.scheduling.admin.dto.AdminPeriodScheduleResponse;
 import scheduling.scheduling.admin.dto.AdminShiftAssignmentResponse;
 import scheduling.scheduling.admin.dto.CreateShiftAssignmentRequest;
+import scheduling.scheduling.admin.dto.UpdateShiftAssignmentRequest;
 import scheduling.scheduling.auth.CurrentAccountPrincipal;
 import scheduling.scheduling.employee.ScheduleWindows;
 import scheduling.scheduling.employee.dto.EmployeeScheduleItemResponse;
@@ -99,6 +100,45 @@ public class AdminShiftAssignmentService {
         if (shiftAssignmentRepository.countByWorkShiftId(workShiftId) >= shift.getShiftType().getMaxStaff()) {
             throw invalidAssignment("Work shift is already at maximum staff");
         }
+        validateEmployeeAvailability(shift, employee, null);
+        ShiftAssignment assignment = ShiftAssignment.builder()
+                .workShift(shift)
+                .employee(employee)
+                .assignmentStatus(ASSIGNED)
+                .assignedSource(MANUAL)
+                .locked(false)
+                .build();
+        return AdminShiftAssignmentResponse.from(shiftAssignmentRepository.save(assignment));
+    }
+
+    @Transactional
+    public AdminShiftAssignmentResponse updateAssignment(
+            CurrentAccountPrincipal principal, Long assignmentId, UpdateShiftAssignmentRequest request) {
+        requireManager(principal);
+        if (request == null || request.employeeId() == null) {
+            throw invalidAssignment("Employee id is required");
+        }
+        ShiftAssignment assignment = shiftAssignmentRepository.findDetailById(assignmentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Assignment not found"));
+        WorkShift shift = assignment.getWorkShift();
+        requireDraft(shift.getSchedulePeriod());
+        Employee employee = employeeRepository.findById(request.employeeId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Employee not found"));
+        if (!ACTIVE.equals(employee.getStatus())) {
+            throw invalidAssignment("Employee is not active");
+        }
+        Long currentEmployeeId = assignment.getEmployee() == null ? null : assignment.getEmployee().getId();
+        if (!employee.getId().equals(currentEmployeeId)
+                && shiftAssignmentRepository.existsByWorkShiftIdAndEmployeeId(shift.getId(), employee.getId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Employee already assigned to this shift");
+        }
+        validateEmployeeAvailability(shift, employee, assignmentId);
+        assignment.setEmployee(employee);
+        assignment.setAssignedSource(MANUAL);
+        return AdminShiftAssignmentResponse.from(shiftAssignmentRepository.save(assignment));
+    }
+
+    private void validateEmployeeAvailability(WorkShift shift, Employee employee, Long ignoredAssignmentId) {
         List<LeaveRequest> leaves = leaveRequestRepository.searchForEmployee(
                 employee.getId(), APPROVED, shift.getWorkDate(), shift.getWorkDate());
         if (!leaves.isEmpty()) {
@@ -109,7 +149,8 @@ public class AdminShiftAssignmentService {
                 employee.getId(), shift.getWorkDate().minusDays(1), shift.getWorkDate().plusDays(1));
         for (ShiftAssignment candidate : nearby) {
             if (candidate.getWorkShift() == null
-                    || workShiftId.equals(candidate.getWorkShift().getId())) {
+                    || (ignoredAssignmentId != null && ignoredAssignmentId.equals(candidate.getId()))
+                    || shift.getId().equals(candidate.getWorkShift().getId())) {
                 continue;
             }
             LocalDateTime[] other = interval(candidate.getWorkShift());
@@ -117,15 +158,7 @@ public class AdminShiftAssignmentService {
                 throw invalidAssignment("Employee has an overlapping assignment");
             }
         }
-        enforceDailyWorkHours(shift, nearby);
-        ShiftAssignment assignment = ShiftAssignment.builder()
-                .workShift(shift)
-                .employee(employee)
-                .assignmentStatus(ASSIGNED)
-                .assignedSource(MANUAL)
-                .locked(false)
-                .build();
-        return AdminShiftAssignmentResponse.from(shiftAssignmentRepository.save(assignment));
+        enforceDailyWorkHours(shift, nearby, ignoredAssignmentId);
     }
 
     @Transactional(readOnly = true)
@@ -222,12 +255,15 @@ public class AdminShiftAssignmentService {
         return new LocalDateTime[] {start, end};
     }
 
-    private void enforceDailyWorkHours(WorkShift targetShift, List<ShiftAssignment> nearbyAssignments) {
+    private void enforceDailyWorkHours(
+            WorkShift targetShift, List<ShiftAssignment> nearbyAssignments, Long ignoredAssignmentId) {
         int totalMinutes = workMinutes(targetShift);
         LocalDate targetDate = targetShift.getWorkDate();
         for (ShiftAssignment assignment : nearbyAssignments) {
             WorkShift shift = assignment.getWorkShift();
-            if (shift != null && targetDate.equals(shift.getWorkDate())) {
+            if (shift != null
+                    && (ignoredAssignmentId == null || !ignoredAssignmentId.equals(assignment.getId()))
+                    && targetDate.equals(shift.getWorkDate())) {
                 totalMinutes += workMinutes(shift);
             }
         }

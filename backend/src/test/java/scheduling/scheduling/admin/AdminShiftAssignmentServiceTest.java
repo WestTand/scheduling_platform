@@ -24,6 +24,7 @@ import org.springframework.web.server.ResponseStatusException;
 import scheduling.scheduling.admin.dto.AdminPeriodScheduleResponse;
 import scheduling.scheduling.admin.dto.AdminShiftAssignmentResponse;
 import scheduling.scheduling.admin.dto.CreateShiftAssignmentRequest;
+import scheduling.scheduling.admin.dto.UpdateShiftAssignmentRequest;
 import scheduling.scheduling.auth.CurrentAccountPrincipal;
 import scheduling.scheduling.employee.dto.EmployeeScheduleItemResponse;
 import scheduling.scheduling.entity.Account;
@@ -284,6 +285,35 @@ class AdminShiftAssignmentServiceTest {
                 .isEqualTo("Employee exceeds maximum work hours per day");
 
         verify(shiftAssignmentRepository, never()).save(any());
+    }
+
+    @Test
+    void managerUpdatesAssignmentEmployee() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        Employee oldEmployee = employee(7L, "NV007", "Nguyen Van A");
+        Employee newEmployee = employee(8L, "NV008", "Tran Thi B");
+        ShiftAssignment assignment = assignment(500L, workShift(), oldEmployee, true);
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(shiftAssignmentRepository.findDetailById(500L)).thenReturn(Optional.of(assignment));
+        when(employeeRepository.findById(8L)).thenReturn(Optional.of(newEmployee));
+        when(shiftAssignmentRepository.existsByWorkShiftIdAndEmployeeId(200L, 8L)).thenReturn(false);
+        when(leaveRequestRepository.searchForEmployee(8L, "APPROVED",
+                LocalDate.of(2026, 9, 14), LocalDate.of(2026, 9, 14)))
+                .thenReturn(List.of());
+        when(shiftAssignmentRepository.findForEmployeeInWindow(8L,
+                LocalDate.of(2026, 9, 13), LocalDate.of(2026, 9, 15)))
+                .thenReturn(List.of());
+        when(shiftAssignmentRepository.save(any(ShiftAssignment.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        AdminShiftAssignmentResponse response = service.updateAssignment(
+                principal, 500L, new UpdateShiftAssignmentRequest(8L));
+
+        assertThat(response.id()).isEqualTo(500L);
+        assertThat(response.employeeId()).isEqualTo(8L);
+        assertThat(response.employeeCode()).isEqualTo("NV008");
+        assertThat(response.locked()).isTrue();
+        assertThat(assignment.getAssignedSource()).isEqualTo("MANUAL");
     }
 
     @Test

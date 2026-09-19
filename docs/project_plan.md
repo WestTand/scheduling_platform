@@ -391,7 +391,7 @@ Ket qua mong doi: manager co the tao lich, gan nhan vien, kiem tra xung dot, duy
 - [x] API phan cong nhan vien vao ca thu cong (da xong: assign + delete assignment; chi cho phep khi period o DRAFT)
   - Dung de manager gan employee vao work shift.
   - La fallback/override khi AI khong dung hoac can dieu chinh.
-- [ ] API cap nhat phan cong
+- [x] API cap nhat phan cong (da xong: manager can update assignment employee in DRAFT with manual assignment validations)
   - Dung de doi nhan vien/ca trong assignment.
   - Can validate xung dot va gio lam.
 - [x] API khoa phan cong `is_locked` (da xong; chi cho phep khi period o DRAFT)
