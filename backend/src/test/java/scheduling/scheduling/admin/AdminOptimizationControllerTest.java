@@ -143,6 +143,48 @@ class AdminOptimizationControllerTest {
     }
 
     @Test
+    void rejectsOutOfRangeSolverOptions() throws Exception {
+        givenToken("manager-token", manager());
+
+        mockMvc.perform(post("/api/admin/schedule-periods/5/optimize")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer manager-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "solverOptions": {
+                                    "timeLimitSeconds": 0,
+                                    "randomSeed": 1,
+                                    "numWorkers": 4
+                                  }
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(adminOptimizationService);
+    }
+
+    @Test
+    void rejectsFractionalTimeLimitSeconds() throws Exception {
+        givenToken("manager-token", manager());
+
+        mockMvc.perform(post("/api/admin/schedule-periods/5/optimize")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer manager-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "solverOptions": {
+                                    "timeLimitSeconds": 10.5,
+                                    "randomSeed": 1,
+                                    "numWorkers": 4
+                                  }
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(adminOptimizationService);
+    }
+
+    @Test
     void managerOptimizesSchedulePeriodWithoutBody() throws Exception {
         givenToken("manager-token", manager());
         when(adminOptimizationService.optimize(
