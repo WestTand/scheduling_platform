@@ -209,6 +209,78 @@ def test_weekly_special_shift_quota_is_enforced() -> None:
     assert response.json()["status"] == "INFEASIBLE"
 
 
+def test_overtime_quota_counts_same_date_once() -> None:
+    request = base_request()
+    request["employees"] = [{"employeeId": 1}]
+    request["rules"]["hardRules"]["minRestHoursBetweenShifts"] = 0
+    request["shiftTypes"][0]["durationMinutes"] = 60
+    request["shiftTypes"][0]["quotaCategory"] = "OVERTIME"
+    request["workShifts"] = [
+        {"workShiftId":1000,"shiftTypeId":100,"workDate":"2026-09-14","startsAt":"2026-09-14T08:00:00+07:00","endsAt":"2026-09-14T09:00:00+07:00","requiredStaff":1},
+        {"workShiftId":1001,"shiftTypeId":100,"workDate":"2026-09-14","startsAt":"2026-09-14T10:00:00+07:00","endsAt":"2026-09-14T11:00:00+07:00","requiredStaff":1},
+    ]
+    request["lockedAssignments"] = [{"assignmentId":50,"employeeId":1,"workShiftId":1000},{"assignmentId":51,"employeeId":1,"workShiftId":1001}]
+    response = client.post("/api/v1/scheduling/optimize", json=request)
+    assert response.status_code == 200
+    assert sorted(response.json()["assignments"], key=lambda item: item["workShiftId"]) == [{"employeeId":1,"workShiftId":1000},{"employeeId":1,"workShiftId":1001}]
+
+
+def test_overtime_quota_counts_different_dates_separately() -> None:
+    request = base_request()
+    request["period"]["endDate"] = "2026-09-15"
+    request["rules"]["hardRules"]["minRestHoursBetweenShifts"] = 0
+    request["shiftTypes"][0]["durationMinutes"] = 60
+    request["shiftTypes"][0]["quotaCategory"] = "OVERTIME"
+    request["workShifts"] = [
+        {"workShiftId":1000,"shiftTypeId":100,"workDate":"2026-09-14","startsAt":"2026-09-14T08:00:00+07:00","endsAt":"2026-09-14T09:00:00+07:00","requiredStaff":1},
+        {"workShiftId":1001,"shiftTypeId":100,"workDate":"2026-09-15","startsAt":"2026-09-15T08:00:00+07:00","endsAt":"2026-09-15T09:00:00+07:00","requiredStaff":1},
+    ]
+    request["lockedAssignments"] = [{"assignmentId":50,"employeeId":1,"workShiftId":1000}]
+    response = client.post("/api/v1/scheduling/optimize", json=request)
+    assert response.status_code == 200
+    assert sorted(response.json()["assignments"], key=lambda item: item["workShiftId"]) == [{"employeeId":1,"workShiftId":1000},{"employeeId":2,"workShiftId":1001}]
+
+
+def test_bathing_quota_allows_two_distinct_dates_not_three() -> None:
+    request = base_request()
+    request["employees"] = [{"employeeId": 1}]
+    request["period"]["endDate"] = "2026-09-16"
+    request["rules"]["hardRules"]["minRestHoursBetweenShifts"] = 0
+    request["shiftTypes"][0]["durationMinutes"] = 60
+    request["shiftTypes"][0]["quotaCategory"] = "BATHING"
+    request["workShifts"] = [
+        {"workShiftId":1000,"shiftTypeId":100,"workDate":"2026-09-14","startsAt":"2026-09-14T08:00:00+07:00","endsAt":"2026-09-14T09:00:00+07:00","requiredStaff":1},
+        {"workShiftId":1001,"shiftTypeId":100,"workDate":"2026-09-15","startsAt":"2026-09-15T08:00:00+07:00","endsAt":"2026-09-15T09:00:00+07:00","requiredStaff":1},
+    ]
+    response = client.post("/api/v1/scheduling/optimize", json=request)
+    assert response.status_code == 200
+    assert response.json()["status"] == "SUCCESS"
+    request["workShifts"].append(
+        {"workShiftId":1002,"shiftTypeId":100,"workDate":"2026-09-16","startsAt":"2026-09-16T08:00:00+07:00","endsAt":"2026-09-16T09:00:00+07:00","requiredStaff":1},
+    )
+    response = client.post("/api/v1/scheduling/optimize", json=request)
+    assert response.status_code == 200
+    assert response.json()["status"] == "INFEASIBLE"
+
+
+def test_boundary_assignment_consumes_distinct_quota_date() -> None:
+    request = base_request()
+    request["employees"] = [{"employeeId": 1}]
+    request["period"]["endDate"] = "2026-09-15"
+    request["rules"]["hardRules"]["minRestHoursBetweenShifts"] = 0
+    request["shiftTypes"][0]["durationMinutes"] = 60
+    request["shiftTypes"][0]["quotaCategory"] = "OVERTIME"
+    request["workShifts"] = [
+        {"workShiftId":1000,"shiftTypeId":100,"workDate":"2026-09-15","startsAt":"2026-09-15T08:00:00+07:00","endsAt":"2026-09-15T09:00:00+07:00","requiredStaff":1},
+    ]
+    request["boundaryAssignments"] = [
+        {"employeeId":1,"shiftTypeId":100,"startsAt":"2026-09-14T08:00:00+07:00","endsAt":"2026-09-14T09:00:00+07:00"},
+    ]
+    response = client.post("/api/v1/scheduling/optimize", json=request)
+    assert response.status_code == 200
+    assert response.json()["status"] == "INFEASIBLE"
+
+
 def test_naive_shift_datetime_is_rejected() -> None:
     request = base_request()
     request["workShifts"][0]["startsAt"] = "2026-09-14T08:00:00"
