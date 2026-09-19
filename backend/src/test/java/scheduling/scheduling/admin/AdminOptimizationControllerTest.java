@@ -3,6 +3,7 @@ package scheduling.scheduling.admin;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -139,6 +140,33 @@ class AdminOptimizationControllerTest {
         assertThat(requestCaptor.getValue().solverOptions().timeLimitSeconds()).isEqualTo(10);
         assertThat(requestCaptor.getValue().solverOptions().randomSeed()).isEqualTo(2);
         assertThat(requestCaptor.getValue().solverOptions().numWorkers()).isEqualTo(4);
+    }
+
+    @Test
+    void managerOptimizesSchedulePeriodWithoutBody() throws Exception {
+        givenToken("manager-token", manager());
+        when(adminOptimizationService.optimize(
+                any(CurrentAccountPrincipal.class), eq(5L), isNull()))
+                .thenReturn(response());
+
+        mockMvc.perform(post("/api/admin/schedule-periods/5/optimize")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer manager-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.runId").value(900));
+
+        ArgumentCaptor<OptimizeScheduleRequest> requestCaptor =
+                ArgumentCaptor.forClass(OptimizeScheduleRequest.class);
+        verify(adminOptimizationService).optimize(
+                any(CurrentAccountPrincipal.class), eq(5L), requestCaptor.capture());
+        assertThat(requestCaptor.getValue()).isNull();
+    }
+
+    @Test
+    void anonymousCannotOptimizeSchedulePeriod() throws Exception {
+        mockMvc.perform(post("/api/admin/schedule-periods/5/optimize"))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(adminOptimizationService);
     }
 
     private void givenToken(String token, CurrentAccountPrincipal principal) {
