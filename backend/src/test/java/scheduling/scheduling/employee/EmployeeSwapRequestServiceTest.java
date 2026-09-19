@@ -533,4 +533,39 @@ class EmployeeSwapRequestServiceTest {
         swapRequest.setId(id);
         return swapRequest;
     }
+
+    @Test
+    void listSwapRequestsWithBlankStatusReturnsAllRelated() {
+        CurrentAccountPrincipal principal = employeePrincipal();
+        Employee me = employee(7L, "ACTIVE");
+        SwapRequest swapRequest = swapRequest(50L, assignment(100L, me, "PUBLISHED"), employee(9L, "ACTIVE"), "APPROVED");
+        when(accountRepository.findById(ACCOUNT_ID))
+                .thenReturn(Optional.of(account(principal, me)));
+        when(swapRequestRepository.findRelatedForEmployee(7L, null))
+                .thenReturn(List.of(swapRequest));
+
+        List<SwapRequestResponse> response = service.listSwapRequests(principal, "   ");
+
+        assertThat(response).extracting(SwapRequestResponse::id).containsExactly(50L);
+        verify(swapRequestRepository).findRelatedForEmployee(7L, null);
+    }
+
+    @Test
+    void respondSwapRequestRejectsNonPendingTarget() {
+        CurrentAccountPrincipal principal = employeePrincipal();
+        Employee me = employee(9L, "ACTIVE");
+        SwapRequest swapRequest = swapRequest(
+                50L, assignment(100L, employee(7L, "ACTIVE"), "PUBLISHED"), me, "PENDING_APPROVAL");
+        when(accountRepository.findById(ACCOUNT_ID))
+                .thenReturn(Optional.of(account(principal, me)));
+        when(swapRequestRepository.findDetailById(50L)).thenReturn(Optional.of(swapRequest));
+
+        assertThatThrownBy(() -> service.respondSwapRequest(
+                principal, 50L, new RespondSwapRequestRequest(true)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(swapRequestRepository, never()).save(any());
+    }
 }
