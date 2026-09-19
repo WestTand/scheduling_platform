@@ -428,6 +428,14 @@ Muc dich: tu dong tao lich dua tren nhan vien active, loai ca, don nghi, prefere
 
 Ket qua mong doi: backend goi AI service, AI tra lich toi uu hoac ly do infeasible, backend luu assignments va optimization run.
 
+Backend/database compatibility notes from rule foundation slices:
+
+- Phase 6 quota semantics do not require a database schema change. Backend/API field names stay `overtimeShiftsPerWeek` and `bathingShiftsPerWeek`, and DB rule codes stay `OVERTIME_SHIFTS_PER_WEEK` and `BATHING_SHIFTS_PER_WEEK`; their business meaning for AI is max distinct work dates per employee per ISO week.
+- Backend-to-AI payload mapping must keep the existing `quotaCategory` contract: backend `REGULAR` maps to AI `null`; backend `OVERTIME`, `BATHING`, and `ON_CALL` map directly.
+- `shiftCode` and `penaltyWeightMultiplier` are persisted on backend shift types, but AI schema `1.0` does not consume `penaltyWeightMultiplier` yet. A later slice should explicitly decide whether/how to send it.
+- `WorkShift.startsAt` and `WorkShift.endsAt` are persisted exact windows. The backend AI payload slice should send these persisted values; if old rows can have null windows, add a backfill or derive fallback before calling AI.
+- Production-hardening follow-up: after existing shift types are backfilled with stable `shiftCode`, enforce `shift_code` as not null if the deployment needs DB-level protection.
+
 - [ ] Thiet ke request payload tu backend sang AI service
   - Dung de thong nhat schema du lieu dau vao cho solver.
   - Giam coupling giua Spring Boot backend va AI service.
@@ -611,6 +619,59 @@ Ket qua mong doi: manager co nut export va cac bao cao co filter ro rang.
 Muc dich: xay UI hoan chinh ket noi backend cho manager va employee. Phase nay bien API thanh san pham co the demo va nguoi dung thao tac.
 
 Ket qua mong doi: user co luong dang nhap/kich hoat, dashboard, quan ly nhan vien/ca/lich, va employee self-service.
+
+Frontend backend-contract alignment notes:
+
+- Frontend hien la mock-first: services doc seed data tu `src/mocks` va dung UI-friendly model. Khi ket noi backend that, khong nen sua backend theo mock cu; backend API/DTO la source of truth.
+- Can them adapter layer `backend DTO -> frontend UI model` de page/component khong tu map response raw. Mock data cung phai mo phong backend DTO hoac di qua cung adapter de tranh mock pass nhung backend fail.
+- Can co config bat/tat data source, vi du `VITE_USE_MOCK_API`, de cung service public API co the chay voi mock hoac backend.
+- UI terminology phai theo nghiep vu moi: `overtimeShiftsPerWeek` va `bathingShiftsPerWeek` la so ngay distinct moi tuan, khong phai so ca/shift rows.
+- Giao dien khong can redesign lon trong slice integration. Uu tien chinh form, label, table columns, loading/error/empty states va calendar/detail hien dung du lieu backend.
+
+- [ ] Tao frontend HTTP client va API mode config
+  - Dung `VITE_API_BASE_URL` de goi backend that.
+  - Dung `VITE_USE_MOCK_API` de chuyen giua mock va backend trong qua trinh migrate.
+  - Chuan hoa parse loi backend thanh message hien thi duoc tren UI.
+- [ ] Tao backend DTO types va adapter functions trong frontend
+  - Dinh nghia type raw theo backend DTO cho employee, shift type, scheduling rules, schedule period, work shift, assignment.
+  - Adapter map raw DTO sang UI model hien tai de component it bi thay doi.
+  - Khong de page/component map response raw truc tiep.
+- [ ] Cap nhat mock data theo backend contract
+  - Mock nen mo phong response backend DTO, khong tao shape rieng qua xa backend.
+  - Mock va backend cung di qua adapter layer.
+  - Giam rui ro UI chay mock duoc nhung fail khi doi sang backend.
+- [ ] Align giao dien quan ly nhan vien voi backend API
+  - Endpoint chinh: `/api/admin/employees`.
+  - Xu ly khac biet `id` backend numeric va UI string neu can.
+  - Hien/luu dung status, employee code, contact va account summary backend tra ve.
+- [ ] Align giao dien quan ly loai ca voi backend API
+  - Endpoint chinh: `/api/admin/shift-types`.
+  - Hien va submit dung `shiftCode`, `shiftName`, `startTime`, `endTime`, `durationHours`, `overnight`, `heavy`, `minStaff`, `maxStaff`, `quotaCategory`, `applicableWeekdays`, `appliesOnHolidays`, `penaltyWeightMultiplier`, `status`.
+  - Map label tieng Viet cho quota category: `REGULAR`, `OVERTIME`, `BATHING`, `ON_CALL`.
+  - Khong dung `shiftDefinitions` lam source chinh khi backend da co shift type data.
+- [ ] Them/cap nhat giao dien quy dinh xep lich
+  - Endpoint chinh: `/api/admin/scheduling-rules`.
+  - Chia UI thanh hard rules, quotas va soft weights.
+  - Label quota dung nghia ngay/tuan: ngay ngoai gio toi da, ngay thong tam toi da, khoang cach ngay truc.
+- [ ] Align giao dien ky lich va work shifts
+  - Endpoints chinh: `/api/admin/schedule-periods`, `/api/admin/schedule-periods/{periodId}/work-shifts`, `/api/admin/work-shifts/{workShiftId}`.
+  - Calendar/table hien theo `workDate`, detail/tooltip hien `startsAt`, `endsAt`, `workMinutes`.
+  - Hien badge ca qua ngay khi `isTransitionShift = true`.
+- [ ] Align giao dien assignment va dieu chinh lich thu cong
+  - Endpoints chinh: tao assignment theo work shift, xem schedule theo period/employee, delete assignment, lock/unlock assignment.
+  - Hien locked assignment bang badge/icon ro rang.
+  - Group assignment theo work shift de lich nhieu nhan vien cung ca khong bi roi.
+- [ ] Cap nhat giao dien tao lich tu dong
+  - Truoc khi chay, hien checklist input: period, work shifts, active employees, active shift types, scheduling rules, locked assignments.
+  - Sau khi chay, hien `SUCCESS`, `INFEASIBLE`, `FAILED`, total penalty va diagnostics neu co.
+  - Khong hien thong bao thanh cong/that bai chung chung khi backend/AI co ly do cu the.
+- [ ] Cap nhat giao dien ngay nghi va nguyen vong
+  - Ngay nghi approved phai ghi ro AI se khong xep ca trong khoang ngay nay.
+  - Nguyen vong phai ghi ro la soft constraint, khong dam bao luon duoc dap ung.
+- [ ] Them frontend contract/adapter tests toi thieu
+  - Test sample backend DTO map dung sang UI model cho employee, shift type, work shift va scheduling rules.
+  - Test service chon mock/backend theo config.
+  - Chay `npm run build` de bat loi type khi contract doi.
 
 - [ ] Setup routing
   - Dung de chia trang login, dashboard, admin, employee.
