@@ -152,7 +152,8 @@ Fields:
 Important:
 
 - `quotaCategory` phai la stable enum do backend map tu cau hinh, khong infer tu display name.
-- AI quota semantics: `OVERTIME` and `BATHING` quotas are counted by distinct `workDate` per employee per ISO week. Multiple same-category work shifts on the same `workDate` count once. Boundary assignments count by `startsAt.date()`. The field names `overtimeShiftsPerWeek` and `bathingShiftsPerWeek` are kept for `schemaVersion = "1.0"` compatibility even though their semantics are day-based.
+- AI quota semantics: `OVERTIME` and `BATHING` quotas are counted by distinct `workDate` per employee per ISO week. Multiple same-category work shifts on the same `workDate` count once. Boundary assignments count by `startsAt` local date.
+- AI quota compatibility: the field names `overtimeShiftsPerWeek` and `bathingShiftsPerWeek` are kept for `schemaVersion = "1.0"` compatibility even though their semantics are day-based.
 - Shift calendar foundation (backend-only, chua gui sang AI): backend luu `shiftCode` (canonical key, khong key logic theo display name) va `penaltyWeightMultiplier` (da persist, AI schema `1.0` chua nhan multiplier). Quota category contract (`OVERTIME`, `BATHING`, `ON_CALL`, hoac `null`) giu nguyen trong slice nay.
 
 ### `workShifts`

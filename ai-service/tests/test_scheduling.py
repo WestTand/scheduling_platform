@@ -281,6 +281,23 @@ def test_boundary_assignment_consumes_distinct_quota_date() -> None:
     assert response.json()["status"] == "INFEASIBLE"
 
 
+def test_boundary_same_date_counts_once() -> None:
+    request = base_request()
+    request["employees"] = [{"employeeId": 1}]
+    request["rules"]["hardRules"]["minRestHoursBetweenShifts"] = 0
+    request["shiftTypes"][0]["durationMinutes"] = 60
+    request["shiftTypes"][0]["quotaCategory"] = "OVERTIME"
+    request["workShifts"] = [
+        {"workShiftId":1000,"shiftTypeId":100,"workDate":"2026-09-14","startsAt":"2026-09-14T08:00:00+07:00","endsAt":"2026-09-14T09:00:00+07:00","requiredStaff":1},
+    ]
+    request["boundaryAssignments"] = [
+        {"employeeId":1,"shiftTypeId":100,"startsAt":"2026-09-14T18:00:00+07:00","endsAt":"2026-09-14T19:00:00+07:00"},
+    ]
+    response = client.post("/api/v1/scheduling/optimize", json=request)
+    assert response.status_code == 200
+    assert response.json()["status"] == "SUCCESS"
+
+
 def test_naive_shift_datetime_is_rejected() -> None:
     request = base_request()
     request["workShifts"][0]["startsAt"] = "2026-09-14T08:00:00"
