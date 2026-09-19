@@ -87,7 +87,7 @@ public class AdminSwapRequestService {
     }
 
     private SwapRequest findDetail(Long swapRequestId) {
-        return swapRequestRepository.findDetailById(swapRequestId)
+        return swapRequestRepository.findDetailByIdForUpdate(swapRequestId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Swap request not found"));
     }
 

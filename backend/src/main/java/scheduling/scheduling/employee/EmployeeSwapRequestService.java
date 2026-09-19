@@ -116,7 +116,7 @@ public class EmployeeSwapRequestService {
             throw invalidRequest();
         }
         Employee employee = employeeAccess.requireActiveEmployee(principal);
-        SwapRequest swapRequest = swapRequestRepository.findDetailById(swapRequestId)
+        SwapRequest swapRequest = swapRequestRepository.findDetailByIdForUpdate(swapRequestId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Swap request not found"));
         if (!employee.getId().equals(swapRequest.getTargetEmployee().getId())) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Swap request not found");
@@ -130,7 +130,7 @@ public class EmployeeSwapRequestService {
     }
 
     private SwapRequest findVisibleToRequester(Long swapRequestId, Long employeeId) {
-        SwapRequest swapRequest = swapRequestRepository.findDetailById(swapRequestId)
+        SwapRequest swapRequest = swapRequestRepository.findDetailByIdForUpdate(swapRequestId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Swap request not found"));
         if (!employeeId.equals(swapRequest.getRequesterAssignment().getEmployee().getId())) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Swap request not found");

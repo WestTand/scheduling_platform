@@ -409,7 +409,7 @@ class EmployeeSwapRequestServiceTest {
         SwapRequest swapRequest = swapRequest(50L, assignment(100L, me, "PUBLISHED"), employee(9L, "ACTIVE"), "PENDING_TARGET");
         when(accountRepository.findById(ACCOUNT_ID))
                 .thenReturn(Optional.of(account(principal, me)));
-        when(swapRequestRepository.findDetailById(50L)).thenReturn(Optional.of(swapRequest));
+        when(swapRequestRepository.findDetailByIdForUpdate(50L)).thenReturn(Optional.of(swapRequest));
         when(swapRequestRepository.save(any(SwapRequest.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         SwapRequestResponse response = service.cancelSwapRequest(principal, 50L);
@@ -425,7 +425,7 @@ class EmployeeSwapRequestServiceTest {
                 50L, assignment(100L, employee(8L, "ACTIVE"), "PUBLISHED"), employee(9L, "ACTIVE"), "PENDING_TARGET");
         when(accountRepository.findById(ACCOUNT_ID))
                 .thenReturn(Optional.of(account(principal, me)));
-        when(swapRequestRepository.findDetailById(50L)).thenReturn(Optional.of(swapRequest));
+        when(swapRequestRepository.findDetailByIdForUpdate(50L)).thenReturn(Optional.of(swapRequest));
 
         assertThatThrownBy(() -> service.cancelSwapRequest(principal, 50L))
                 .isInstanceOf(ResponseStatusException.class)
@@ -442,7 +442,7 @@ class EmployeeSwapRequestServiceTest {
         SwapRequest swapRequest = swapRequest(50L, assignment(100L, me, "PUBLISHED"), employee(9L, "ACTIVE"), "PENDING_APPROVAL");
         when(accountRepository.findById(ACCOUNT_ID))
                 .thenReturn(Optional.of(account(principal, me)));
-        when(swapRequestRepository.findDetailById(50L)).thenReturn(Optional.of(swapRequest));
+        when(swapRequestRepository.findDetailByIdForUpdate(50L)).thenReturn(Optional.of(swapRequest));
 
         assertThatThrownBy(() -> service.cancelSwapRequest(principal, 50L))
                 .isInstanceOf(ResponseStatusException.class)
@@ -460,7 +460,7 @@ class EmployeeSwapRequestServiceTest {
                 50L, assignment(100L, employee(7L, "ACTIVE"), "PUBLISHED"), me, "PENDING_TARGET");
         when(accountRepository.findById(ACCOUNT_ID))
                 .thenReturn(Optional.of(account(principal, me)));
-        when(swapRequestRepository.findDetailById(50L)).thenReturn(Optional.of(swapRequest));
+        when(swapRequestRepository.findDetailByIdForUpdate(50L)).thenReturn(Optional.of(swapRequest));
         when(swapRequestRepository.save(any(SwapRequest.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         SwapRequestResponse response = service.respondSwapRequest(
@@ -477,7 +477,7 @@ class EmployeeSwapRequestServiceTest {
                 50L, assignment(100L, employee(7L, "ACTIVE"), "PUBLISHED"), me, "PENDING_TARGET");
         when(accountRepository.findById(ACCOUNT_ID))
                 .thenReturn(Optional.of(account(principal, me)));
-        when(swapRequestRepository.findDetailById(50L)).thenReturn(Optional.of(swapRequest));
+        when(swapRequestRepository.findDetailByIdForUpdate(50L)).thenReturn(Optional.of(swapRequest));
         when(swapRequestRepository.save(any(SwapRequest.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         SwapRequestResponse response = service.respondSwapRequest(
@@ -494,7 +494,7 @@ class EmployeeSwapRequestServiceTest {
                 50L, assignment(100L, employee(7L, "ACTIVE"), "PUBLISHED"), employee(9L, "ACTIVE"), "PENDING_TARGET");
         when(accountRepository.findById(ACCOUNT_ID))
                 .thenReturn(Optional.of(account(principal, me)));
-        when(swapRequestRepository.findDetailById(50L)).thenReturn(Optional.of(swapRequest));
+        when(swapRequestRepository.findDetailByIdForUpdate(50L)).thenReturn(Optional.of(swapRequest));
 
         assertThatThrownBy(() -> service.respondSwapRequest(
                 principal, 50L, new RespondSwapRequestRequest(true)))
@@ -513,7 +513,7 @@ class EmployeeSwapRequestServiceTest {
                 50L, assignment(100L, employee(7L, "ACTIVE"), "PUBLISHED"), me, "PENDING_TARGET");
         when(accountRepository.findById(ACCOUNT_ID))
                 .thenReturn(Optional.of(account(principal, me)));
-        when(swapRequestRepository.findDetailById(50L)).thenReturn(Optional.of(swapRequest));
+        when(swapRequestRepository.findDetailByIdForUpdate(50L)).thenReturn(Optional.of(swapRequest));
 
         assertThatThrownBy(() -> service.respondSwapRequest(principal, 50L, null))
                 .isInstanceOf(ResponseStatusException.class)
@@ -558,7 +558,7 @@ class EmployeeSwapRequestServiceTest {
                 50L, assignment(100L, employee(7L, "ACTIVE"), "PUBLISHED"), me, "PENDING_APPROVAL");
         when(accountRepository.findById(ACCOUNT_ID))
                 .thenReturn(Optional.of(account(principal, me)));
-        when(swapRequestRepository.findDetailById(50L)).thenReturn(Optional.of(swapRequest));
+        when(swapRequestRepository.findDetailByIdForUpdate(50L)).thenReturn(Optional.of(swapRequest));
 
         assertThatThrownBy(() -> service.respondSwapRequest(
                 principal, 50L, new RespondSwapRequestRequest(true)))
