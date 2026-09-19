@@ -15,6 +15,8 @@ import java.time.LocalDateTime;
  *
  * Status flow:
  *   PENDING_TARGET → PENDING_APPROVAL → APPROVED / REJECTED
+ *   PENDING_TARGET → CANCELLED (requester cancels before target responds)
+ *   PENDING_TARGET / PENDING_APPROVAL → REJECTED (target declines or manager rejects)
  */
 @Getter
 @Setter
