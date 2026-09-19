@@ -30,7 +30,8 @@ New files and their responsibility:
 Modified files:
 
 - `backend/src/main/java/scheduling/scheduling/entity/SwapRequest.java` — JavaDoc comment only: add `CANCELLED` to status flow.
-- `backend/src/test/java/scheduling/scheduling/auth/AuthControllerTest.java` — add `/me` employee-profile test.
+- `backend/src/test/java/scheduling/scheduling/auth/AuthControllerTest.java`
+- `backend/src/test/java/scheduling/scheduling/SchedulingApplicationTests.java` — add `/me` employee-profile test.
 - `docs/project_plan.md` — tick 6 Phase 4 items (profile, 2 swap APIs, 3 test flows).
 
 ---
@@ -1873,7 +1874,7 @@ git commit -m "feat: add manager swap request controller"
 **Files:**
 - Modify: `backend/src/main/java/scheduling/scheduling/entity/SwapRequest.java` (comment only)
 - Modify: `backend/src/test/java/scheduling/scheduling/auth/AuthControllerTest.java`
-- Modify: `backend/src/test/java/scheduling/scheduling/SchedulingApplicationTests.java` (append test)
+- Modify: `backend/src/test/java/scheduling/scheduling/SchedulingApplicationTests.java` (Task 8b only: add `SwapRequestRepository` mock field, no new test)
 
 - [ ] **Step 1: Update the entity JavaDoc status flow**
 
@@ -2005,7 +2006,7 @@ git commit -m "docs: tick phase 4 swap profile items"
 
 ## Self-Review
 
-**1. Spec coverage:** every spec section maps to a task — profile reuse + test (Task 8), create/list/cancel/respond (Tasks 3–5), admin list/approve/reject (Tasks 6–7), PUBLISHED validation (Task 3 tests + impl), `Boolean @NotNull` accept (Tasks 3–5 DTO + controller missing-accept test), `left join fetch` nullable target (Task 1), `order by id desc` (Task 1), `LocalDateTime.now(clock)` (Task 6 fixed-clock test), response fields (Task 2), duplicate = non-goal (no code), JavaDoc update (Task 8), plan ticks (Task 9).
+**1. Spec coverage:** every spec section maps to a task — profile reuse + test (Task 8), create/list/cancel/respond (Tasks 3–5), admin list/approve/reject (Tasks 6–7), PUBLISHED validation (Task 3 tests + impl), `Boolean @NotNull` accept (Tasks 3–5 DTO + controller missing-accept test), `left join fetch` nullable target (Task 1), `order by id desc` (Task 1), `LocalDateTime.now(clock)` (Task 6 fixed-clock test), response fields (Task 2), duplicate = non-goal (no code), JavaDoc update (Task 8), smoke-test context wiring for the new repository (Task 8b), plan ticks (Task 9).
 
 **2. Placeholder scan:** no TODO/TBD/vague steps; every code step shows exact code, exact commands, exact expected output.
 
