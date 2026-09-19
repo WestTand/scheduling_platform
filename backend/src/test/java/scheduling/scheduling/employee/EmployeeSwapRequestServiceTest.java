@@ -304,17 +304,21 @@ class EmployeeSwapRequestServiceTest {
     void createSwapRequestRejectsTargetAssignmentEqualToRequesterAssignment() {
         CurrentAccountPrincipal principal = employeePrincipal();
         Employee requester = employee(7L, "ACTIVE");
+        Employee target = employee(9L, "ACTIVE");
         when(accountRepository.findByIdForUpdate(ACCOUNT_ID))
                 .thenReturn(Optional.of(account(principal, requester)));
         when(shiftAssignmentRepository.findDetailById(100L))
-                .thenReturn(Optional.of(assignment(100L, requester, "PUBLISHED")));
-        when(employeeRepository.findById(9L)).thenReturn(Optional.of(employee(9L, "ACTIVE")));
+                .thenReturn(
+                        Optional.of(assignment(100L, requester, "PUBLISHED")),
+                        Optional.of(assignment(100L, target, "PUBLISHED")));
+        when(employeeRepository.findById(9L)).thenReturn(Optional.of(target));
 
         assertThatThrownBy(() -> service.createSwapRequest(
                 principal, new CreateSwapRequestRequest(100L, 9L, 100L, null)))
-                .isInstanceOf(ResponseStatusException.class)
-                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
-                .isEqualTo(HttpStatus.BAD_REQUEST);
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex -> {
+                    assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(ex.getReason()).isEqualTo("Target assignment must differ from requester assignment");
+                });
 
         verify(swapRequestRepository, never()).save(any());
     }
