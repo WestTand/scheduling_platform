@@ -31,7 +31,7 @@ Modified files:
 
 - `backend/src/main/java/scheduling/scheduling/entity/SwapRequest.java` — JavaDoc comment only: add `CANCELLED` to status flow.
 - `backend/src/test/java/scheduling/scheduling/auth/AuthControllerTest.java`
-- `backend/src/test/java/scheduling/scheduling/SchedulingApplicationTests.java` — add `/me` employee-profile test.
+- `backend/src/test/java/scheduling/scheduling/SchedulingApplicationTests.java` — add `SwapRequestRepository` mock so the smoke-test context loads.
 - `docs/project_plan.md` — tick 6 Phase 4 items (profile, 2 swap APIs, 3 test flows).
 
 ---
@@ -1874,7 +1874,6 @@ git commit -m "feat: add manager swap request controller"
 **Files:**
 - Modify: `backend/src/main/java/scheduling/scheduling/entity/SwapRequest.java` (comment only)
 - Modify: `backend/src/test/java/scheduling/scheduling/auth/AuthControllerTest.java`
-- Modify: `backend/src/test/java/scheduling/scheduling/SchedulingApplicationTests.java` (Task 8b only: add `SwapRequestRepository` mock field, no new test)
 
 - [ ] **Step 1: Update the entity JavaDoc status flow**
 
