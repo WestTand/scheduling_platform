@@ -114,6 +114,16 @@
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<configuration>
+					<!-- Pin test JVM timezone: pgjdbc sends the JVM default as the Postgres TimeZone
+						parameter, and legacy aliases like Asia/Saigon are rejected by PostgreSQL.
+						UTC keeps DB-backed tests deterministic on any machine. -->
+					<argLine>-Duser.timezone=UTC</argLine>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
 				<executions>
 					<execution>
