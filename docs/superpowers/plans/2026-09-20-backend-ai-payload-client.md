@@ -14,7 +14,7 @@
 
 - Create `backend/src/main/java/scheduling/scheduling/repository/OptimizationRunRepository.java`: `JpaRepository<OptimizationRun, Long>`.
 - Modify `backend/src/main/java/scheduling/scheduling/repository/WorkShiftRepository.java`: add `findForAiPayload(Long periodId)` period detail query for AI payload.
-- Modify `backend/src/main/java/scheduling/scheduling/repository/EmployeeRepository.java`: add `findByStatus(String status)` active schedulable employees query.
+- Modify `backend/src/main/java/scheduling/scheduling/repository/EmployeeRepository.java`: add `findSchedulableForAi()` query for active employees linked to active employee accounts.
 - Modify `backend/src/main/java/scheduling/scheduling/repository/ShiftTypeRepository.java`: add `findByStatus(String status)` active shift types query.
 - Modify `backend/src/main/java/scheduling/scheduling/repository/LeaveRequestRepository.java`: add approved-overlap query.
 - Modify `backend/src/main/java/scheduling/scheduling/repository/PreferenceRepository.java`: add active-status in-range query.
@@ -31,6 +31,7 @@
 - Create `backend/src/main/java/scheduling/scheduling/admin/AdminOptimizationService.java`: validate period, create run, build payload, call AI, update run, map response.
 - Create `backend/src/main/java/scheduling/scheduling/admin/AdminOptimizationController.java`: route `POST /api/admin/schedule-periods/{periodId}/optimize`.
 - Create `backend/src/test/java/scheduling/scheduling/ai/AiSchedulingPayloadBuilderTest.java`: mapping and validation tests.
+- Create `backend/src/test/java/scheduling/scheduling/ai/OptimizationRunRecorderTransactionTest.java`: real transaction test proving a failed run remains committed after a throwing caller rolls back.
 - Create `backend/src/test/java/scheduling/scheduling/admin/AdminOptimizationServiceTest.java`: orchestration/run lifecycle tests.
 - Create `backend/src/test/java/scheduling/scheduling/admin/AdminOptimizationControllerTest.java`: route/security/error status tests.
 - Modify `backend/src/test/java/scheduling/scheduling/SchedulingApplicationTests.java`: add mocks only if context requires them.
@@ -73,15 +74,15 @@ public record AiSchedulingRequestDto(
 
     public record PeriodDto(Long periodId, LocalDate startDate, LocalDate endDate, Integer versionNo, String timezone) {}
     public record EmployeeDto(Long employeeId) {}
-    public record ShiftTypeDto(Long shiftTypeId, String shiftCode, Integer durationMinutes, Boolean overnight,
+    public record ShiftTypeDto(Long shiftTypeId, Integer durationMinutes, Boolean overnight,
                                Boolean heavy, Integer minStaff, Integer maxStaff, String quotaCategory) {}
     public record WorkShiftDto(Long workShiftId, Long shiftTypeId, LocalDate workDate, OffsetDateTime startsAt,
                                OffsetDateTime endsAt, Integer requiredStaff) {}
-    public record ApprovedLeaveDto(Long employeeId, LocalDate startDate, LocalDate endDate) {}
-    public record PreferenceDto(Long employeeId, Long shiftTypeId, LocalDate preferenceDate, String preferenceType,
+    public record ApprovedLeaveDto(Long leaveRequestId, Long employeeId, LocalDate startDate, LocalDate endDate) {}
+    public record PreferenceDto(Long preferenceId, Long employeeId, Long shiftTypeId, LocalDate preferenceDate, String preferenceType,
                                 Integer priority) {}
     public record LockedAssignmentDto(Long assignmentId, Long employeeId, Long workShiftId) {}
-    public record BoundaryAssignmentDto(Long employeeId, Long workShiftId) {}
+    public record BoundaryAssignmentDto(Long employeeId, Long shiftTypeId, OffsetDateTime startsAt, OffsetDateTime endsAt) {}
     public record RulesDto(HardRulesDto hardRules, QuotasDto quotas, SoftWeightsDto softWeights) {}
     public record HardRulesDto(Integer minRestHoursBetweenShifts, Integer maxWorkHoursPerDay, Integer maxShiftsPerWeek) {}
     public record QuotasDto(Integer overtimeShiftsPerWeek, Integer bathingShiftsPerWeek, Integer onCallEveryNDays) {}
@@ -91,32 +92,34 @@ public record AiSchedulingRequestDto(
 }
 ```
 
+Backend intentionally accepts whole-second `timeLimitSeconds` only, even though the AI schema type is numeric/float. Keep this as `Integer` and reject fractional values at JSON binding/validation time.
+
 - [ ] **Step 2: Create AI response DTO**
 
 ```java
 package scheduling.scheduling.ai.dto;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
 public record AiSchedulingResponseDto(
         String schemaVersion,
         Long runId,
+        Long periodId,
         String status,
         String solverStatus,
-        BigDecimal objectiveValue,
-        BigDecimal totalPenalty,
         List<AssignmentDto> assignments,
-        List<DiagnosticDto> diagnostics,
-        StatisticsDto statistics,
+        BigDecimal totalPenalty,
+        Map<String, BigDecimal> penaltyDetails,
         List<String> warnings,
-        String errorMessage) {
+        List<DiagnosticDto> diagnostics,
+        String errorMessage,
+        StatisticsDto statistics) {
 
-    public record AssignmentDto(Long employeeId, Long workShiftId, LocalDate workDate, Long shiftTypeId) {}
-    public record DiagnosticDto(String code, String message, Map<String, Object> context) {}
-    public record StatisticsDto(Integer assignedShifts, Integer unassignedShifts, Map<String, Object> details) {}
+    public record AssignmentDto(Long employeeId, Long workShiftId) {}
+    public record DiagnosticDto(String code, String message, Long employeeId, Long workShiftId) {}
+    public record StatisticsDto(BigDecimal wallTimeSeconds, Integer conflicts, Integer branches) {}
 }
 ```
 
@@ -188,7 +191,16 @@ Run: `git add backend/src/main/java/scheduling/scheduling/ai/dto backend/src/mai
 Add methods using established repository style. Exact signatures to use from builder:
 
 ```java
-List<Employee> findByStatus(String status);
+@Query("""
+        select e from Employee e
+        join fetch e.account a
+        where e.status = 'ACTIVE'
+          and a.role = scheduling.scheduling.entity.AccountRole.EMPLOYEE
+          and a.status = scheduling.scheduling.entity.AccountStatus.ACTIVE
+          and a.isActive = true
+        order by e.employeeCode asc
+        """)
+List<Employee> findSchedulableForAi();
 List<ShiftType> findByStatus(String status);
 @Query("""
         select ws from WorkShift ws
@@ -227,7 +239,7 @@ List<Preference> findActiveInRange(@Param("periodStart") LocalDate periodStart, 
 List<ShiftAssignment> findLockedForPeriod(@Param("periodId") Long periodId);
 ```
 
-Do not add duplicate methods if `findByStatus(String status)` already exists in `EmployeeRepository` or `ShiftTypeRepository`; use the existing method name in `AiSchedulingPayloadBuilder`.
+Do not add duplicate `findByStatus(String status)` if it already exists in `ShiftTypeRepository`; use the existing method name in `AiSchedulingPayloadBuilder`. Always add `findSchedulableForAi()` to `EmployeeRepository` because employee scheduling requires account role/status checks, not only employee status.
 
 - [ ] **Step 2: Compile repository methods**
 
@@ -247,7 +259,7 @@ Run: `git add backend/src/main/java/scheduling/scheduling/repository && git comm
 
 - [ ] **Step 1: Write failing happy-path builder test**
 
-Create a unit test with mocked repositories. Assert `schemaVersion`, `runId`, `timezone`, quota mapping `REGULAR -> null`, persisted `startsAt`/`endsAt`, empty `boundaryAssignments`, and resolved rules/options.
+Create a unit test with mocked repositories. Assert `schemaVersion`, `runId`, `timezone`, quota mapping `REGULAR -> null`, persisted `startsAt`/`endsAt`, `leaveRequestId`, `preferenceId`, empty `boundaryAssignments`, and resolved rules/options.
 
 Use method name: `buildsPayloadFromDraftPeriodData()`.
 
@@ -259,6 +271,8 @@ assertThat(payload.runId()).isEqualTo(900L);
 assertThat(payload.period().timezone()).isEqualTo("Asia/Ho_Chi_Minh");
 assertThat(payload.shiftTypes()).extracting(AiSchedulingRequestDto.ShiftTypeDto::quotaCategory).containsExactly((String) null);
 assertThat(payload.workShifts()).extracting(AiSchedulingRequestDto.WorkShiftDto::startsAt).containsExactly(startsAt);
+assertThat(payload.approvedLeaves()).extracting(AiSchedulingRequestDto.ApprovedLeaveDto::leaveRequestId).containsExactly(700L);
+assertThat(payload.preferences()).extracting(AiSchedulingRequestDto.PreferenceDto::preferenceId).containsExactly(800L);
 assertThat(payload.boundaryAssignments()).isEmpty();
 assertThat(payload.rules().hardRules().maxWorkHoursPerDay()).isEqualTo(12);
 assertThat(payload.solverOptions().timeLimitSeconds()).isEqualTo(30);
@@ -285,10 +299,10 @@ public AiSchedulingRequestDto build(SchedulePeriod period, Long runId, AiSchedul
 Implementation rules:
 
 - Default solver options: `(30, 1, 8)` if request options is null.
-- Validate `timeLimitSeconds` 1-300, `numWorkers` 1-64, `randomSeed >= 0`; throw `ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid solver options")`.
+- Validate integer `timeLimitSeconds` 1-300, `numWorkers` 1-64, `randomSeed >= 0`; throw `ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid solver options")`.
 - Parse hard/quota rule value by reading `ruleValueJson` object field `value` using `ObjectMapper.readTree`.
 - Throw `ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing scheduling rule: " + code)` for missing/inactive/unparseable rules.
-- Build active employee id set and active shift type id set.
+- Build active employee id set from `employeeRepository.findSchedulableForAi()` and active shift type id set from `shiftTypeRepository.findByStatus("ACTIVE")`.
 - Throw `400 No active employees to schedule` if no active employees.
 - Throw `400 No work shifts in period` if no work shifts.
 - Throw `400 Work shift <id> uses inactive shift type <id>` if any period work shift references inactive shift type.
@@ -334,6 +348,7 @@ Run: `git add backend/src/main/java/scheduling/scheduling/ai/AiSchedulingPayload
 - Create: `backend/src/main/java/scheduling/scheduling/ai/AiSchedulingClient.java`
 - Create: `backend/src/main/java/scheduling/scheduling/ai/RestClientAiSchedulingClient.java`
 - Create: `backend/src/main/java/scheduling/scheduling/ai/OptimizationRunRecorder.java`
+- Create: `backend/src/test/java/scheduling/scheduling/ai/OptimizationRunRecorderTransactionTest.java`
 
 - [ ] **Step 1: Implement client interface and exception**
 
@@ -364,7 +379,17 @@ public interface AiSchedulingClient {
 
 - [ ] **Step 2: Implement RestClient client**
 
-Use `@Value("${app.ai-service-url}") String aiServiceUrl`. POST to `/api/v1/scheduling/optimize`. Catch `RestClientException` and null body as `AiServiceException`. If response body is null, throw `AiServiceException("AI service returned empty response")`.
+Use `@Value("${app.ai-service-url}") String aiServiceUrl`. Build a `RestClient` with a `SimpleClientHttpRequestFactory` configured with 5-minute connect/read timeouts, then POST to `/api/v1/scheduling/optimize`. Catch `RestClientException` and null body as `AiServiceException`. If response body is null, throw `AiServiceException("AI service returned empty response")`. The client only handles transport/deserialization failures; semantic protocol validation happens in `AdminOptimizationService` after the run has been created, so a protocol-invalid body can be recorded as run `FAILED` before returning 502.
+
+```java
+SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+requestFactory.setConnectTimeout(Duration.ofSeconds(30));
+requestFactory.setReadTimeout(Duration.ofMinutes(5));
+this.restClient = RestClient.builder()
+        .baseUrl(aiServiceUrl)
+        .requestFactory(requestFactory)
+        .build();
+```
 
 - [ ] **Step 3: Implement run recorder**
 
@@ -381,17 +406,25 @@ public OptimizationRun finishSuccess(Long runId, AiSchedulingResponseDto respons
 public OptimizationRun finishFailure(Long runId, String status, String errorMessage, AiSchedulingResponseDto response)
 ```
 
-Set `startedAt` on start and `finishedAt` on finish with `LocalDateTime.now(clock)`. Serialize weights snapshot and penalty diagnostics with `ObjectMapper.writeValueAsString`. Truncate `errorMessage` to 2000 chars.
+Set `startedAt` on start and `finishedAt` on finish with `LocalDateTime.now(clock)`. Serialize weights snapshot and `response.penaltyDetails()` with `ObjectMapper.writeValueAsString` only when `response != null`; for transport/protocol failures where `response == null`, set `penaltyDetailsJson = null`. Truncate `errorMessage` to 2000 chars.
 
-- [ ] **Step 4: Compile**
+- [ ] **Step 4: Add transaction persistence test**
+
+Create `OptimizationRunRecorderTransactionTest` as a Spring Boot test using real repositories. Add an inner `@TestConfiguration` service that starts a run, calls `finishFailure(...)`, then throws `ResponseStatusException(HttpStatus.BAD_GATEWAY, "AI service unavailable")` from an outer `@Transactional` method. Assert after catching the exception that `optimizationRunRepository.findAll()` contains one run with `status = "FAILED"` and non-null `finishedAt`. This proves `REQUIRES_NEW` survives caller rollback.
+
+Run: `.\backend\mvnw.cmd -f backend/pom.xml -Dtest=OptimizationRunRecorderTransactionTest test`
+
+Expected: PASS.
+
+- [ ] **Step 5: Compile**
 
 Run: `.\backend\mvnw.cmd -f backend/pom.xml test -DskipTests`
 
 Expected: PASS compile.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
-Run: `git add backend/src/main/java/scheduling/scheduling/ai && git commit -m "feat: add AI scheduling client and run recorder"`
+Run: `git add backend/src/main/java/scheduling/scheduling/ai backend/src/test/java/scheduling/scheduling/ai/OptimizationRunRecorderTransactionTest.java && git commit -m "feat: add AI scheduling client and run recorder"`
 
 ## Task 5: Admin Optimization Service With TDD
 
@@ -432,7 +465,8 @@ Rules:
 - Call `optimizationRunRecorder.start(period, manager, payloadBuilder.weightsSnapshot(period, options))` to create and flush the run.
 - Call `payloadBuilder.build(period, run.getId(), options)` after run creation so the AI payload includes the persisted `runId`.
 - Call client and update run by AI status.
-- For `AiServiceException`, call recorder `finishFailure(run.id, "FAILED", ex.getMessage(), null)` then throw `ResponseStatusException(HttpStatus.BAD_GATEWAY, "AI service unavailable")`.
+- Validate response protocol before treating it as a normal AI outcome. Required checks: `schemaVersion == "1.0"`, `runId.equals(run.getId())`, `periodId.equals(period.getId())`, `status in ["SUCCESS", "INFEASIBLE", "FAILED"]`, `solverStatus in ["OPTIMAL", "FEASIBLE", "INFEASIBLE", "UNKNOWN", "MODEL_INVALID"]`, `assignments != null`, `penaltyDetails != null`, `warnings != null`, `diagnostics != null`, `statistics != null`, and for `SUCCESS`, `totalPenalty != null`. If validation fails, call `optimizationRunRecorder.finishFailure(run.getId(), "FAILED", "Invalid AI response: " + reason, null)` and throw `ResponseStatusException(HttpStatus.BAD_GATEWAY, "Invalid AI response")`.
+- For `AiServiceException`, call recorder `finishFailure(run.getId(), "FAILED", ex.getMessage(), null)` then throw `ResponseStatusException(HttpStatus.BAD_GATEWAY, "AI service unavailable")`.
 
 - [ ] **Step 4: Add failing outcome tests**
 
@@ -442,11 +476,12 @@ Add tests:
 @Test void optimizeReturnsInfeasibleAndStoresDiagnostics()
 @Test void optimizeReturnsFailedWhenAiReturnsFailedStatus()
 @Test void optimizeThrows502AndRecordsFailedRunWhenClientFails()
+@Test void optimizeThrows502AndRecordsFailedRunWhenAiResponseIsInvalid()
 @Test void optimizeRejectsNonDraftPeriodBeforeCreatingRun()
 @Test void optimizeRejectsMissingPeriod()
 ```
 
-Assertions: 502 path verifies `optimizationRunRecorder.finishFailure(...)` is called before exception. Non-DRAFT/missing period verifies recorder/client have no interactions.
+Assertions: 502 path verifies `optimizationRunRecorder.finishFailure(...)` is called before exception; committed persistence is covered by `OptimizationRunRecorderTransactionTest` in Task 4. Non-DRAFT/missing period verifies recorder/client have no interactions.
 
 - [ ] **Step 5: Run service tests**
 
