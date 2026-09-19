@@ -2,6 +2,8 @@ package scheduling.scheduling.entity;
 
 import lombok.*;
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -44,10 +46,12 @@ public class OptimizationRun extends BaseEntity {
     private String status;
 
     /** Soft-constraint weights used in objective function (w1..w5). */
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "weights_json", columnDefinition = "JSONB")
     private String weightsJson;
 
     /** Per-criterion penalty breakdown from the solver. */
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "penalty_details_json", columnDefinition = "JSONB")
     private String penaltyDetailsJson;
 
