@@ -327,7 +327,7 @@ Muc dich: cho nhan vien tu thao tac voi lich cua minh: xem profile, xem lich, xi
 
 Ket qua mong doi: nhan vien co the tu gui nhu cau/lien quan lich; manager va AI co du input thuc te de lap lich hop ly.
 
-- [ ] API nhan vien xem profile ca nhan
+- [x] API nhan vien xem profile ca nhan (da xong: dung GET /api/auth/me)
   - Dung de nhan vien xem thong tin account/employee cua minh.
   - Ho tro man hinh ca nhan tren frontend.
 - [x] API nhan vien xem lich cua minh (da xong: employee sees own PUBLISHED schedule)
@@ -354,19 +354,19 @@ Ket qua mong doi: nhan vien co the tu gui nhu cau/lien quan lich; manager va AI 
 - [x] API cap nhat nguyen vong pending
   - Dung de sua preference truoc khi lich duoc tao/duyet.
   - Giam data sai dua vao AI.
-- [ ] API gui yeu cau doi ca
+- [x] API gui yeu cau doi ca (da xong: POST /api/employee/swap-requests + target respond + manager approve/reject, status-only)
   - Dung de nhan vien de xuat doi assignment voi nguoi khac.
   - Ho tro workflow doi ca co phe duyet.
-- [ ] API xem yeu cau doi ca lien quan den minh
+- [x] API xem yeu cau doi ca lien quan den minh (da xong: GET /api/employee/swap-requests + GET /api/admin/swap-requests)
   - Dung de nhan vien xem request do minh tao hoac duoc yeu cau.
   - La nen tang cho UI xu ly doi ca.
-- [ ] Test leave request flow
+- [x] Test leave request flow (da xong: EmployeeLeaveRequest*Test pass trong full suite)
   - Kiem tra tao/xem/huy don nghi va status.
   - Dam bao ngay nghi sau nay dung trong scheduling.
-- [ ] Test preference flow
+- [x] Test preference flow (da xong: EmployeePreference*Test pass trong full suite)
   - Kiem tra tao/xem/sua preference.
   - Dam bao soft constraint input hop le.
-- [ ] Test swap request flow
+- [x] Test swap request flow (da xong: EmployeeSwapRequest*Test + AdminSwapRequest*Test)
   - Kiem tra tao/xem yeu cau doi ca.
   - Dam bao workflow doi ca khong lam hong assignment.
 

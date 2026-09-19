@@ -25,6 +25,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import scheduling.scheduling.auth.dto.AccountResponse;
 import scheduling.scheduling.auth.dto.ActivationStateResponse;
 import scheduling.scheduling.auth.dto.AuthResponse;
+import scheduling.scheduling.auth.dto.EmployeeResponse;
 import scheduling.scheduling.auth.dto.LoginRequest;
 import scheduling.scheduling.auth.dto.LoginStateResponse;
 import scheduling.scheduling.auth.dto.MeResponse;
@@ -349,5 +350,27 @@ class AuthControllerTest {
                 .build();
         account.setId(id);
         return account;
+    }
+
+    @Test
+    void meReturnsEmployeeProfileForEmployee() throws Exception {
+        CurrentAccountPrincipal principal = new CurrentAccountPrincipal(42L, "employee01", AccountRole.EMPLOYEE);
+        when(jwtService.parseAccessToken("valid-access-token")).thenReturn(principal);
+        when(accountRepository.findById(42L)).thenReturn(Optional.of(account(42L, "employee01", AccountRole.EMPLOYEE, AccountStatus.ACTIVE, true)));
+        when(authService.me(principal)).thenReturn(new MeResponse(
+                new AccountResponse(42L, "employee01", AccountRole.EMPLOYEE),
+                new EmployeeResponse(7L, "NV007", "Nguyen Van A", "a@example.com", "0900000007", "ACTIVE")));
+
+        mockMvc.perform(get("/api/auth/me")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer valid-access-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.account.id").value(42))
+                .andExpect(jsonPath("$.employee.id").value(7))
+                .andExpect(jsonPath("$.employee.employeeCode").value("NV007"))
+                .andExpect(jsonPath("$.employee.fullName").value("Nguyen Van A"))
+                .andExpect(jsonPath("$.employee.email").value("a@example.com"))
+                .andExpect(jsonPath("$.employee.phone").value("0900000007"))
+                .andExpect(jsonPath("$.employee.status").value("ACTIVE"));
+        verify(authService).me(principal);
     }
 }
