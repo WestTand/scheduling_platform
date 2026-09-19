@@ -238,4 +238,133 @@ class EmployeeSwapRequestServiceTest {
 
         verify(swapRequestRepository, never()).save(any());
     }
+
+    @Test
+    void createSwapRequestRejectsMissingTargetEmployee() {
+        CurrentAccountPrincipal principal = employeePrincipal();
+        Employee requester = employee(7L, "ACTIVE");
+        when(accountRepository.findByIdForUpdate(ACCOUNT_ID))
+                .thenReturn(Optional.of(account(principal, requester)));
+        when(shiftAssignmentRepository.findDetailById(100L))
+                .thenReturn(Optional.of(assignment(100L, requester, "PUBLISHED")));
+        when(employeeRepository.findById(9L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.createSwapRequest(
+                principal, new CreateSwapRequestRequest(100L, 9L, null, null)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+
+        verify(swapRequestRepository, never()).save(any());
+    }
+
+    @Test
+    void createSwapRequestRejectsMissingTargetAssignment() {
+        CurrentAccountPrincipal principal = employeePrincipal();
+        Employee requester = employee(7L, "ACTIVE");
+        when(accountRepository.findByIdForUpdate(ACCOUNT_ID))
+                .thenReturn(Optional.of(account(principal, requester)));
+        when(shiftAssignmentRepository.findDetailById(100L))
+                .thenReturn(Optional.of(assignment(100L, requester, "PUBLISHED")));
+        when(employeeRepository.findById(9L)).thenReturn(Optional.of(employee(9L, "ACTIVE")));
+        when(shiftAssignmentRepository.findDetailById(200L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.createSwapRequest(
+                principal, new CreateSwapRequestRequest(100L, 9L, 200L, null)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+
+        verify(swapRequestRepository, never()).save(any());
+    }
+
+    @Test
+    void createSwapRequestRejectsTargetAssignmentOutsidePublishedPeriod() {
+        CurrentAccountPrincipal principal = employeePrincipal();
+        Employee requester = employee(7L, "ACTIVE");
+        Employee target = employee(9L, "ACTIVE");
+        when(accountRepository.findByIdForUpdate(ACCOUNT_ID))
+                .thenReturn(Optional.of(account(principal, requester)));
+        when(shiftAssignmentRepository.findDetailById(100L))
+                .thenReturn(Optional.of(assignment(100L, requester, "PUBLISHED")));
+        when(employeeRepository.findById(9L)).thenReturn(Optional.of(target));
+        when(shiftAssignmentRepository.findDetailById(200L))
+                .thenReturn(Optional.of(assignment(200L, target, "APPROVED")));
+
+        assertThatThrownBy(() -> service.createSwapRequest(
+                principal, new CreateSwapRequestRequest(100L, 9L, 200L, null)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(swapRequestRepository, never()).save(any());
+    }
+
+    @Test
+    void createSwapRequestRejectsTargetAssignmentEqualToRequesterAssignment() {
+        CurrentAccountPrincipal principal = employeePrincipal();
+        Employee requester = employee(7L, "ACTIVE");
+        when(accountRepository.findByIdForUpdate(ACCOUNT_ID))
+                .thenReturn(Optional.of(account(principal, requester)));
+        when(shiftAssignmentRepository.findDetailById(100L))
+                .thenReturn(Optional.of(assignment(100L, requester, "PUBLISHED")));
+        when(employeeRepository.findById(9L)).thenReturn(Optional.of(employee(9L, "ACTIVE")));
+
+        assertThatThrownBy(() -> service.createSwapRequest(
+                principal, new CreateSwapRequestRequest(100L, 9L, 100L, null)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(swapRequestRepository, never()).save(any());
+    }
+
+    @Test
+    void createSwapRequestTrimsBlankReasonToNull() {
+        CurrentAccountPrincipal principal = employeePrincipal();
+        Employee requester = employee(7L, "ACTIVE");
+        Employee target = employee(9L, "ACTIVE");
+        when(accountRepository.findByIdForUpdate(ACCOUNT_ID))
+                .thenReturn(Optional.of(account(principal, requester)));
+        when(shiftAssignmentRepository.findDetailById(100L))
+                .thenReturn(Optional.of(assignment(100L, requester, "PUBLISHED")));
+        when(employeeRepository.findById(9L)).thenReturn(Optional.of(target));
+        when(swapRequestRepository.save(any(SwapRequest.class))).thenAnswer(invocation -> {
+            SwapRequest saved = invocation.getArgument(0);
+            saved.setId(51L);
+            return saved;
+        });
+
+        SwapRequestResponse response = service.createSwapRequest(
+                principal, new CreateSwapRequestRequest(100L, 9L, null, "   "));
+
+        assertThat(response.reason()).isNull();
+        assertThat(response.status()).isEqualTo("PENDING_TARGET");
+    }
+
+    @Test
+    void createSwapRequestAcceptsValidTargetAssignment() {
+        CurrentAccountPrincipal principal = employeePrincipal();
+        Employee requester = employee(7L, "ACTIVE");
+        Employee target = employee(9L, "ACTIVE");
+        when(accountRepository.findByIdForUpdate(ACCOUNT_ID))
+                .thenReturn(Optional.of(account(principal, requester)));
+        when(shiftAssignmentRepository.findDetailById(100L))
+                .thenReturn(Optional.of(assignment(100L, requester, "PUBLISHED")));
+        when(employeeRepository.findById(9L)).thenReturn(Optional.of(target));
+        when(shiftAssignmentRepository.findDetailById(200L))
+                .thenReturn(Optional.of(assignment(200L, target, "PUBLISHED")));
+        when(swapRequestRepository.save(any(SwapRequest.class))).thenAnswer(invocation -> {
+            SwapRequest saved = invocation.getArgument(0);
+            saved.setId(52L);
+            return saved;
+        });
+
+        SwapRequestResponse response = service.createSwapRequest(
+                principal, new CreateSwapRequestRequest(100L, 9L, 200L, "Swap shifts"));
+
+        assertThat(response.id()).isEqualTo(52L);
+        assertThat(response.targetAssignmentId()).isEqualTo(200L);
+        assertThat(response.status()).isEqualTo("PENDING_TARGET");
+    }
 }
