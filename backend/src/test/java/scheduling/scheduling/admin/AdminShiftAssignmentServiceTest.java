@@ -17,12 +17,14 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import scheduling.scheduling.admin.dto.AdminPeriodScheduleResponse;
 import scheduling.scheduling.admin.dto.AdminShiftAssignmentResponse;
 import scheduling.scheduling.admin.dto.CreateShiftAssignmentRequest;
+import scheduling.scheduling.admin.dto.UpdateShiftAssignmentRequest;
 import scheduling.scheduling.auth.CurrentAccountPrincipal;
 import scheduling.scheduling.employee.dto.EmployeeScheduleItemResponse;
 import scheduling.scheduling.entity.Account;
@@ -31,6 +33,7 @@ import scheduling.scheduling.entity.AccountStatus;
 import scheduling.scheduling.entity.Employee;
 import scheduling.scheduling.entity.LeaveRequest;
 import scheduling.scheduling.entity.SchedulePeriod;
+import scheduling.scheduling.entity.SchedulingRule;
 import scheduling.scheduling.entity.ShiftAssignment;
 import scheduling.scheduling.entity.ShiftType;
 import scheduling.scheduling.entity.WorkShift;
@@ -38,6 +41,7 @@ import scheduling.scheduling.repository.AccountRepository;
 import scheduling.scheduling.repository.EmployeeRepository;
 import scheduling.scheduling.repository.LeaveRequestRepository;
 import scheduling.scheduling.repository.SchedulePeriodRepository;
+import scheduling.scheduling.repository.SchedulingRuleRepository;
 import scheduling.scheduling.repository.ShiftAssignmentRepository;
 import scheduling.scheduling.repository.WorkShiftRepository;
 
@@ -49,11 +53,19 @@ class AdminShiftAssignmentServiceTest {
     private final EmployeeRepository employeeRepository = mock(EmployeeRepository.class);
     private final LeaveRequestRepository leaveRequestRepository = mock(LeaveRequestRepository.class);
     private final AccountRepository accountRepository = mock(AccountRepository.class);
+    private final SchedulingRuleRepository schedulingRuleRepository = mock(SchedulingRuleRepository.class);
     private static final Clock FIXED_CLOCK =
             Clock.fixed(Instant.parse("2026-09-17T00:00:00Z"), ZoneOffset.UTC);
     private final AdminShiftAssignmentService service = new AdminShiftAssignmentService(
             shiftAssignmentRepository, workShiftRepository, schedulePeriodRepository,
-            employeeRepository, leaveRequestRepository, accountRepository, FIXED_CLOCK);
+            employeeRepository, leaveRequestRepository, accountRepository,
+            schedulingRuleRepository, FIXED_CLOCK);
+
+    @BeforeEach
+    void setUpSchedulingRules() {
+        when(schedulingRuleRepository.findByRuleCode("MAX_WORK_HOURS_PER_DAY"))
+                .thenReturn(Optional.of(maxWorkHoursRule(12)));
+    }
 
     @Test
     void managerAssignsActiveEmployee() {
@@ -224,6 +236,7 @@ class AdminShiftAssignmentServiceTest {
         CurrentAccountPrincipal principal = managerPrincipal();
         Employee employee = employee(7L, "NV007", "Nguyen Van A");
         ShiftAssignment touching = assignment(503L, lateShift(), employee, false);
+        touching.getWorkShift().getShiftType().setDurationHours(new BigDecimal("4.0"));
         when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
         when(workShiftRepository.findDetailById(200L)).thenReturn(Optional.of(workShift()));
         when(employeeRepository.findById(7L)).thenReturn(Optional.of(employee));
@@ -246,6 +259,61 @@ class AdminShiftAssignmentServiceTest {
                 principal, 200L, new CreateShiftAssignmentRequest(7L));
 
         assertThat(response.id()).isEqualTo(504L);
+    }
+
+    @Test
+    void assignRejectsWhenDailyWorkHoursWouldBeExceeded() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        Employee employee = employee(7L, "NV007", "Nguyen Van A");
+        ShiftAssignment existing = assignment(503L, lateShift(), employee, false);
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(workShiftRepository.findDetailById(200L)).thenReturn(Optional.of(workShift()));
+        when(employeeRepository.findById(7L)).thenReturn(Optional.of(employee));
+        when(shiftAssignmentRepository.existsByWorkShiftIdAndEmployeeId(200L, 7L)).thenReturn(false);
+        when(shiftAssignmentRepository.countByWorkShiftId(200L)).thenReturn(0L);
+        when(leaveRequestRepository.searchForEmployee(7L, "APPROVED",
+                LocalDate.of(2026, 9, 14), LocalDate.of(2026, 9, 14)))
+                .thenReturn(List.of());
+        when(shiftAssignmentRepository.findForEmployeeInWindow(7L,
+                LocalDate.of(2026, 9, 13), LocalDate.of(2026, 9, 15)))
+                .thenReturn(List.of(existing));
+
+        assertThatThrownBy(() -> service.createAssignment(
+                principal, 200L, new CreateShiftAssignmentRequest(7L)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getReason())
+                .isEqualTo("Employee exceeds maximum work hours per day");
+
+        verify(shiftAssignmentRepository, never()).save(any());
+    }
+
+    @Test
+    void managerUpdatesAssignmentEmployee() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        Employee oldEmployee = employee(7L, "NV007", "Nguyen Van A");
+        Employee newEmployee = employee(8L, "NV008", "Tran Thi B");
+        ShiftAssignment assignment = assignment(500L, workShift(), oldEmployee, true);
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(shiftAssignmentRepository.findDetailById(500L)).thenReturn(Optional.of(assignment));
+        when(employeeRepository.findById(8L)).thenReturn(Optional.of(newEmployee));
+        when(shiftAssignmentRepository.existsByWorkShiftIdAndEmployeeId(200L, 8L)).thenReturn(false);
+        when(leaveRequestRepository.searchForEmployee(8L, "APPROVED",
+                LocalDate.of(2026, 9, 14), LocalDate.of(2026, 9, 14)))
+                .thenReturn(List.of());
+        when(shiftAssignmentRepository.findForEmployeeInWindow(8L,
+                LocalDate.of(2026, 9, 13), LocalDate.of(2026, 9, 15)))
+                .thenReturn(List.of());
+        when(shiftAssignmentRepository.save(any(ShiftAssignment.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        AdminShiftAssignmentResponse response = service.updateAssignment(
+                principal, 500L, new UpdateShiftAssignmentRequest(8L));
+
+        assertThat(response.id()).isEqualTo(500L);
+        assertThat(response.employeeId()).isEqualTo(8L);
+        assertThat(response.employeeCode()).isEqualTo("NV008");
+        assertThat(response.locked()).isTrue();
+        assertThat(assignment.getAssignedSource()).isEqualTo("MANUAL");
     }
 
     @Test
@@ -683,6 +751,16 @@ class AdminShiftAssignmentServiceTest {
                 .build();
         shift.setId(200L);
         return shift;
+    }
+
+    private static SchedulingRule maxWorkHoursRule(int value) {
+        return SchedulingRule.builder()
+                .ruleCode("MAX_WORK_HOURS_PER_DAY")
+                .ruleName("Maximum work hours per day")
+                .ruleType("HARD")
+                .ruleValueJson("{\"value\":" + value + "}")
+                .active(true)
+                .build();
     }
 
     private static WorkShift eveningShift() {
