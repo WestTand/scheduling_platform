@@ -90,18 +90,65 @@ public class EmployeeSwapRequestService {
 
     @Transactional(readOnly = true)
     public List<SwapRequestResponse> listSwapRequests(CurrentAccountPrincipal principal, String status) {
-        throw new ResponseStatusException(HttpStatus.NOT_IMPLEMENTED, "Not implemented yet");
+        Employee employee = employeeAccess.requireActiveEmployee(principal);
+        String normalizedStatus = normalizeStatus(status);
+        return swapRequestRepository.findRelatedForEmployee(employee.getId(), normalizedStatus).stream()
+                .map(SwapRequestResponse::from)
+                .toList();
     }
 
     @Transactional
     public SwapRequestResponse cancelSwapRequest(CurrentAccountPrincipal principal, Long swapRequestId) {
-        throw new ResponseStatusException(HttpStatus.NOT_IMPLEMENTED, "Not implemented yet");
+        Employee employee = employeeAccess.requireActiveEmployee(principal);
+        SwapRequest swapRequest = findVisibleToRequester(swapRequestId, employee.getId());
+        if (!PENDING_TARGET.equals(swapRequest.getStatus())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Swap request is not pending target response");
+        }
+        swapRequest.setStatus(CANCELLED);
+        return SwapRequestResponse.from(swapRequestRepository.save(swapRequest));
     }
 
     @Transactional
     public SwapRequestResponse respondSwapRequest(
             CurrentAccountPrincipal principal, Long swapRequestId, RespondSwapRequestRequest request) {
-        throw new ResponseStatusException(HttpStatus.NOT_IMPLEMENTED, "Not implemented yet");
+        if (request == null) {
+            throw invalidRequest();
+        }
+        Employee employee = employeeAccess.requireActiveEmployee(principal);
+        SwapRequest swapRequest = swapRequestRepository.findDetailById(swapRequestId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Swap request not found"));
+        if (!employee.getId().equals(swapRequest.getTargetEmployee().getId())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Swap request not found");
+        }
+        if (!PENDING_TARGET.equals(swapRequest.getStatus())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Swap request is not pending target response");
+        }
+        swapRequest.setStatus(Boolean.TRUE.equals(request.accept()) ? PENDING_APPROVAL : REJECTED);
+        return SwapRequestResponse.from(swapRequestRepository.save(swapRequest));
+    }
+
+    private SwapRequest findVisibleToRequester(Long swapRequestId, Long employeeId) {
+        SwapRequest swapRequest = swapRequestRepository.findDetailById(swapRequestId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Swap request not found"));
+        if (!employeeId.equals(swapRequest.getRequesterAssignment().getEmployee().getId())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Swap request not found");
+        }
+        return swapRequest;
+    }
+
+    private static String normalizeStatus(String status) {
+        if (!StringUtils.hasText(status)) {
+            return null;
+        }
+        String normalized = status.trim();
+        if (!PENDING_TARGET.equals(normalized) && !PENDING_APPROVAL.equals(normalized)
+                && !APPROVED.equals(normalized) && !REJECTED.equals(normalized)
+                && !CANCELLED.equals(normalized)) {
+            throw invalidRequest();
+        }
+        return normalized;
     }
 
     private static void requirePublished(ShiftAssignment assignment) {
