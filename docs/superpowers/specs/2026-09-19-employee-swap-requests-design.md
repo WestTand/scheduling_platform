@@ -56,7 +56,7 @@ Tất cả response lỗi dùng `ResponseStatusException` theo convention hiện
 | POST | `/api/employee/swap-requests` | `CreateSwapRequestRequest` | `201` + `SwapRequestResponse` (`PENDING_TARGET`) | Requester là employee sở hữu `requesterAssignmentId` |
 | GET | `/api/employee/swap-requests` | `?status=` optional | `200` + list | Các request mình gửi HOẶC mình là target |
 | POST | `/api/employee/swap-requests/{id}/cancel` | — | `200` + response (`CANCELLED`) | Chỉ requester, chỉ khi `PENDING_TARGET` |
-| POST | `/api/employee/swap-requests/{id}/respond` | `RespondSwapRequestRequest(accept)` | `200` + response | Chỉ target, chỉ khi `PENDING_TARGET`; `accept=true → PENDING_APPROVAL`, `false → REJECTED` |
+| POST | `/api/employee/swap-requests/{id}/respond` | `RespondSwapRequestRequest(accept)` | `200` + response | Chỉ target, chỉ khi `PENDING_TARGET`; `accept=true → PENDING_APPROVAL`, `false → REJECTED`. `accept` là `Boolean` với `@NotNull` (thiếu field → `400`), không dùng primitive `boolean` để tránh mặc định `false` thành reject vô tình |
 
 `CreateSwapRequestRequest`:
 
@@ -100,7 +100,7 @@ Tất cả response lỗi dùng `ResponseStatusException` theo convention hiện
 
 Mới:
 
-- `backend/.../repository/SwapRequestRepository.java` — `findDetailById`, `findRelatedForEmployee(employeeId, status?)`, `findAllDetail(status?)` cho admin list (fetch join assignment/employee/target/reviewer, `order by id desc` để thứ tự deterministic; `BaseEntity` không có `createdAt`).
+- `backend/.../repository/SwapRequestRepository.java` — `findDetailById`, `findRelatedForEmployee(employeeId, status?)`, `findAllDetail(status?)` cho admin list (`join fetch` assignment/workShift/period/employee/target, `left join fetch` `targetAssignment` vì nullable để không mất request cover-only, fetch `reviewedBy`; `order by id desc` để thứ tự deterministic; `BaseEntity` không có `createdAt`).
 - `backend/.../employee/dto/CreateSwapRequestRequest.java`, `RespondSwapRequestRequest.java`, `SwapRequestResponse.java` (có `from(SwapRequest)` mapper, map trong transaction).
 - `backend/.../employee/EmployeeSwapRequestService.java` — dùng `EmployeeAccess` + repositories (không cần `Clock`; employee flow không set thời gian).
 - `backend/.../employee/EmployeeSwapRequestController.java`.
@@ -110,6 +110,7 @@ Mới:
 
 Sửa:
 
+- `backend/.../entity/SwapRequest.java` — chỉ cập nhật JavaDoc comment status flow thêm `CANCELLED` (không đổi annotation/schema; cột `status` là string tự do).
 - `docs/project_plan.md` — tick các mục Phase 4 kèm ghi chú đã xong: profile (dùng `/api/auth/me`), gửi/xem swap (sau khi API + tests mới pass), `Test leave request flow` và `Test preference flow` (sau khi full suite xác nhận tests hiện có pass — plan đang stale), `Test swap request flow` (sau khi tests mới pass).
 
 ## 7. Testing Plan
