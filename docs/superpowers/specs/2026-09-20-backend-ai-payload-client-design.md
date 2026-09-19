@@ -27,7 +27,7 @@ Manager gọi một endpoint duy nhất để chạy AI scheduling cho một `Sc
 - `POST /api/admin/schedule-periods/{periodId}/optimize`, `@PreAuthorize("hasRole('MANAGER')")`.
 - Period không tồn tại → `404 Schedule period not found`.
 - Period không ở `DRAFT` → `400 Only DRAFT periods can be optimized`.
-- Request body: object rỗng/optional `solverOptions` (`timeLimitSeconds`, `randomSeed`, `numWorkers`); nếu null dùng default của AI schema (`30`, `1`, `8`). Validation range theo AI schema (`timeLimitSeconds` 0–300, `numWorkers` 1–64, `randomSeed` >= 0), sai → `400`.
+- Request body: object rỗng/optional `solverOptions` (`timeLimitSeconds`, `randomSeed`, `numWorkers`); nếu null dùng default của AI schema (`30`, `1`, `8`). Validation range theo AI schema (`timeLimitSeconds` 1–300, `numWorkers` 1–64, `randomSeed` >= 0), sai → `400`.
 
 ### 3.2 Payload builder
 
@@ -41,9 +41,9 @@ Manager gọi một endpoint duy nhất để chạy AI scheduling cho một `Sc
   - `overnight`, `heavy`, `minStaff`, `maxStaff` giữ nguyên.
   - `quotaCategory`: backend `REGULAR` → AI `null`; `OVERTIME`, `BATHING`, `ON_CALL` → giữ nguyên (contract đã chốt trong project plan).
   - Không gửi `penaltyWeightMultiplier` (AI schema 1.0 chưa dùng).
-- `workShifts`: mọi work shift thuộc period. Map `workShiftId`, `shiftTypeId`, `workDate`, `startsAt`, `endsAt` (persisted values, `OffsetDateTime` → aware datetime), `requiredStaff`.
+- `workShifts`: mọi work shift thuộc period có shift type active. Map `workShiftId`, `shiftTypeId`, `workDate`, `startsAt`, `endsAt` (persisted values, `OffsetDateTime` → aware datetime), `requiredStaff`.
 - `approvedLeaves`: leave request `status = APPROVED` overlap period (`startDate <= period.endDate && endDate >= period.startDate`).
-- `preferences`: preference trong period (`preferenceDate` trong `[startDate, endDate]`). Chỉ gửi preference của employee active và shift type active (nếu `shiftType` null vẫn gửi với `shiftTypeId = null`).
+- `preferences`: preference trong period (`preferenceDate` trong `[startDate, endDate]`) và `status in (PENDING, APPROVED)` (cùng semantics active với duplicate checks hiện có). Chỉ gửi preference của employee active và shift type active (nếu `shiftType` null vẫn gửi với `shiftTypeId = null`).
 - `lockedAssignments`: assignment thuộc period có `locked = true`. Map `assignmentId`, `employeeId`, `workShiftId`.
 - `boundaryAssignments`: **không gửi trong Slice 6A** (để trống list). Lý do: boundary assignments phục vụ rest/quota liên kỳ, cần design riêng ở slice sau; gửi sai còn nguy hiểm hơn không gửi.
 - `rules`: đọc từ `SchedulingRule` active theo rule codes hiện có:
@@ -53,11 +53,14 @@ Manager gọi một endpoint duy nhất để chạy AI scheduling cho một `Sc
   - Rule thiếu/inactive/unparseable → `400` với reason rõ ràng, ví dụ `Missing scheduling rule: MAX_WORK_HOURS_PER_DAY`. Không dùng default âm thầm (trừ khi rule vốn optional — trong slice này mọi rule trên đều required).
 - `solverOptions`: từ request body hoặc default AI schema.
 
-Pre-call validations (trước khi gọi AI, sau khi tạo run? xem §3.4):
+Pre-call validations (trước khi tạo `OptimizationRun` và trước khi gọi AI; xem §3.4):
 
 - Không có active employee → `400 No active employees to schedule`.
-- Không có work shift trong period → `400 No work shifts in period`.
+- Không có work shift schedulable trong period → `400 No work shifts in period`.
 - Work shift thiếu `startsAt`/`endsAt` → `400 Work shift <id> is missing time window` (AI schema bắt buộc aware datetime; không derive fallback trong slice này).
+- Nếu có work shift thuộc period trỏ tới shift type không active → `400 Work shift <id> uses inactive shift type <id>` (không gửi payload thiếu master reference).
+- Nếu có locked assignment trỏ tới employee không active hoặc work shift bị loại vì inactive shift type → `400 Locked assignment <id> references inactive scheduling data` (locked assignment không được âm thầm drop).
+- Approved leave/preference của employee không active được bỏ qua vì employee đó không thể được AI xếp lịch trong run hiện tại.
 
 ### 3.3 AI client
 
@@ -77,7 +80,7 @@ Pre-call validations (trước khi gọi AI, sau khi tạo run? xem §3.4):
    - `SUCCESS` → run `SUCCESS`, `finishedAt`, `totalPenalty`, `penaltyDetailsJson`; trả `200` + response (run id, period id, aiStatus, totalPenalty, assignments count, warnings; **không** trả full assignments list nếu lớn — chỉ trả count; chi tiết xem §4).
    - `INFEASIBLE` → run `INFEASIBLE`, `finishedAt`, `errorMessage` (tổng hợp từ `diagnostics` + `errorMessage` của AI, cắt 2000 chars); trả `200`.
    - `FAILED` (AI response hợp lệ) → run `FAILED`, tương tự; trả `200`.
-   - Exception/timeout/4xx/5xx/invalid body → run `FAILED` với `errorMessage`, `finishedAt`; throw `502 Bad Gateway` (`ResponseStatusException`).
+   - Exception/timeout/4xx/5xx/invalid body → run `FAILED` với `errorMessage`, `finishedAt`; persist failed run in a transaction that will not roll back, then throw `502 Bad Gateway` (`ResponseStatusException`). Implementation must use either a small `OptimizationRunRecorder` with `REQUIRES_NEW` transactions or an equivalent `@Transactional(noRollbackFor = ResponseStatusException.class)` design. The test must prove the failed run remains committed after the 502 path.
 6. Không mutate `ShiftAssignment` trong mọi path.
 
 `weightsJson`: snapshot JSON gồm rules đã resolve (hard + quotas + soft weights) và solver options. Không lưu full payload (có thể lớn); payload có thể reconstruct từ DB + run.
@@ -137,8 +140,8 @@ Sửa:
 ## 7. Testing Plan
 
 - TDD cho builder/service theo skill `test-driven-development`.
-- Payload mapping tests: active-only filtering, quota mapping `REGULAR → null`, persisted windows passthrough, approved-leave overlap, preference range, locked filter, rules resolve + missing-rule 400.
-- Service tests với mocked client: SUCCESS/INFEASIBLE/FAILED/client-exception paths, run persistence assertions, 502 behavior, no-assignment-mutation (verify `shiftAssignmentRepository` không có `save`, hoặc đơn giản là service không inject assignment repo).
+- Payload mapping tests: active-only filtering, inactive referenced shift type 400, inactive locked-assignment reference 400, cancelled/rejected preferences excluded, quota mapping `REGULAR → null`, persisted windows passthrough, approved-leave overlap, preference range, locked filter, rules resolve + missing-rule 400.
+- Service tests với mocked client: SUCCESS/INFEASIBLE/FAILED/client-exception paths, run persistence assertions, 502 behavior with failed run still committed, no-assignment-mutation (verify `shiftAssignmentRepository` không có `save`, hoặc đơn giản là service không inject assignment repo).
 - Controller tests: route, 200/400/404/502, role guard.
 - Regression: full backend suite `.\backend\mvnw.cmd -f backend/pom.xml test`, `git diff --check`.
 
