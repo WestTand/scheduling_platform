@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -77,13 +78,14 @@ class AdminOptimizationServiceTest {
                 new AiSchedulingResponseDto.StatisticsDto(new BigDecimal("1.5"), 0, 10));
         OptimizationRun startedRun = startedRun(900L, period, manager);
         OptimizationRun finishedRun = finishedRun(900L, period, manager, "SUCCESS");
+        AiSchedulingPayloadBuilder.PayloadSnapshot snapshot = testSnapshot();
 
         when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
         when(schedulePeriodRepository.findDetailById(5L)).thenReturn(Optional.of(period));
-        when(payloadBuilder.prepareSnapshot(eq(period), eq(null))).thenReturn(testSnapshot());
-        when(payloadBuilder.weightsSnapshotFrom(any())).thenReturn(weights);
+        when(payloadBuilder.prepareSnapshot(eq(period), eq(null))).thenReturn(snapshot);
+        when(payloadBuilder.weightsSnapshotFrom(same(snapshot))).thenReturn(weights);
         when(optimizationRunRecorder.start(eq(period), eq(manager), eq(weights))).thenReturn(startedRun);
-        when(payloadBuilder.buildFrom(any(), eq(period), eq(900L))).thenReturn(payload);
+        when(payloadBuilder.buildFrom(same(snapshot), eq(period), eq(900L))).thenReturn(payload);
         when(aiSchedulingClient.optimize(eq(payload))).thenReturn(aiResponse);
         when(optimizationRunRecorder.finishSuccess(eq(900L), eq(aiResponse))).thenReturn(finishedRun);
 
@@ -101,8 +103,9 @@ class AdminOptimizationServiceTest {
 
         InOrder inOrder = inOrder(payloadBuilder, optimizationRunRecorder, aiSchedulingClient);
         inOrder.verify(payloadBuilder).prepareSnapshot(eq(period), eq(null));
+        inOrder.verify(payloadBuilder).weightsSnapshotFrom(same(snapshot));
         inOrder.verify(optimizationRunRecorder).start(eq(period), eq(manager), eq(weights));
-        inOrder.verify(payloadBuilder).buildFrom(any(), eq(period), eq(900L));
+        inOrder.verify(payloadBuilder).buildFrom(same(snapshot), eq(period), eq(900L));
         inOrder.verify(aiSchedulingClient).optimize(eq(payload));
         inOrder.verify(optimizationRunRecorder).finishSuccess(eq(900L), eq(aiResponse));
         verify(accountRepository).findById(1L);

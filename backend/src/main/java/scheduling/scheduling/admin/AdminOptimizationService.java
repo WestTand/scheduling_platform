@@ -125,7 +125,7 @@ public class AdminOptimizationService {
                 // Do not mask the original failure if the safety-net recording itself fails.
                 log.warn("Failed to record failed optimization run {}", run.getId(), recordingFailure);
             }
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "AI service unavailable");
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "AI service unavailable", ex);
         }
     }
 
