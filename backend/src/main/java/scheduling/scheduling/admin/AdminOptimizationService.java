@@ -62,12 +62,12 @@ public class AdminOptimizationService {
         AiSchedulingRequestDto.SolverOptionsDto options =
                 request == null || request.solverOptions() == null ? null : request.solverOptions();
 
-        payloadBuilder.validateInputs(period, options);
+        AiSchedulingPayloadBuilder.PayloadSnapshot snapshot = payloadBuilder.prepareSnapshot(period, options);
 
-        Map<String, Object> weights = payloadBuilder.weightsSnapshot(period, options);
+        Map<String, Object> weights = payloadBuilder.weightsSnapshotFrom(snapshot);
         OptimizationRun run = optimizationRunRecorder.start(period, manager, weights);
 
-        AiSchedulingRequestDto payload = payloadBuilder.build(period, run.getId(), options);
+        AiSchedulingRequestDto payload = payloadBuilder.buildFrom(snapshot, period, run.getId());
 
         AiSchedulingResponseDto response;
         try {

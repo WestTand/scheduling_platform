@@ -6,8 +6,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -82,10 +80,10 @@ class AdminOptimizationServiceTest {
 
         when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
         when(schedulePeriodRepository.findDetailById(5L)).thenReturn(Optional.of(period));
-        doNothing().when(payloadBuilder).validateInputs(eq(period), eq(null));
-        when(payloadBuilder.weightsSnapshot(eq(period), eq(null))).thenReturn(weights);
+        when(payloadBuilder.prepareSnapshot(eq(period), eq(null))).thenReturn(testSnapshot());
+        when(payloadBuilder.weightsSnapshotFrom(any())).thenReturn(weights);
         when(optimizationRunRecorder.start(eq(period), eq(manager), eq(weights))).thenReturn(startedRun);
-        when(payloadBuilder.build(eq(period), eq(900L), eq(null))).thenReturn(payload);
+        when(payloadBuilder.buildFrom(any(), eq(period), eq(900L))).thenReturn(payload);
         when(aiSchedulingClient.optimize(eq(payload))).thenReturn(aiResponse);
         when(optimizationRunRecorder.finishSuccess(eq(900L), eq(aiResponse))).thenReturn(finishedRun);
 
@@ -102,9 +100,9 @@ class AdminOptimizationServiceTest {
         assertThat(response.finishedAt()).isEqualTo(LocalDateTime.of(2026, 9, 21, 9, 1));
 
         InOrder inOrder = inOrder(payloadBuilder, optimizationRunRecorder, aiSchedulingClient);
-        inOrder.verify(payloadBuilder).validateInputs(eq(period), eq(null));
+        inOrder.verify(payloadBuilder).prepareSnapshot(eq(period), eq(null));
         inOrder.verify(optimizationRunRecorder).start(eq(period), eq(manager), eq(weights));
-        inOrder.verify(payloadBuilder).build(eq(period), eq(900L), eq(null));
+        inOrder.verify(payloadBuilder).buildFrom(any(), eq(period), eq(900L));
         inOrder.verify(aiSchedulingClient).optimize(eq(payload));
         inOrder.verify(optimizationRunRecorder).finishSuccess(eq(900L), eq(aiResponse));
         verify(accountRepository).findById(1L);
@@ -137,10 +135,10 @@ class AdminOptimizationServiceTest {
 
         when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
         when(schedulePeriodRepository.findDetailById(5L)).thenReturn(Optional.of(period));
-        doNothing().when(payloadBuilder).validateInputs(eq(period), eq(null));
-        when(payloadBuilder.weightsSnapshot(eq(period), eq(null))).thenReturn(weights);
+        when(payloadBuilder.prepareSnapshot(eq(period), eq(null))).thenReturn(testSnapshot());
+        when(payloadBuilder.weightsSnapshotFrom(any())).thenReturn(weights);
         when(optimizationRunRecorder.start(eq(period), eq(manager), eq(weights))).thenReturn(startedRun);
-        when(payloadBuilder.build(eq(period), eq(900L), eq(null))).thenReturn(payload);
+        when(payloadBuilder.buildFrom(any(), eq(period), eq(900L))).thenReturn(payload);
         when(aiSchedulingClient.optimize(eq(payload))).thenReturn(aiResponse);
         when(optimizationRunRecorder.finishFailure(eq(900L), eq("INFEASIBLE"), any(), eq(aiResponse)))
                 .thenReturn(finishedRun);
@@ -155,9 +153,9 @@ class AdminOptimizationServiceTest {
         verify(optimizationRunRecorder, never()).finishSuccess(any(), any());
 
         InOrder inOrder = inOrder(payloadBuilder, optimizationRunRecorder, aiSchedulingClient);
-        inOrder.verify(payloadBuilder).validateInputs(eq(period), eq(null));
+        inOrder.verify(payloadBuilder).prepareSnapshot(eq(period), eq(null));
         inOrder.verify(optimizationRunRecorder).start(eq(period), eq(manager), eq(weights));
-        inOrder.verify(payloadBuilder).build(eq(period), eq(900L), eq(null));
+        inOrder.verify(payloadBuilder).buildFrom(any(), eq(period), eq(900L));
         inOrder.verify(aiSchedulingClient).optimize(eq(payload));
         inOrder.verify(optimizationRunRecorder).finishFailure(eq(900L), eq("INFEASIBLE"), contains("Not enough staff"), eq(aiResponse));
     }
@@ -196,10 +194,10 @@ class AdminOptimizationServiceTest {
 
         when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
         when(schedulePeriodRepository.findDetailById(5L)).thenReturn(Optional.of(period));
-        doNothing().when(payloadBuilder).validateInputs(eq(period), eq(null));
-        when(payloadBuilder.weightsSnapshot(eq(period), eq(null))).thenReturn(weights);
+        when(payloadBuilder.prepareSnapshot(eq(period), eq(null))).thenReturn(testSnapshot());
+        when(payloadBuilder.weightsSnapshotFrom(any())).thenReturn(weights);
         when(optimizationRunRecorder.start(eq(period), eq(manager), eq(weights))).thenReturn(startedRun);
-        when(payloadBuilder.build(eq(period), eq(900L), eq(null))).thenReturn(payload);
+        when(payloadBuilder.buildFrom(any(), eq(period), eq(900L))).thenReturn(payload);
         when(aiSchedulingClient.optimize(eq(payload))).thenReturn(aiResponse);
         when(optimizationRunRecorder.finishFailure(eq(900L), eq("INFEASIBLE"), any(), eq(aiResponse)))
                 .thenReturn(finishedRun);
@@ -242,9 +240,10 @@ class AdminOptimizationServiceTest {
 
         when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
         when(schedulePeriodRepository.findDetailById(5L)).thenReturn(Optional.of(period));
-        when(payloadBuilder.weightsSnapshot(eq(period), eq(null))).thenReturn(weights);
+        when(payloadBuilder.prepareSnapshot(eq(period), eq(null))).thenReturn(testSnapshot());
+        when(payloadBuilder.weightsSnapshotFrom(any())).thenReturn(weights);
         when(optimizationRunRecorder.start(eq(period), eq(manager), eq(weights))).thenReturn(startedRun);
-        when(payloadBuilder.build(eq(period), eq(900L), eq(null))).thenReturn(payload);
+        when(payloadBuilder.buildFrom(any(), eq(period), eq(900L))).thenReturn(payload);
         when(aiSchedulingClient.optimize(eq(payload))).thenReturn(aiResponse);
         when(optimizationRunRecorder.finishFailure(eq(900L), eq("FAILED"), any(), eq(aiResponse)))
                 .thenReturn(finishedRun);
@@ -271,10 +270,10 @@ class AdminOptimizationServiceTest {
 
         when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
         when(schedulePeriodRepository.findDetailById(5L)).thenReturn(Optional.of(period));
-        doNothing().when(payloadBuilder).validateInputs(eq(period), eq(null));
-        when(payloadBuilder.weightsSnapshot(eq(period), eq(null))).thenReturn(weights);
+        when(payloadBuilder.prepareSnapshot(eq(period), eq(null))).thenReturn(testSnapshot());
+        when(payloadBuilder.weightsSnapshotFrom(any())).thenReturn(weights);
         when(optimizationRunRecorder.start(eq(period), eq(manager), eq(weights))).thenReturn(startedRun);
-        when(payloadBuilder.build(eq(period), eq(900L), eq(null))).thenReturn(payload);
+        when(payloadBuilder.buildFrom(any(), eq(period), eq(900L))).thenReturn(payload);
         when(aiSchedulingClient.optimize(eq(payload))).thenThrow(new AiServiceException("boom"));
         when(optimizationRunRecorder.finishFailure(eq(900L), eq("FAILED"), eq("boom"), eq(null)))
                 .thenReturn(failedRun);
@@ -288,9 +287,9 @@ class AdminOptimizationServiceTest {
         verify(optimizationRunRecorder, never()).finishSuccess(any(), any());
 
         InOrder inOrder = inOrder(payloadBuilder, optimizationRunRecorder, aiSchedulingClient);
-        inOrder.verify(payloadBuilder).validateInputs(eq(period), eq(null));
+        inOrder.verify(payloadBuilder).prepareSnapshot(eq(period), eq(null));
         inOrder.verify(optimizationRunRecorder).start(eq(period), eq(manager), eq(weights));
-        inOrder.verify(payloadBuilder).build(eq(period), eq(900L), eq(null));
+        inOrder.verify(payloadBuilder).buildFrom(any(), eq(period), eq(900L));
         inOrder.verify(aiSchedulingClient).optimize(eq(payload));
         inOrder.verify(optimizationRunRecorder).finishFailure(eq(900L), eq("FAILED"), eq("boom"), eq(null));
     }
@@ -320,9 +319,10 @@ class AdminOptimizationServiceTest {
 
         when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
         when(schedulePeriodRepository.findDetailById(5L)).thenReturn(Optional.of(period));
-        when(payloadBuilder.weightsSnapshot(eq(period), eq(null))).thenReturn(weights);
+        when(payloadBuilder.prepareSnapshot(eq(period), eq(null))).thenReturn(testSnapshot());
+        when(payloadBuilder.weightsSnapshotFrom(any())).thenReturn(weights);
         when(optimizationRunRecorder.start(eq(period), eq(manager), eq(weights))).thenReturn(startedRun);
-        when(payloadBuilder.build(eq(period), eq(900L), eq(null))).thenReturn(payload);
+        when(payloadBuilder.buildFrom(any(), eq(period), eq(900L))).thenReturn(payload);
         when(aiSchedulingClient.optimize(eq(payload))).thenReturn(invalidResponse);
         when(optimizationRunRecorder.finishFailure(eq(900L), eq("FAILED"), contains("Invalid AI response"), eq(null)))
                 .thenReturn(failedRun);
@@ -344,8 +344,8 @@ class AdminOptimizationServiceTest {
 
         when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
         when(schedulePeriodRepository.findDetailById(5L)).thenReturn(Optional.of(period));
-        doThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "No active employees to schedule"))
-                .when(payloadBuilder).validateInputs(any(), any());
+        when(payloadBuilder.prepareSnapshot(any(), any()))
+                .thenThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "No active employees to schedule"));
 
         assertThatThrownBy(() -> service.optimize(principal, 5L, new OptimizeScheduleRequest(null)))
                 .isInstanceOf(ResponseStatusException.class)
@@ -353,8 +353,8 @@ class AdminOptimizationServiceTest {
                 .isEqualTo(HttpStatus.BAD_REQUEST);
 
         verifyNoInteractions(optimizationRunRecorder, aiSchedulingClient);
-        verify(payloadBuilder, never()).build(any(), any(), any());
-        verify(payloadBuilder, never()).weightsSnapshot(any(), any());
+        verify(payloadBuilder, never()).buildFrom(any(), any(), any());
+        verify(payloadBuilder, never()).weightsSnapshotFrom(any());
     }
 
     @Test
@@ -428,10 +428,10 @@ class AdminOptimizationServiceTest {
 
         when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
         when(schedulePeriodRepository.findDetailById(5L)).thenReturn(Optional.of(period));
-        doNothing().when(payloadBuilder).validateInputs(eq(period), eq(null));
-        when(payloadBuilder.weightsSnapshot(eq(period), eq(null))).thenReturn(weights);
+        when(payloadBuilder.prepareSnapshot(eq(period), eq(null))).thenReturn(testSnapshot());
+        when(payloadBuilder.weightsSnapshotFrom(any())).thenReturn(weights);
         when(optimizationRunRecorder.start(eq(period), eq(manager), eq(weights))).thenReturn(startedRun);
-        when(payloadBuilder.build(eq(period), eq(900L), eq(null))).thenReturn(payload);
+        when(payloadBuilder.buildFrom(any(), eq(period), eq(900L))).thenReturn(payload);
         when(optimizationRunRecorder.finishFailure(eq(900L), eq("FAILED"), contains("Invalid AI response"), isNull()))
                 .thenReturn(failedRun);
 
@@ -483,6 +483,11 @@ class AdminOptimizationServiceTest {
                 .isEqualTo(HttpStatus.NOT_FOUND);
 
         verifyNoInteractions(payloadBuilder, optimizationRunRecorder, aiSchedulingClient);
+    }
+
+    private static AiSchedulingPayloadBuilder.PayloadSnapshot testSnapshot() {
+        return new AiSchedulingPayloadBuilder.PayloadSnapshot(
+                List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), null, null);
     }
 
     private static AiSchedulingRequestDto testPayload() {

@@ -70,18 +70,35 @@ public class AiSchedulingPayloadBuilder {
 
     public void validateInputs(
             SchedulePeriod period, AiSchedulingRequestDto.SolverOptionsDto solverOptions) {
-        loadAndValidate(period, solverOptions);
+        prepareSnapshot(period, solverOptions);
     }
 
     public Map<String, Object> weightsSnapshot(
             SchedulePeriod period, AiSchedulingRequestDto.SolverOptionsDto solverOptions) {
-        PayloadSnapshot snapshot = loadAndValidate(period, solverOptions);
-        return Map.of("rules", snapshot.rules(), "solverOptions", snapshot.solverOptions());
+        return weightsSnapshotFrom(prepareSnapshot(period, solverOptions));
     }
 
     public AiSchedulingRequestDto build(
             SchedulePeriod period, Long runId, AiSchedulingRequestDto.SolverOptionsDto solverOptions) {
-        PayloadSnapshot snapshot = loadAndValidate(period, solverOptions);
+        return buildFrom(prepareSnapshot(period, solverOptions), period, runId);
+    }
+
+    /**
+     * Loads and validates all DB inputs once. The returned snapshot serves a whole
+     * optimize call, avoiding repeated queries and TOCTOU drift between the
+     * weights recorded on the run and the payload sent to the AI service.
+     */
+    public PayloadSnapshot prepareSnapshot(
+            SchedulePeriod period, AiSchedulingRequestDto.SolverOptionsDto solverOptions) {
+        return loadAndValidate(period, solverOptions);
+    }
+
+    public Map<String, Object> weightsSnapshotFrom(PayloadSnapshot snapshot) {
+        return Map.of("rules", snapshot.rules(), "solverOptions", snapshot.solverOptions());
+    }
+
+    public AiSchedulingRequestDto buildFrom(
+            PayloadSnapshot snapshot, SchedulePeriod period, Long runId) {
         return new AiSchedulingRequestDto(
                 SCHEMA_VERSION,
                 runId,
@@ -317,7 +334,7 @@ public class AiSchedulingPayloadBuilder {
         return new ResponseStatusException(HttpStatus.BAD_REQUEST, reason);
     }
 
-    private record PayloadSnapshot(
+    public record PayloadSnapshot(
             List<Employee> employees,
             List<ShiftType> shiftTypes,
             List<WorkShift> workShifts,
