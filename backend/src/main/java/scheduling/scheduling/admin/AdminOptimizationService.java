@@ -176,14 +176,15 @@ public class AdminOptimizationService {
         }
         StringBuilder capped = new StringBuilder();
         for (String part : parts) {
-            if (capped.length() >= 4000) {
+            int separatorLength = capped.length() > 0 ? 2 : 0;
+            int remaining = Math.max(0, 4000 - capped.length() - separatorLength);
+            if (remaining <= 0) {
                 break;
             }
-            if (capped.length() > 0) {
+            if (separatorLength > 0) {
                 capped.append("; ");
             }
-            int remaining = 4000 - capped.length();
-            capped.append(part.length() <= remaining ? part : part.substring(0, remaining));
+            capped.append(part.substring(0, Math.min(part.length(), remaining)));
         }
         return capped.toString();
     }

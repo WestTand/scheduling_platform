@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
@@ -162,6 +163,61 @@ class AdminOptimizationServiceTest {
     }
 
     @Test
+    void optimizeCapsManyLongDiagnosticsWithoutThrowing() {
+        CurrentAccountPrincipal principal = new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
+        Account manager = managerAccount(principal);
+        SchedulePeriod period = draftPeriod(5L, manager);
+        Map<String, Object> weights = Map.of("fairness", BigDecimal.ONE);
+        AiSchedulingRequestDto payload = testPayload();
+        // First part is exactly 3999 chars ("C: " + 3996 chars): the old builder appended
+        // the "; " separator before recomputing room, yielding remaining = -1 and throwing
+        // StringIndexOutOfBoundsException on the next part. The remaining diagnostics push
+        // the uncapped total far beyond the ~4000-char cap.
+        List<AiSchedulingResponseDto.DiagnosticDto> diagnostics = new ArrayList<>();
+        diagnostics.add(new AiSchedulingResponseDto.DiagnosticDto("C", "x".repeat(3996), null, null));
+        for (int i = 1; i < 30; i++) {
+            diagnostics.add(new AiSchedulingResponseDto.DiagnosticDto("CODE-" + i, "y".repeat(500), null, null));
+        }
+        AiSchedulingResponseDto aiResponse = new AiSchedulingResponseDto(
+                "1.0",
+                900L,
+                5L,
+                "INFEASIBLE",
+                "INFEASIBLE",
+                List.of(),
+                null,
+                Map.of(),
+                List.of(),
+                diagnostics,
+                "Infeasible",
+                new AiSchedulingResponseDto.StatisticsDto(new BigDecimal("0.5"), 3, 5));
+        OptimizationRun startedRun = startedRun(900L, period, manager);
+        OptimizationRun finishedRun = finishedRun(900L, period, manager, "INFEASIBLE");
+
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
+        when(schedulePeriodRepository.findDetailById(5L)).thenReturn(Optional.of(period));
+        doNothing().when(payloadBuilder).validateInputs(eq(period), eq(null));
+        when(payloadBuilder.weightsSnapshot(eq(period), eq(null))).thenReturn(weights);
+        when(optimizationRunRecorder.start(eq(period), eq(manager), eq(weights))).thenReturn(startedRun);
+        when(payloadBuilder.build(eq(period), eq(900L), eq(null))).thenReturn(payload);
+        when(aiSchedulingClient.optimize(eq(payload))).thenReturn(aiResponse);
+        when(optimizationRunRecorder.finishFailure(eq(900L), eq("INFEASIBLE"), any(), eq(aiResponse)))
+                .thenReturn(finishedRun);
+
+        OptimizeScheduleResponse response = service.optimize(principal, 5L, new OptimizeScheduleRequest(null));
+
+        assertThat(response.aiStatus()).isEqualTo("INFEASIBLE");
+        assertThat(response.errorMessage()).isNotNull();
+        assertThat(response.errorMessage().length()).isLessThanOrEqualTo(4000);
+        ArgumentCaptor<String> errorCaptor = ArgumentCaptor.forClass(String.class);
+        verify(optimizationRunRecorder).finishFailure(eq(900L), eq("INFEASIBLE"), errorCaptor.capture(), eq(aiResponse));
+        // The mocked recorder receives the pre-truncation message (service caps at ~4000;
+        // the real OptimizationRunRecorder truncates to 2000 for persistence).
+        assertThat(errorCaptor.getValue().length()).isLessThanOrEqualTo(4000);
+        verify(optimizationRunRecorder, never()).finishSuccess(any(), any());
+    }
+
+    @Test
     void optimizeReturnsFailedWhenAiReturnsFailedStatus() {
         CurrentAccountPrincipal principal = new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
         Account manager = managerAccount(principal);
@@ -297,6 +353,8 @@ class AdminOptimizationServiceTest {
                 .isEqualTo(HttpStatus.BAD_REQUEST);
 
         verifyNoInteractions(optimizationRunRecorder, aiSchedulingClient);
+        verify(payloadBuilder, never()).build(any(), any(), any());
+        verify(payloadBuilder, never()).weightsSnapshot(any(), any());
     }
 
     @Test
