@@ -29,4 +29,6 @@ public interface ShiftTypeRepository extends JpaRepository<ShiftType, Long> {
             order by s.shiftName asc
             """)
     List<ShiftType> search(@Param("query") String query, @Param("status") String status);
+
+    List<ShiftType> findByStatus(String status);
 }

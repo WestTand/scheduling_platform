@@ -18,4 +18,15 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
             order by e.employeeCode asc
             """)
     List<Employee> search(String query, String status);
+
+    @Query("""
+            select e from Employee e
+            join fetch e.account a
+            where e.status = 'ACTIVE'
+              and a.role = scheduling.scheduling.entity.AccountRole.EMPLOYEE
+              and a.status = scheduling.scheduling.entity.AccountStatus.ACTIVE
+              and a.isActive = true
+            order by e.employeeCode asc
+            """)
+    List<Employee> findSchedulableForAi();
 }

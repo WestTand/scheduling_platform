@@ -54,4 +54,15 @@ public interface PreferenceRepository extends JpaRepository<Preference, Long> {
     Optional<Preference> findByIdAndEmployeeIdForUpdate(
             @Param("id") Long id,
             @Param("employeeId") Long employeeId);
+
+    @Query("""
+            select p from Preference p
+            join fetch p.employee e
+            left join fetch p.shiftType st
+            where p.preferenceDate between :periodStart and :periodEnd
+              and p.status in ('PENDING', 'APPROVED')
+            order by p.preferenceDate asc, p.id asc
+            """)
+    List<Preference> findActiveInRange(
+            @Param("periodStart") LocalDate periodStart, @Param("periodEnd") LocalDate periodEnd);
 }
