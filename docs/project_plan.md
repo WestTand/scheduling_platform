@@ -473,6 +473,7 @@ Ket qua mong doi: backend goi AI service, AI tra lich toi uu hoac ly do infeasib
 - [ ] Implement quota: thong tam 2 ngay/tuan
   - Dung de gioi han so ngay thong tam neu ap dung.
   - Giam lich khong cong bang hoac qua tai.
+  - Quota semantics slice: AI counts `OVERTIME` and `BATHING` by distinct work dates per employee per ISO week while keeping legacy schema field names.
 - [ ] Implement quota: truc 1 ngay/6 ngay neu ap dung
   - Dung de can bang ca truc dac biet theo chu ky.
   - Bao dam phan bo cong bang hon.

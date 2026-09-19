@@ -45,8 +45,8 @@ The backend persists each rule as one `SchedulingRule` row with a stable `ruleCo
 | `MIN_REST_HOURS_BETWEEN_SHIFTS` | `HARD` | `hardRules.minRestHoursBetweenShifts` | Minimum rest time between two assigned shifts. |
 | `MAX_WORK_HOURS_PER_DAY` | `HARD` | `hardRules.maxWorkHoursPerDay` | Maximum total scheduled hours per employee per day. |
 | `MAX_SHIFTS_PER_WEEK` | `HARD` | `hardRules.maxShiftsPerWeek` | Maximum number of shifts per employee per week. |
-| `OVERTIME_SHIFTS_PER_WEEK` | `HARD` | `quotas.overtimeShiftsPerWeek` | Maximum overtime/special shifts per employee per week. |
-| `BATHING_SHIFTS_PER_WEEK` | `HARD` | `quotas.bathingShiftsPerWeek` | Maximum bathing/special shifts per employee per week. |
+| `OVERTIME_SHIFTS_PER_WEEK` | `HARD` | `quotas.overtimeShiftsPerWeek` | Maximum distinct overtime work dates per employee per ISO week (legacy field name kept). |
+| `BATHING_SHIFTS_PER_WEEK` | `HARD` | `quotas.bathingShiftsPerWeek` | Maximum distinct bathing work dates per employee per ISO week (legacy field name kept). |
 | `ON_CALL_EVERY_N_DAYS` | `HARD` | `quotas.onCallEveryNDays` | Minimum cycle for on-call shifts when applicable. |
 | `FAIRNESS_WEIGHT` | `SOFT` | `softWeights.fairness` | Penalty weight for uneven shift distribution. |
 | `PREFERENCE_WEIGHT` | `SOFT` | `softWeights.preference` | Penalty weight for violating employee preferences. |
