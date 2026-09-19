@@ -5,10 +5,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -16,6 +19,7 @@ import static org.mockito.Mockito.when;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -132,6 +136,7 @@ class AdminOptimizationServiceTest {
 
         when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
         when(schedulePeriodRepository.findDetailById(5L)).thenReturn(Optional.of(period));
+        doNothing().when(payloadBuilder).validateInputs(eq(period), eq(null));
         when(payloadBuilder.weightsSnapshot(eq(period), eq(null))).thenReturn(weights);
         when(optimizationRunRecorder.start(eq(period), eq(manager), eq(weights))).thenReturn(startedRun);
         when(payloadBuilder.build(eq(period), eq(900L), eq(null))).thenReturn(payload);
@@ -147,6 +152,13 @@ class AdminOptimizationServiceTest {
         assertThat(response.errorMessage()).contains("Not enough staff");
         verify(optimizationRunRecorder).finishFailure(eq(900L), eq("INFEASIBLE"), contains("Not enough staff"), eq(aiResponse));
         verify(optimizationRunRecorder, never()).finishSuccess(any(), any());
+
+        InOrder inOrder = inOrder(payloadBuilder, optimizationRunRecorder, aiSchedulingClient);
+        inOrder.verify(payloadBuilder).validateInputs(eq(period), eq(null));
+        inOrder.verify(optimizationRunRecorder).start(eq(period), eq(manager), eq(weights));
+        inOrder.verify(payloadBuilder).build(eq(period), eq(900L), eq(null));
+        inOrder.verify(aiSchedulingClient).optimize(eq(payload));
+        inOrder.verify(optimizationRunRecorder).finishFailure(eq(900L), eq("INFEASIBLE"), contains("Not enough staff"), eq(aiResponse));
     }
 
     @Test
@@ -203,6 +215,7 @@ class AdminOptimizationServiceTest {
 
         when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
         when(schedulePeriodRepository.findDetailById(5L)).thenReturn(Optional.of(period));
+        doNothing().when(payloadBuilder).validateInputs(eq(period), eq(null));
         when(payloadBuilder.weightsSnapshot(eq(period), eq(null))).thenReturn(weights);
         when(optimizationRunRecorder.start(eq(period), eq(manager), eq(weights))).thenReturn(startedRun);
         when(payloadBuilder.build(eq(period), eq(900L), eq(null))).thenReturn(payload);
@@ -217,6 +230,13 @@ class AdminOptimizationServiceTest {
 
         verify(optimizationRunRecorder).finishFailure(eq(900L), eq("FAILED"), eq("boom"), eq(null));
         verify(optimizationRunRecorder, never()).finishSuccess(any(), any());
+
+        InOrder inOrder = inOrder(payloadBuilder, optimizationRunRecorder, aiSchedulingClient);
+        inOrder.verify(payloadBuilder).validateInputs(eq(period), eq(null));
+        inOrder.verify(optimizationRunRecorder).start(eq(period), eq(manager), eq(weights));
+        inOrder.verify(payloadBuilder).build(eq(period), eq(900L), eq(null));
+        inOrder.verify(aiSchedulingClient).optimize(eq(payload));
+        inOrder.verify(optimizationRunRecorder).finishFailure(eq(900L), eq("FAILED"), eq("boom"), eq(null));
     }
 
     @Test
@@ -257,6 +277,119 @@ class AdminOptimizationServiceTest {
                 .isEqualTo(HttpStatus.BAD_GATEWAY);
 
         verify(optimizationRunRecorder).finishFailure(eq(900L), eq("FAILED"), contains("Invalid AI response"), eq(null));
+        verify(optimizationRunRecorder, never()).finishSuccess(any(), any());
+    }
+
+    @Test
+    void optimizeCreatesNoRunWhenValidationFails() {
+        CurrentAccountPrincipal principal = new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
+        Account manager = managerAccount(principal);
+        SchedulePeriod period = draftPeriod(5L, manager);
+
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
+        when(schedulePeriodRepository.findDetailById(5L)).thenReturn(Optional.of(period));
+        doThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "No active employees to schedule"))
+                .when(payloadBuilder).validateInputs(any(), any());
+
+        assertThatThrownBy(() -> service.optimize(principal, 5L, new OptimizeScheduleRequest(null)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verifyNoInteractions(optimizationRunRecorder, aiSchedulingClient);
+    }
+
+    @Test
+    void optimizeThrows502ForEachProtocolViolation() {
+        CurrentAccountPrincipal principal = new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
+        Account manager = managerAccount(principal);
+        SchedulePeriod period = draftPeriod(5L, manager);
+        Map<String, Object> weights = Map.of("fairness", BigDecimal.ONE);
+        AiSchedulingRequestDto payload = testPayload();
+        AiSchedulingResponseDto base = new AiSchedulingResponseDto(
+                "1.0",
+                900L,
+                5L,
+                "SUCCESS",
+                "OPTIMAL",
+                List.of(new AiSchedulingResponseDto.AssignmentDto(10L, 100L)),
+                new BigDecimal("12.50"),
+                Map.of("fairness", new BigDecimal("12.50")),
+                List.of(),
+                List.of(),
+                null,
+                new AiSchedulingResponseDto.StatisticsDto(new BigDecimal("1.5"), 0, 10));
+        List<AiSchedulingResponseDto> variants = new ArrayList<>();
+        variants.add(new AiSchedulingResponseDto(
+                "2.0", base.runId(), base.periodId(), base.status(), base.solverStatus(), base.assignments(),
+                base.totalPenalty(), base.penaltyDetails(), base.warnings(), base.diagnostics(),
+                base.errorMessage(), base.statistics()));
+        variants.add(new AiSchedulingResponseDto(
+                base.schemaVersion(), 901L, base.periodId(), base.status(), base.solverStatus(), base.assignments(),
+                base.totalPenalty(), base.penaltyDetails(), base.warnings(), base.diagnostics(),
+                base.errorMessage(), base.statistics()));
+        variants.add(new AiSchedulingResponseDto(
+                base.schemaVersion(), base.runId(), 6L, base.status(), base.solverStatus(), base.assignments(),
+                base.totalPenalty(), base.penaltyDetails(), base.warnings(), base.diagnostics(),
+                base.errorMessage(), base.statistics()));
+        variants.add(new AiSchedulingResponseDto(
+                base.schemaVersion(), base.runId(), base.periodId(), "BROKEN", base.solverStatus(), base.assignments(),
+                base.totalPenalty(), base.penaltyDetails(), base.warnings(), base.diagnostics(),
+                base.errorMessage(), base.statistics()));
+        variants.add(new AiSchedulingResponseDto(
+                base.schemaVersion(), base.runId(), base.periodId(), base.status(), "BROKEN", base.assignments(),
+                base.totalPenalty(), base.penaltyDetails(), base.warnings(), base.diagnostics(),
+                base.errorMessage(), base.statistics()));
+        variants.add(new AiSchedulingResponseDto(
+                base.schemaVersion(), base.runId(), base.periodId(), base.status(), base.solverStatus(), null,
+                base.totalPenalty(), base.penaltyDetails(), base.warnings(), base.diagnostics(),
+                base.errorMessage(), base.statistics()));
+        variants.add(new AiSchedulingResponseDto(
+                base.schemaVersion(), base.runId(), base.periodId(), base.status(), base.solverStatus(),
+                base.assignments(), base.totalPenalty(), null, base.warnings(), base.diagnostics(),
+                base.errorMessage(), base.statistics()));
+        variants.add(new AiSchedulingResponseDto(
+                base.schemaVersion(), base.runId(), base.periodId(), base.status(), base.solverStatus(),
+                base.assignments(), base.totalPenalty(), base.penaltyDetails(), null, base.diagnostics(),
+                base.errorMessage(), base.statistics()));
+        variants.add(new AiSchedulingResponseDto(
+                base.schemaVersion(), base.runId(), base.periodId(), base.status(), base.solverStatus(),
+                base.assignments(), base.totalPenalty(), base.penaltyDetails(), base.warnings(), null,
+                base.errorMessage(), base.statistics()));
+        variants.add(new AiSchedulingResponseDto(
+                base.schemaVersion(), base.runId(), base.periodId(), base.status(), base.solverStatus(),
+                base.assignments(), base.totalPenalty(), base.penaltyDetails(), base.warnings(),
+                base.diagnostics(), base.errorMessage(), null));
+        variants.add(new AiSchedulingResponseDto(
+                base.schemaVersion(), base.runId(), base.periodId(), base.status(), base.solverStatus(),
+                base.assignments(), null, base.penaltyDetails(), base.warnings(), base.diagnostics(),
+                base.errorMessage(), base.statistics()));
+        variants.add(null);
+        OptimizationRun startedRun = startedRun(900L, period, manager);
+        OptimizationRun failedRun = finishedRun(900L, period, manager, "FAILED");
+
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
+        when(schedulePeriodRepository.findDetailById(5L)).thenReturn(Optional.of(period));
+        doNothing().when(payloadBuilder).validateInputs(eq(period), eq(null));
+        when(payloadBuilder.weightsSnapshot(eq(period), eq(null))).thenReturn(weights);
+        when(optimizationRunRecorder.start(eq(period), eq(manager), eq(weights))).thenReturn(startedRun);
+        when(payloadBuilder.build(eq(period), eq(900L), eq(null))).thenReturn(payload);
+        when(optimizationRunRecorder.finishFailure(eq(900L), eq("FAILED"), contains("Invalid AI response"), isNull()))
+                .thenReturn(failedRun);
+
+        int expectedCalls = 0;
+        for (AiSchedulingResponseDto variant : variants) {
+            when(aiSchedulingClient.optimize(eq(payload))).thenReturn(variant);
+
+            assertThatThrownBy(() -> service.optimize(principal, 5L, new OptimizeScheduleRequest(null)))
+                    .isInstanceOf(ResponseStatusException.class)
+                    .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                    .isEqualTo(HttpStatus.BAD_GATEWAY);
+
+            expectedCalls++;
+            verify(optimizationRunRecorder, times(expectedCalls))
+                    .finishFailure(eq(900L), eq("FAILED"), contains("Invalid AI response"), isNull());
+        }
         verify(optimizationRunRecorder, never()).finishSuccess(any(), any());
     }
 

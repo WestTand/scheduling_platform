@@ -50,6 +50,7 @@ public class AdminOptimizationService {
         this.aiSchedulingClient = aiSchedulingClient;
     }
 
+    // Deliberately no @Transactional: the AI HTTP call is long-lived and must not hold a DB transaction; run persistence is handled by the recorder's REQUIRES_NEW methods.
     public OptimizeScheduleResponse optimize(
             CurrentAccountPrincipal principal, Long periodId, OptimizeScheduleRequest request) {
         Account manager = requireManager(principal);
@@ -158,6 +159,9 @@ public class AdminOptimizationService {
         List<String> parts = new ArrayList<>();
         if (response.diagnostics() != null) {
             for (AiSchedulingResponseDto.DiagnosticDto diagnostic : response.diagnostics()) {
+                if (parts.size() >= 20) {
+                    break;
+                }
                 if (diagnostic != null && StringUtils.hasText(diagnostic.message())) {
                     String code = diagnostic.code() == null ? "" : diagnostic.code() + ": ";
                     parts.add(code + diagnostic.message());
@@ -170,7 +174,18 @@ public class AdminOptimizationService {
         if (parts.isEmpty()) {
             return response.status();
         }
-        return String.join("; ", parts);
+        StringBuilder capped = new StringBuilder();
+        for (String part : parts) {
+            if (capped.length() >= 4000) {
+                break;
+            }
+            if (capped.length() > 0) {
+                capped.append("; ");
+            }
+            int remaining = 4000 - capped.length();
+            capped.append(part.length() <= remaining ? part : part.substring(0, remaining));
+        }
+        return capped.toString();
     }
 
     private Account requireManager(CurrentAccountPrincipal principal) {
