@@ -76,11 +76,12 @@ Tất cả response lỗi dùng `ResponseStatusException` theo convention hiện
 ### 4.3 Validation rules (shared)
 
 - `requesterAssignment` không tồn tại hoặc không thuộc về caller → `404 Assignment not found`.
+- `requesterAssignment` (và `targetAssignment` nếu có) phải thuộc schedule period `PUBLISHED`, ngược lại → `400 Assignment is not in a published schedule` (đồng nhất với `EmployeeScheduleService.getOwnSchedule`, employee chỉ thấy lịch `PUBLISHED`).
 - `targetEmployee` không tồn tại → `404 Employee not found`; inactive → `400 Employee is not active`; trùng với requester → `400 Cannot target yourself`.
 - `targetAssignment` (nếu có): không tồn tại → `404`; không thuộc về target → `400`; trùng `requesterAssignment` → `400`.
 - Sai trạng thái cho cancel/respond/approve/reject → `400` với reason rõ ràng (ví dụ `Swap request is not pending target response`).
 - Sai chủ thể: caller không phải requester (cancel), không phải target (respond) → `404 Swap request not found` (không leak sự tồn tại của resource); caller không phải manager ở admin endpoints → `403` bởi role guard.
-- `employeeId/request body` null → `400 Employee id is required` / Bean Validation `400`.
+- `requesterAssignmentId` / `targetEmployeeId` null hoặc body null → Bean Validation `400` (service cũng guard null request → `400`).
 
 ## 5. Data Model
 
@@ -91,17 +92,17 @@ Tất cả response lỗi dùng `ResponseStatusException` theo convention hiện
 
 Mới:
 
-- `backend/.../repository/SwapRequestRepository.java` — `findDetailById`, `findRelatedForEmployee(employeeId, status?)` (fetch join assignment/employee/target).
+- `backend/.../repository/SwapRequestRepository.java` — `findDetailById`, `findRelatedForEmployee(employeeId, status?)` (fetch join assignment/employee/target, `order by id desc` để thứ tự deterministic; `BaseEntity` không có `createdAt`).
 - `backend/.../employee/dto/CreateSwapRequestRequest.java`, `RespondSwapRequestRequest.java`, `SwapRequestResponse.java` (có `from(SwapRequest)` mapper, map trong transaction).
 - `backend/.../employee/EmployeeSwapRequestService.java` — dùng `EmployeeAccess` + repositories (không cần `Clock`; employee flow không set thời gian).
 - `backend/.../employee/EmployeeSwapRequestController.java`.
-- `backend/.../admin/AdminSwapRequestService.java` — dùng `AccountRepository` load manager account (pattern `requireManager` như `AdminShiftAssignmentService`) + inject `Clock` để set `reviewedAt` (test-friendly).
+- `backend/.../admin/AdminSwapRequestService.java` — dùng `AccountRepository` load manager account (pattern `requireManager` như `AdminShiftAssignmentService`) + inject `Clock` và set `reviewedAt = LocalDateTime.now(clock)` (pattern `AdminLeaveRequestService:114`).
 - `backend/.../admin/AdminSwapRequestController.java`.
 - Tests: `EmployeeSwapRequestServiceTest`, `EmployeeSwapRequestControllerTest`, `AdminSwapRequestServiceTest`, `AdminSwapRequestControllerTest`.
 
 Sửa:
 
-- `docs/project_plan.md` — tick các mục Phase 4 (profile, gửi/xem swap, 3 test flow items) kèm ghi chú đã xong.
+- `docs/project_plan.md` — tick các mục Phase 4 kèm ghi chú đã xong: profile (dùng `/api/auth/me`), gửi/xem swap (sau khi API + tests mới pass), `Test leave request flow` và `Test preference flow` (sau khi full suite xác nhận tests hiện có pass — plan đang stale), `Test swap request flow` (sau khi tests mới pass).
 
 ## 7. Testing Plan
 
