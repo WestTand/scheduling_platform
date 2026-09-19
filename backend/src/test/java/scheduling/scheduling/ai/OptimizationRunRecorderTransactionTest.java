@@ -77,13 +77,18 @@ class OptimizationRunRecorderTransactionTest {
         assertThat(runs).hasSize(1);
         assertThat(runs.get(0).getStatus()).isEqualTo("FAILED");
         assertThat(runs.get(0).getFinishedAt()).isNotNull();
+        assertThat(runs.get(0).getWeightsJson()).isNotNull();
+        assertThat(runs.get(0).getPenaltyDetailsJson()).isNull();
+        assertThat(schedulePeriodRepository.findAll())
+                .noneMatch(p -> "rollback-probe".equals(p.getPeriodName()));
     }
 
     @TestConfiguration
     static class FailingRunnerConfiguration {
         @Bean
-        FailingOptimizationRunner failingOptimizationRunner(OptimizationRunRecorder recorder) {
-            return new FailingOptimizationRunner(recorder);
+        FailingOptimizationRunner failingOptimizationRunner(
+                OptimizationRunRecorder recorder, SchedulePeriodRepository schedulePeriodRepository) {
+            return new FailingOptimizationRunner(recorder, schedulePeriodRepository);
         }
     }
 
@@ -91,15 +96,26 @@ class OptimizationRunRecorderTransactionTest {
     static class FailingOptimizationRunner {
 
         private final OptimizationRunRecorder recorder;
+        private final SchedulePeriodRepository schedulePeriodRepository;
 
-        FailingOptimizationRunner(OptimizationRunRecorder recorder) {
+        FailingOptimizationRunner(
+                OptimizationRunRecorder recorder, SchedulePeriodRepository schedulePeriodRepository) {
             this.recorder = recorder;
+            this.schedulePeriodRepository = schedulePeriodRepository;
         }
 
         @Transactional
         public void runAndFail(SchedulePeriod period, Account manager) {
             OptimizationRun run = recorder.start(period, manager, Map.of("timeLimitSeconds", 30));
             recorder.finishFailure(run.getId(), "FAILED", "AI service unavailable", null);
+            schedulePeriodRepository.save(SchedulePeriod.builder()
+                    .periodName("rollback-probe")
+                    .startDate(LocalDate.of(2099, 1, 1))
+                    .endDate(LocalDate.of(2099, 1, 7))
+                    .versionNo(1)
+                    .status("DRAFT")
+                    .createdBy(manager)
+                    .build());
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "AI service unavailable");
         }
     }

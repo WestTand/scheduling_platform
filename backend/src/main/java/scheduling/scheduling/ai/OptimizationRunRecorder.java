@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.Objects;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -44,8 +45,14 @@ public class OptimizationRunRecorder {
         return optimizationRunRepository.save(run);
     }
 
+    /**
+     * Records a successful optimization run. The AI protocol response must not be null.
+     * Task 5 ({@code AdminOptimizationService}) must validate the AI protocol response
+     * and call {@code finishFailure(..., null)} instead when the response is missing or invalid.
+     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public OptimizationRun finishSuccess(Long runId, AiSchedulingResponseDto response) {
+        Objects.requireNonNull(response, "AI response must not be null for finishSuccess; call finishFailure for transport/protocol failures");
         OptimizationRun run = findRun(runId);
         run.setStatus("SUCCESS");
         run.setFinishedAt(LocalDateTime.now(clock));
