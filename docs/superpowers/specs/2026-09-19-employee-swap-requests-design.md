@@ -65,6 +65,13 @@ Tất cả response lỗi dùng `ResponseStatusException` theo convention hiện
 - `targetAssignmentId: Long` (nullable).
 - `reason: String` (nullable, `@Size(max = 1000)`, trim).
 
+`SwapRequestResponse` tối thiểu gồm:
+
+- `id`, `requesterAssignmentId`, `targetAssignmentId`, `status`, `reason`, `reviewedAt`.
+- `requesterEmployee`: `id`, `employeeCode`, `fullName` lấy từ `requesterAssignment.employee`.
+- `targetEmployee`: `id`, `employeeCode`, `fullName`.
+- `reviewedBy`: `id`, `username` nếu đã được manager review, ngược lại `null`.
+
 ### 4.2 Admin endpoints (`@PreAuthorize("hasRole('MANAGER')")`)
 
 | Method | Path | Success | Notes |
@@ -79,6 +86,7 @@ Tất cả response lỗi dùng `ResponseStatusException` theo convention hiện
 - `requesterAssignment` (và `targetAssignment` nếu có) phải thuộc schedule period `PUBLISHED`, ngược lại → `400 Assignment is not in a published schedule` (đồng nhất với `EmployeeScheduleService.getOwnSchedule`, employee chỉ thấy lịch `PUBLISHED`).
 - `targetEmployee` không tồn tại → `404 Employee not found`; inactive → `400 Employee is not active`; trùng với requester → `400 Cannot target yourself`.
 - `targetAssignment` (nếu có): không tồn tại → `404`; không thuộc về target → `400`; trùng `requesterAssignment` → `400`.
+- Trong Phase 4, chưa chặn duplicate pending request cho cùng `requesterAssignment`; đây là non-goal vì chưa có requirement sản phẩm và chưa có unique constraint.
 - Sai trạng thái cho cancel/respond/approve/reject → `400` với reason rõ ràng (ví dụ `Swap request is not pending target response`).
 - Sai chủ thể: caller không phải requester (cancel), không phải target (respond) → `404 Swap request not found` (không leak sự tồn tại của resource); caller không phải manager ở admin endpoints → `403` bởi role guard.
 - `requesterAssignmentId` / `targetEmployeeId` null hoặc body null → Bean Validation `400` (service cũng guard null request → `400`).
@@ -92,7 +100,7 @@ Tất cả response lỗi dùng `ResponseStatusException` theo convention hiện
 
 Mới:
 
-- `backend/.../repository/SwapRequestRepository.java` — `findDetailById`, `findRelatedForEmployee(employeeId, status?)` (fetch join assignment/employee/target, `order by id desc` để thứ tự deterministic; `BaseEntity` không có `createdAt`).
+- `backend/.../repository/SwapRequestRepository.java` — `findDetailById`, `findRelatedForEmployee(employeeId, status?)`, `findAllDetail(status?)` cho admin list (fetch join assignment/employee/target/reviewer, `order by id desc` để thứ tự deterministic; `BaseEntity` không có `createdAt`).
 - `backend/.../employee/dto/CreateSwapRequestRequest.java`, `RespondSwapRequestRequest.java`, `SwapRequestResponse.java` (có `from(SwapRequest)` mapper, map trong transaction).
 - `backend/.../employee/EmployeeSwapRequestService.java` — dùng `EmployeeAccess` + repositories (không cần `Clock`; employee flow không set thời gian).
 - `backend/.../employee/EmployeeSwapRequestController.java`.
@@ -120,5 +128,6 @@ Sửa:
 ## 9. Non-goals / Follow-ups
 
 - Auto-execute swap (hoán đổi `ShiftAssignment` giữa 2 nhân viên) khi manager approve — follow-up slice riêng, cần reuse validation manual assignment (overlap, leave, max hours/day).
+- Chặn duplicate pending request cho cùng `requesterAssignment` — follow-up khi có requirement rõ ràng về chính sách duplicate.
 - Không đổi enum/status frontend mock (`PENDING/APPROVED/REJECTED/CANCELLED`) trong slice này.
 - Không làm frontend integration cho swap (thuộc Phase 9 plan).
