@@ -205,23 +205,30 @@ def solve_schedule(request: SchedulingRequest) -> SchedulingResponse:
     for category, limit in quota_limits.items():
         for employee_id in employees:
             for week, weekly_shifts in shifts_by_week.items():
-                category_shifts = [
-                    shift
-                    for shift in weekly_shifts
-                    if shift_type_by_id[shift.shift_type_id].quota_category == category
-                ]
-                fixed_count = sum(
-                    1
+                shifts_by_quota_date = defaultdict(list)
+                for shift in weekly_shifts:
+                    if shift_type_by_id[shift.shift_type_id].quota_category == category:
+                        shifts_by_quota_date[shift.work_date].append(shift)
+                boundary_dates = {
+                    boundary.starts_at.date()
                     for boundary in request.boundary_assignments
                     if boundary.employee_id == employee_id
                     and _week_key(boundary.starts_at.date()) == week
                     and shift_type_by_id[boundary.shift_type_id].quota_category == category
-                )
-                model.add(
-                    sum(assigned[employee_id, shift.work_shift_id] for shift in category_shifts)
-                    + fixed_count
-                    <= limit
-                )
+                }
+                assigned_dates = []
+                for work_date, dated_shifts in shifts_by_quota_date.items():
+                    if work_date in boundary_dates:
+                        continue
+                    date_assigned = model.new_bool_var(
+                        f"{category.lower()}_{employee_id}_{work_date.isoformat()}_assigned"
+                    )
+                    model.add_max_equality(
+                        date_assigned,
+                        [assigned[employee_id, shift.work_shift_id] for shift in dated_shifts],
+                    )
+                    assigned_dates.append(date_assigned)
+                model.add(sum(assigned_dates) + len(boundary_dates) <= limit)
 
     on_call_gap = request.rules.quotas.on_call_every_n_days
     on_call_shifts = [

@@ -152,7 +152,8 @@ Fields:
 Important:
 
 - `quotaCategory` phai la stable enum do backend map tu cau hinh, khong infer tu display name.
-- Current solver dem quota `OVERTIME` va `BATHING` theo so work shift/ISO week. Neu nghiep vu bat buoc dem theo ngay/tuần, can follow-up chinh solver thanh distinct day count.
+- AI quota semantics: `OVERTIME` and `BATHING` quotas are counted by distinct `workDate` per employee per ISO week. Multiple same-category work shifts on the same `workDate` count once. Boundary assignments count by `startsAt` local date.
+- AI quota compatibility: the field names `overtimeShiftsPerWeek` and `bathingShiftsPerWeek` are kept for `schemaVersion = "1.0"` compatibility even though their semantics are day-based.
 - Shift calendar foundation (backend-only, chua gui sang AI): backend luu `shiftCode` (canonical key, khong key logic theo display name) va `penaltyWeightMultiplier` (da persist, AI schema `1.0` chua nhan multiplier). Quota category contract (`OVERTIME`, `BATHING`, `ON_CALL`, hoac `null`) giu nguyen trong slice nay.
 
 ### `workShifts`
@@ -297,8 +298,8 @@ Hard rules:
 
 Quotas:
 
-- `overtimeShiftsPerWeek`: currently max `OVERTIME` work shifts per employee per ISO week.
-- `bathingShiftsPerWeek`: currently max `BATHING` work shifts per employee per ISO week.
+- `overtimeShiftsPerWeek`: max distinct `OVERTIME` work dates per employee per ISO week. Legacy field name kept for schema `1.0` compatibility.
+- `bathingShiftsPerWeek`: max distinct `BATHING` work dates per employee per ISO week. Legacy field name kept for schema `1.0` compatibility.
 - `onCallEveryNDays`: minimum day gap between `ON_CALL` assignments.
 
 Soft weights:
@@ -658,7 +659,7 @@ LLM must not override hard constraints or fabricate root causes not present in d
 
 ## Open Follow-ups
 
-- Decide whether quota should count work shifts or distinct days. Project wording says day/week for overtime and bathing. Current CP-SAT PR counts work shifts/week.
+- Quota count ambiguity resolved: `OVERTIME` and `BATHING` use distinct work-date counts per employee per ISO week while retaining legacy schema `1.0` field names.
 - Add richer infeasible diagnostics for quota conflicts, locked assignment conflicts, rest conflicts, and max-hour conflicts.
 - Add backend integration tests with mocked AI service.
 - Add retry/timeout policy for backend HTTP call to AI service.
