@@ -403,7 +403,7 @@ Ket qua mong doi: manager co the tao lich, gan nhan vien, kiem tra xung dot, duy
 - [x] API kiem tra trung ca khi phan cong thu cong (da xong nhu mot phan cua manual assign: chan overlap)
   - Dung de ngan mot nhan vien bi gan hai ca bi overlap.
   - Bao ve tinh hop le cua lich.
-- [ ] API kiem tra gioi han gio lam/ngay
+- [x] API kiem tra gioi han gio lam/ngay (da xong: manual assignment rejects employees exceeding `MAX_WORK_HOURS_PER_DAY` on the work date)
   - Dung de ngan assignment vuot quy dinh/nghiep vu.
   - Giam rui ro lich khong kha thi.
 - [x] API duyet lich (da xong: approve DRAFT -> APPROVED kem staffing validation)
