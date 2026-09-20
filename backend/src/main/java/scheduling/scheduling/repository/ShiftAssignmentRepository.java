@@ -64,4 +64,20 @@ public interface ShiftAssignmentRepository extends JpaRepository<ShiftAssignment
             order by sa.id asc
             """)
     List<ShiftAssignment> findFixedForPeriod(@Param("periodId") Long periodId);
+
+    @Query("""
+            select sa
+            from ShiftAssignment sa
+            join fetch sa.workShift ws
+            join fetch ws.schedulePeriod sp
+            join fetch ws.shiftType st
+            join fetch sa.employee e
+            where sp.id <> :periodId
+              and ws.workDate between :from and :to
+            order by ws.workDate asc, st.startTime asc, sa.id asc
+            """)
+    List<ShiftAssignment> findBoundaryForAiPayload(
+            @Param("periodId") Long periodId,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to);
 }

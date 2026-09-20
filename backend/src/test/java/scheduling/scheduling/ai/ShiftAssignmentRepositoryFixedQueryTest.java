@@ -147,4 +147,86 @@ class ShiftAssignmentRepositoryFixedQueryTest {
                 .extracting(ShiftAssignment::getId)
                 .containsExactlyInAnyOrder(lockedAuto.getId(), manualUnlocked.getId());
     }
+
+    @Test
+    void findBoundaryForAiPayloadReturnsOnlyAssignmentsOutsideTargetPeriodInWindow() {
+        Account manager = accountRepository.save(Account.builder()
+                .username("boundary-manager")
+                .passwordHash("hash")
+                .role(AccountRole.MANAGER)
+                .build());
+        ShiftType shiftType = shiftTypeRepository.save(ShiftType.builder()
+                .shiftName("Boundary Day")
+                .startTime(LocalTime.of(8, 0))
+                .endTime(LocalTime.of(16, 0))
+                .durationHours(new BigDecimal("8.0"))
+                .minStaff(1)
+                .maxStaff(2)
+                .quotaCategory("REGULAR")
+                .status("ACTIVE")
+                .shiftCode("BOUNDARY_DAY")
+                .build());
+        Employee employee = employeeRepository.save(Employee.builder()
+                .employeeCode("BOUNDARY_001")
+                .fullName("Boundary Employee")
+                .status("ACTIVE")
+                .build());
+        SchedulePeriod target = schedulePeriodRepository.save(SchedulePeriod.builder()
+                .periodName("Boundary Target Period")
+                .startDate(LocalDate.of(2031, 2, 17))
+                .endDate(LocalDate.of(2031, 2, 23))
+                .createdBy(manager)
+                .build());
+        SchedulePeriod previous = schedulePeriodRepository.save(SchedulePeriod.builder()
+                .periodName("Boundary Previous Period")
+                .startDate(LocalDate.of(2031, 2, 10))
+                .endDate(LocalDate.of(2031, 2, 16))
+                .createdBy(manager)
+                .build());
+        WorkShift previousShift = workShiftRepository.save(WorkShift.builder()
+                .workDate(LocalDate.of(2031, 2, 16))
+                .requiredStaff(1)
+                .schedulePeriod(previous)
+                .shiftType(shiftType)
+                .build());
+        WorkShift targetShift = workShiftRepository.save(WorkShift.builder()
+                .workDate(LocalDate.of(2031, 2, 18))
+                .requiredStaff(1)
+                .schedulePeriod(target)
+                .shiftType(shiftType)
+                .build());
+        WorkShift farShift = workShiftRepository.save(WorkShift.builder()
+                .workDate(LocalDate.of(2031, 2, 14))
+                .requiredStaff(1)
+                .schedulePeriod(previous)
+                .shiftType(shiftType)
+                .build());
+
+        ShiftAssignment previousAssignment = shiftAssignmentRepository.save(ShiftAssignment.builder()
+                .workShift(previousShift)
+                .employee(employee)
+                .assignmentStatus("ASSIGNED")
+                .assignedSource("AUTO")
+                .locked(false)
+                .build());
+        shiftAssignmentRepository.save(ShiftAssignment.builder()
+                .workShift(targetShift)
+                .employee(employee)
+                .assignmentStatus("ASSIGNED")
+                .assignedSource("AUTO")
+                .locked(false)
+                .build());
+        shiftAssignmentRepository.save(ShiftAssignment.builder()
+                .workShift(farShift)
+                .employee(employee)
+                .assignmentStatus("ASSIGNED")
+                .assignedSource("AUTO")
+                .locked(false)
+                .build());
+
+        List<ShiftAssignment> result = shiftAssignmentRepository.findBoundaryForAiPayload(
+                target.getId(), LocalDate.of(2031, 2, 16), LocalDate.of(2031, 2, 24));
+
+        assertThat(result).extracting(ShiftAssignment::getId).containsExactly(previousAssignment.getId());
+    }
 }
