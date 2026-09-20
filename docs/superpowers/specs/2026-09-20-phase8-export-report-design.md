@@ -26,13 +26,13 @@ Out of scope:
 
 ## API Design
 
-Add manager/admin endpoints under the existing schedule period area:
+Add manager/admin endpoints under the existing admin schedule period area:
 
-- `GET /api/manager/schedule-periods/{periodId}/exports/schedule.xlsx`
-- `GET /api/manager/schedule-periods/{periodId}/exports/schedule.pdf`
-- `GET /api/manager/schedule-periods/{periodId}/reports/workload.xlsx`
+- `GET /api/admin/schedule-periods/{periodId}/exports/schedule.xlsx`
+- `GET /api/admin/schedule-periods/{periodId}/exports/schedule.pdf`
+- `GET /api/admin/schedule-periods/{periodId}/reports/workload.xlsx`
 
-All endpoints require the same protected manager/admin access pattern used by existing manager/admin APIs.
+All endpoints require manager/admin access. Phase 8 should explicitly allow both `MANAGER` and `ADMIN` roles for these export/report endpoints even though some existing schedule-period endpoints currently use manager-only guards.
 
 Responses:
 
@@ -54,7 +54,7 @@ Schedule export reads existing data:
 - `ShiftAssignment` for assigned employees and assignment status/lock state.
 - `Employee` for employee code and display name.
 
-Workload report derives values from assignments in one schedule period:
+Workload report derives values from active employees and assignments in one schedule period. Active employees with no assignments in the period must still appear with zero totals so the report can reveal staffing gaps or unfair distribution.
 
 - Employee code.
 - Employee full name.
@@ -123,7 +123,7 @@ Table columns:
 - Overnight shifts.
 - Distinct working days.
 
-Rows are sorted by employee code or employee name for stable output.
+Rows are sorted by `employeeCode ASC`, then `employeeName ASC` when codes are missing or equal.
 
 ## Architecture
 
@@ -157,7 +157,7 @@ The controller should return `ResponseEntity<byte[]>` with `Content-Disposition:
 
 ## Security
 
-- Endpoints are manager/admin-only and follow the existing security configuration conventions.
+- Endpoints are manager/admin-only and should explicitly authorize both roles.
 - Employee users must not access manager export/report endpoints.
 - Export data is scoped strictly to the requested `periodId`.
 - No export file is persisted to disk by default.
@@ -169,7 +169,7 @@ Unit tests:
 - Workload calculation totals shifts, hours, heavy shifts, overnight shifts, and distinct days correctly.
 - Schedule Excel writer creates a parseable workbook with expected headers and rows.
 - Workload Excel writer creates a parseable workbook with expected totals.
-- Schedule PDF writer creates non-empty PDF bytes with a valid PDF header.
+- Schedule PDF writer creates parseable PDF bytes with a valid PDF header and expected text such as the period name/date range.
 
 Controller/service tests:
 
