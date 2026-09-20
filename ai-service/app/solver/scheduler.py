@@ -108,6 +108,51 @@ def _validate_request(request: SchedulingRequest) -> None:
             )
 
 
+def _leave_overlaps_shift(leave, shift) -> bool:
+    last_shift_date = (shift.ends_at - timedelta(microseconds=1)).date()
+    return leave.start_date <= last_shift_date and shift.starts_at.date() <= leave.end_date
+
+
+def _infeasible_diagnostics(request: SchedulingRequest) -> list[DiagnosticOutput]:
+    diagnostics = [
+        DiagnosticOutput(
+            code="NO_FEASIBLE_SCHEDULE",
+            message="No schedule satisfies all hard constraints",
+        )
+    ]
+    shift_by_id = {shift.work_shift_id: shift for shift in request.work_shifts}
+    leaves_by_employee = defaultdict(list)
+    for leave in request.approved_leaves:
+        leaves_by_employee[leave.employee_id].append(leave)
+
+    for locked in request.locked_assignments:
+        shift = shift_by_id.get(locked.work_shift_id)
+        if shift is None:
+            continue
+        for leave in leaves_by_employee[locked.employee_id]:
+            if _leave_overlaps_shift(leave, shift):
+                diagnostics.append(DiagnosticOutput(
+                    code="LOCKED_ASSIGNMENT_CONFLICTS_WITH_LEAVE",
+                    message="Locked assignment conflicts with approved leave",
+                    employee_id=locked.employee_id,
+                    work_shift_id=locked.work_shift_id,
+                ))
+
+    for shift in request.work_shifts:
+        unavailable = {
+            leave.employee_id
+            for leave in request.approved_leaves
+            if _leave_overlaps_shift(leave, shift)
+        }
+        if len(request.employees) - len(unavailable) < shift.required_staff:
+            diagnostics.append(DiagnosticOutput(
+                code="INSUFFICIENT_AVAILABLE_STAFF",
+                message="Approved leave leaves too few employees for this shift",
+                work_shift_id=shift.work_shift_id,
+            ))
+    return diagnostics
+
+
 def solve_schedule(request: SchedulingRequest) -> SchedulingResponse:
     _validate_request(request)
     model = cp_model.CpModel()
@@ -404,26 +449,7 @@ def solve_schedule(request: SchedulingRequest) -> SchedulingResponse:
         )
 
     if result == cp_model.INFEASIBLE:
-        diagnostics = [
-            DiagnosticOutput(
-                code="NO_FEASIBLE_SCHEDULE",
-                message="No schedule satisfies all hard constraints",
-            )
-        ]
-        for shift in shifts:
-            unavailable = {
-                leave.employee_id
-                for leave in request.approved_leaves
-                if leave.start_date <= shift.work_date <= leave.end_date
-            }
-            if len(employees) - len(unavailable) < shift.required_staff:
-                diagnostics.append(
-                    DiagnosticOutput(
-                        code="INSUFFICIENT_AVAILABLE_STAFF",
-                        message="Approved leave leaves too few employees for this shift",
-                        work_shift_id=shift.work_shift_id,
-                    )
-                )
+        diagnostics = _infeasible_diagnostics(request)
         return SchedulingResponse(
             run_id=request.run_id,
             period_id=request.period.period_id,
