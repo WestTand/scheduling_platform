@@ -6,10 +6,10 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.transaction.annotation.Transactional;
 import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
 import scheduling.scheduling.entity.Employee;
@@ -29,6 +29,7 @@ import scheduling.scheduling.repository.WorkShiftRepository;
         "app.jwt.secret=test-secret-key-with-at-least-32-characters",
         "app.auth.default-employee-password=configured-default",
 })
+@Transactional
 class ShiftAssignmentRepositoryFixedQueryTest {
 
     @Autowired
@@ -51,17 +52,6 @@ class ShiftAssignmentRepositoryFixedQueryTest {
 
     @Autowired
     private OptimizationRunRepository optimizationRunRepository;
-
-    @BeforeEach
-    void cleanUp() {
-        shiftAssignmentRepository.deleteAll();
-        workShiftRepository.deleteAll();
-        optimizationRunRepository.deleteAll();
-        schedulePeriodRepository.deleteAll();
-        employeeRepository.deleteAll();
-        shiftTypeRepository.deleteAll();
-        accountRepository.deleteAll();
-    }
 
     @Test
     void findFixedForPeriodReturnsOnlyFixedRowsInPeriod() {
@@ -93,30 +83,30 @@ class ShiftAssignmentRepositoryFixedQueryTest {
                 .build());
         SchedulePeriod periodA = schedulePeriodRepository.save(SchedulePeriod.builder()
                 .periodName("Fixed Query Period A")
-                .startDate(LocalDate.of(2026, 9, 14))
-                .endDate(LocalDate.of(2026, 9, 20))
+                .startDate(LocalDate.of(2031, 2, 3))
+                .endDate(LocalDate.of(2031, 2, 9))
                 .createdBy(manager)
                 .build());
         SchedulePeriod periodB = schedulePeriodRepository.save(SchedulePeriod.builder()
                 .periodName("Fixed Query Period B")
-                .startDate(LocalDate.of(2026, 9, 21))
-                .endDate(LocalDate.of(2026, 9, 27))
+                .startDate(LocalDate.of(2031, 2, 10))
+                .endDate(LocalDate.of(2031, 2, 16))
                 .createdBy(manager)
                 .build());
         WorkShift shiftA1 = workShiftRepository.save(WorkShift.builder()
-                .workDate(LocalDate.of(2026, 9, 15))
+                .workDate(LocalDate.of(2031, 2, 4))
                 .requiredStaff(2)
                 .schedulePeriod(periodA)
                 .shiftType(shiftType)
                 .build());
         WorkShift shiftA2 = workShiftRepository.save(WorkShift.builder()
-                .workDate(LocalDate.of(2026, 9, 16))
+                .workDate(LocalDate.of(2031, 2, 5))
                 .requiredStaff(2)
                 .schedulePeriod(periodA)
                 .shiftType(shiftType)
                 .build());
         WorkShift shiftB1 = workShiftRepository.save(WorkShift.builder()
-                .workDate(LocalDate.of(2026, 9, 22))
+                .workDate(LocalDate.of(2031, 2, 11))
                 .requiredStaff(2)
                 .schedulePeriod(periodB)
                 .shiftType(shiftType)

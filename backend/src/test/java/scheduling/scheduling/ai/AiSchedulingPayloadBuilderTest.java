@@ -197,7 +197,7 @@ class AiSchedulingPayloadBuilderTest {
                 .workShift(fixture.workShift())
                 .employee(inactiveEmployee)
                 .assignmentStatus("ASSIGNED")
-                .assignedSource("MANUAL")
+                .assignedSource("AUTO")
                 .locked(true)
                 .build();
         badFixed.setId(601L);
