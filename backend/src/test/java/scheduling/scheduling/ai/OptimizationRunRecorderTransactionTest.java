@@ -3,6 +3,7 @@ package scheduling.scheduling.ai;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -16,6 +17,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import scheduling.scheduling.ai.dto.AiSchedulingResponseDto;
 import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
 import scheduling.scheduling.entity.OptimizationRun;
@@ -81,6 +83,44 @@ class OptimizationRunRecorderTransactionTest {
         assertThat(runs.get(0).getPenaltyDetailsJson()).isNull();
         assertThat(schedulePeriodRepository.findAll())
                 .noneMatch(p -> "rollback-probe".equals(p.getPeriodName()));
+    }
+
+    @Test
+    void finishSuccessUpdatesSchedulePeriodTotalPenalty() {
+        Account manager = accountRepository.save(Account.builder()
+                .username("tx-penalty-manager")
+                .passwordHash("hash")
+                .role(AccountRole.MANAGER)
+                .build());
+        SchedulePeriod period = schedulePeriodRepository.save(SchedulePeriod.builder()
+                .periodName("TX Penalty Period")
+                .startDate(LocalDate.of(2033, 1, 1))
+                .endDate(LocalDate.of(2033, 1, 7))
+                .versionNo(1)
+                .status("DRAFT")
+                .createdBy(manager)
+                .build());
+        OptimizationRun run = recorder.start(period, manager, Map.of("timeLimitSeconds", 30));
+        AiSchedulingResponseDto response = new AiSchedulingResponseDto(
+                "1.0",
+                run.getId(),
+                period.getId(),
+                "SUCCESS",
+                "OPTIMAL",
+                List.of(),
+                new BigDecimal("12.34"),
+                Map.of("fairness", new BigDecimal("12.34")),
+                List.of(),
+                List.of(),
+                null,
+                new AiSchedulingResponseDto.StatisticsDto(BigDecimal.ZERO, 0, 0));
+
+        recorder.finishSuccess(run.getId(), response);
+
+        assertThat(schedulePeriodRepository.findById(period.getId()))
+                .get()
+                .extracting(SchedulePeriod::getTotalPenalty)
+                .isEqualTo(new BigDecimal("12.34"));
     }
 
     @TestConfiguration
