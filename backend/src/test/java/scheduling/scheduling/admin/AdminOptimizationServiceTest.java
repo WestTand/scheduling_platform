@@ -314,6 +314,92 @@ class AdminOptimizationServiceTest {
     }
 
     @Test
+    void rejectsNullAssignmentIdsAsInvalidProtocol() {
+        CurrentAccountPrincipal principal = new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
+        Account manager = managerAccount(principal);
+        SchedulePeriod period = draftPeriod(5L, manager);
+        Map<String, Object> weights = Map.of("fairness", BigDecimal.ONE);
+        AiSchedulingRequestDto payload = testPayload();
+        AiSchedulingResponseDto aiResponse = new AiSchedulingResponseDto(
+                "1.0",
+                900L,
+                5L,
+                "SUCCESS",
+                "OPTIMAL",
+                List.of(new AiSchedulingResponseDto.AssignmentDto(null, 100L)),
+                new BigDecimal("12.50"),
+                Map.of("fairness", new BigDecimal("12.50")),
+                List.of(),
+                List.of(),
+                null,
+                new AiSchedulingResponseDto.StatisticsDto(new BigDecimal("1.5"), 0, 10));
+        OptimizationRun startedRun = startedRun(900L, period, manager);
+        OptimizationRun failedRun = finishedRun(900L, period, manager, "FAILED");
+
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
+        when(schedulePeriodRepository.findDetailById(5L)).thenReturn(Optional.of(period));
+        when(payloadBuilder.prepareSnapshot(eq(period), eq(null))).thenReturn(testSnapshot());
+        when(payloadBuilder.weightsSnapshotFrom(any())).thenReturn(weights);
+        when(optimizationRunRecorder.start(eq(period), eq(manager), eq(weights))).thenReturn(startedRun);
+        when(payloadBuilder.buildFrom(any(), eq(period), eq(900L))).thenReturn(payload);
+        when(aiSchedulingClient.optimize(eq(payload))).thenReturn(aiResponse);
+        when(optimizationRunRecorder.finishFailure(eq(900L), eq("FAILED"), contains("Invalid AI response"), isNull()))
+                .thenReturn(failedRun);
+
+        assertThatThrownBy(() -> service.optimize(principal, 5L, new OptimizeScheduleRequest(null)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_GATEWAY);
+
+        verify(optimizationRunRecorder).finishFailure(eq(900L), eq("FAILED"), contains("Invalid AI response"), isNull());
+        verify(optimizationRunRecorder, never()).finishSuccess(any(), any());
+        verifyNoInteractions(assignmentPersistenceService);
+    }
+
+    @Test
+    void rejectsFailedWithAssignmentsAsInvalidProtocol() {
+        CurrentAccountPrincipal principal = new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
+        Account manager = managerAccount(principal);
+        SchedulePeriod period = draftPeriod(5L, manager);
+        Map<String, Object> weights = Map.of("fairness", BigDecimal.ONE);
+        AiSchedulingRequestDto payload = testPayload();
+        AiSchedulingResponseDto aiResponse = new AiSchedulingResponseDto(
+                "1.0",
+                900L,
+                5L,
+                "FAILED",
+                "UNKNOWN",
+                List.of(new AiSchedulingResponseDto.AssignmentDto(10L, 100L)),
+                null,
+                Map.of(),
+                List.of(),
+                List.of(),
+                "Solver crashed",
+                new AiSchedulingResponseDto.StatisticsDto(new BigDecimal("0.5"), 0, 0));
+        OptimizationRun startedRun = startedRun(900L, period, manager);
+        OptimizationRun failedRun = finishedRun(900L, period, manager, "FAILED");
+
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
+        when(schedulePeriodRepository.findDetailById(5L)).thenReturn(Optional.of(period));
+        when(payloadBuilder.prepareSnapshot(eq(period), eq(null))).thenReturn(testSnapshot());
+        when(payloadBuilder.weightsSnapshotFrom(any())).thenReturn(weights);
+        when(optimizationRunRecorder.start(eq(period), eq(manager), eq(weights))).thenReturn(startedRun);
+        when(payloadBuilder.buildFrom(any(), eq(period), eq(900L))).thenReturn(payload);
+        when(aiSchedulingClient.optimize(eq(payload))).thenReturn(aiResponse);
+        when(optimizationRunRecorder.finishFailure(eq(900L), eq("FAILED"), contains("Invalid AI response"), isNull()))
+                .thenReturn(failedRun);
+
+        assertThatThrownBy(() -> service.optimize(principal, 5L, new OptimizeScheduleRequest(null)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_GATEWAY);
+
+        verify(optimizationRunRecorder).finishFailure(eq(900L), eq("FAILED"), contains("Invalid AI response"), isNull());
+        verify(optimizationRunRecorder, never()).finishSuccess(any(), any());
+        verifyNoInteractions(assignmentPersistenceService);
+    }
+
+    @Test
     void rejectsDuplicateAssignmentPairAsInvalidProtocol() {
         CurrentAccountPrincipal principal = new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
         Account manager = managerAccount(principal);
@@ -399,6 +485,7 @@ class AdminOptimizationServiceTest {
         assertThat(response.errorMessage()).contains("Not enough staff");
         verify(optimizationRunRecorder).finishFailure(eq(900L), eq("INFEASIBLE"), contains("Not enough staff"), eq(aiResponse));
         verify(optimizationRunRecorder, never()).finishSuccess(any(), any());
+        verifyNoInteractions(assignmentPersistenceService);
 
         InOrder inOrder = inOrder(payloadBuilder, optimizationRunRecorder, aiSchedulingClient);
         inOrder.verify(payloadBuilder).prepareSnapshot(eq(period), eq(null));
@@ -504,6 +591,7 @@ class AdminOptimizationServiceTest {
         assertThat(response.errorMessage()).contains("Solver crashed");
         verify(optimizationRunRecorder).finishFailure(eq(900L), eq("FAILED"), contains("Solver crashed"), eq(aiResponse));
         verify(optimizationRunRecorder, never()).finishSuccess(any(), any());
+        verifyNoInteractions(assignmentPersistenceService);
     }
 
     @Test
@@ -533,6 +621,7 @@ class AdminOptimizationServiceTest {
 
         verify(optimizationRunRecorder).finishFailure(eq(900L), eq("FAILED"), eq("boom"), eq(null));
         verify(optimizationRunRecorder, never()).finishSuccess(any(), any());
+        verifyNoInteractions(assignmentPersistenceService);
 
         InOrder inOrder = inOrder(payloadBuilder, optimizationRunRecorder, aiSchedulingClient);
         inOrder.verify(payloadBuilder).prepareSnapshot(eq(period), eq(null));
@@ -570,6 +659,7 @@ class AdminOptimizationServiceTest {
         verify(optimizationRunRecorder)
                 .finishFailure(eq(900L), eq("FAILED"), contains("Unexpected optimization failure"), isNull());
         verify(optimizationRunRecorder, never()).finishSuccess(any(), any());
+        verifyNoInteractions(assignmentPersistenceService);
     }
 
     @Test
