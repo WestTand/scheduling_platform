@@ -61,6 +61,15 @@ Insert:
 - AI assignment đã có preserved row cùng cặp `employeeId + workShiftId` → skip, không duplicate.
 - AI assignment trỏ tới employee/workShift không hợp lệ (ngoài period, ngoài snapshot schedulable) → fail toàn bộ apply, không persist một phần.
 
+Solver-visibility rule:
+
+- Vì backend giữ mọi `MANUAL` assignment, AI phải thấy các assignment đó như fixed/reserved inputs; nếu không, solver có thể trả thêm người cho cùng shift và backend sẽ overstaff.
+- Trong slice 6B, payload builder đổi semantics của `lockedAssignments`: gửi tất cả assignments cần preserve/fix trước AI, gồm:
+  - mọi assignment `locked = true`
+  - mọi assignment `assignedSource = MANUAL`
+- Giữ tên JSON `lockedAssignments` để tương thích schema `1.0`; trong backend code/test gọi đây là preserved/fixed assignments nếu cần để tránh nhầm nghĩa nghiệp vụ.
+- Nếu một preserved assignment trỏ tới employee/work shift không còn schedulable/hợp lệ, pre-call validation phải fail `400` trước khi tạo run (giống locked validation hiện tại), thay vì âm thầm bỏ qua.
+
 ### 3.3 Validation trước insert
 
 Dùng cùng snapshot đã build payload (không query lại toàn bộ nếu có thể):
@@ -69,9 +78,26 @@ Dùng cùng snapshot đã build payload (không query lại toàn bộ nếu có
 - `employeeId` phải thuộc schedulable set (`snapshot` employees).
 - Work shift phải có shift type active (đã validate ở 6A; nếu AI trả assignment cho shift bị loại thì fail apply).
 - Preserved assignments load sau delete để check duplicate chính xác.
-- Không cần re-validate leave/overlap/daily-hours ở backend: solver đã enforce; backend chỉ validate referential integrity + duplicate.
+- AI response `SUCCESS` phải không conflict với preserved/fixed assignments ngoài exact duplicate:
+  - exact duplicate `(employeeId, workShiftId)` → skip
+  - same `workShiftId` nhưng staffing vượt `requiredStaff` khi cộng preserved + AI → fail apply
+  - same employee overlap/max-hours/leave conflicts với preserved assignments → solver đáng ra đã thấy preserved as fixed; nếu vẫn xuất hiện thì fail apply thay vì commit lịch sai
+- Backend không cần chạy lại toàn bộ objective/soft constraints, nhưng phải bảo vệ hard invariants cơ bản trước khi commit: referential integrity, duplicate pairs, shift capacity, employee overlap/date-leave/daily-hours nếu conflict phát sinh từ preserved + AI output.
 
-### 3.4 Transaction và run lifecycle
+### 3.4 AI response protocol tightening
+
+Slice 6B cũng siết protocol validation trong `AdminOptimizationService` trước khi gọi persistence:
+
+- `SUCCESS`:
+  - `assignments` non-null
+  - từng item non-null
+  - từng `employeeId`/`workShiftId` non-null
+  - không duplicate pair `(employeeId, workShiftId)` trong AI response
+- non-`SUCCESS` (`INFEASIBLE`/`FAILED`):
+  - `assignments` phải empty; nếu AI trả assignments cho non-SUCCESS thì coi là invalid protocol → run `FAILED`, `502`, không mutate assignments.
+- Existing checks giữ nguyên: schemaVersion/runId/periodId/status/solverStatus/list fields/statistics/penaltyDetails.
+
+### 3.5 Transaction và run lifecycle
 
 1. AI response protocol passes + `status = SUCCESS` (logic 6A giữ nguyên).
 2. Gọi `AiAssignmentPersistenceService.apply(period, snapshot, response)` trong transaction riêng:
@@ -94,7 +120,7 @@ Không mutate paths (giữ nguyên 6A):
 - Transport/protocol failure → `502`, run `FAILED`, không động assignments.
 - Pre-call `400` → không tạo run, không động assignments.
 
-### 3.5 Response DTO (giữ nguyên)
+### 3.6 Response DTO (giữ nguyên)
 
 - `OptimizeScheduleResponse` không đổi trong slice này.
 - `assignmentCount` = số assignments AI trả về, không phải số rows đã insert.
@@ -126,11 +152,12 @@ Mới:
 
 - `ai/AiAssignmentPersistenceService.java` — transactional apply (delete + validate + insert).
 - `ai/ApplyResult.java` hoặc return record trong service (inserted count, skipped count) — dùng cho log/test, chưa expose qua API.
-- Tests: `AiAssignmentPersistenceServiceTest` (mock repos, transactional semantics kiểm tra qua interaction + rollback behavior), extend `AdminOptimizationServiceTest` (`SUCCESS` gọi persistence trước `finishSuccess`; persistence failure → run `FAILED` + `502`; non-SUCCESS không gọi persistence).
+- Tests: `AiAssignmentPersistenceServiceTest` (unit tests for validation/mapping), real JPA transaction test for rollback behavior, extend `AdminOptimizationServiceTest` (`SUCCESS` gọi persistence trước `finishSuccess`; persistence failure → run `FAILED` + `502`; non-SUCCESS không gọi persistence).
 
 Sửa:
 
-- `admin/AdminOptimizationService.java` — inject persistence service, gọi sau protocol pass khi `SUCCESS`, catch apply failure → `finishFailure` + `502`.
+- `admin/AdminOptimizationService.java` — inject persistence service, gọi sau protocol pass khi `SUCCESS`, catch apply failure → `finishFailure` + `502`, siết protocol validation assignments như §3.4.
+- `ai/AiSchedulingPayloadBuilder.java` — đổi `lockedAssignments` payload thành preserved/fixed assignments (`locked=true OR assignedSource=MANUAL`) để AI reserve dữ liệu backend sẽ giữ.
 - `repository/ShiftAssignmentRepository.java` — thêm delete/query methods.
 - `docs/project_plan.md` — tick sau khi slice pass:
   - `AI service nhan danh sach nhan vien active`
@@ -147,8 +174,11 @@ Quyết định: `boundaryAssignments` vẫn để trống trong slice này (des
 ## 7. Testing Plan
 
 - TDD cho persistence service và service orchestration theo skill `test-driven-development`.
-- Persistence unit tests: delete-unlocked-AUTO-only, preserve MANUAL + locked AUTO, insert AUTO/ASSIGNED/unlocked, skip preserved pairs, reject unknown employee/shift với rollback (verify `save` không gọi hoặc interaction đúng).
+- Payload builder tests: `lockedAssignments` payload includes locked assignments and MANUAL assignments; rejects preserved/fixed assignments that reference inactive employee/invalid work shift before run creation.
+- Persistence unit tests: delete-unlocked-AUTO-only, preserve MANUAL + locked AUTO, insert AUTO/ASSIGNED/unlocked, skip preserved pairs, reject unknown employee/shift, reject capacity/overlap/leave/max-hours conflicts from preserved + AI result.
+- Persistence transaction test with real JPA: persisted unlocked AUTO row is deleted early, then a forced apply failure occurs; after rollback, original unlocked AUTO row is still present and no partial inserted AI rows remain. Service-level test separately proves run `FAILED` is committed via recorder.
 - Service tests với mocked client + mocked persistence: `SUCCESS` order (protocol → persist → `finishSuccess`); persist throw → `finishFailure("FAILED", contains "Failed to apply AI assignments")` + `502`; `INFEASIBLE`/`FAILED`/transport-failure không gọi persistence (`verifyNoInteractions` hoặc `never`).
+- Protocol tests: non-SUCCESS with non-empty assignments, null assignment item/id, duplicate AI pair → invalid protocol `502` + run `FAILED`, no persistence call.
 - Controller tests: giữ nguyên (response shape không đổi); thêm case nếu behavior HTTP đổi (không dự kiến).
 - Regression: full backend suite `.\backend\mvnw.cmd -f backend/pom.xml test` (plain command, UTC đã pin trong surefire), `git diff --check`.
 
@@ -156,13 +186,14 @@ Quyết định: `boundaryAssignments` vẫn để trống trong slice này (des
 
 - Bulk delete + insert trong một transaction dài: period lớn có thể chậm; slice này chấp nhận (optimize vốn đồng bộ), ghi chú cho async slice sau.
 - AI trả assignment cho shift/employee ngoài snapshot (solver bug hoặc data race): fail apply + `502` có thể gây khó chịu; message phải nêu rõ cặp id lỗi để manager debug.
+- Preserved MANUAL assignments phải được gửi sang AI như fixed inputs; nếu implementation quên bước này, AI có thể tạo overstaff/conflict. Tests phải khóa behavior này.
 - Duplicate unique: nếu DB có unique constraint (employee+shift), insert phải skip preserved trước; validate logic phải khớp constraint để không 500 vì `DataIntegrityViolationException` — nếu DB throw, catch → `502` + run `FAILED` (không để 500 rò ra).
 - Locked AUTO assignments: giữ nguyên, không update từ AI result (theo contract "persist as existing locked records instead of duplicated").
 - `OptimizationRunRecorder.finishSuccess` non-null contract: persistence chạy trước `finishSuccess`, response đã validate nên an toàn.
 
 ## 9. Non-goals / Follow-ups
 
-- `boundaryAssignments` design + gửi (slice riêng).
+- `boundaryAssignments` design + gửi liên kỳ (slice riêng). Assignment trong cùng period mà backend preserve được gửi qua `lockedAssignments` như fixed inputs ở slice này.
 - Retry/timeout tuning, background/async run.
 - pytest AI service theo payload thực tế (nếu cần, slice riêng với ai-service).
 - Frontend trigger/monitor optimization run, hiển thị inserted/skipped counts.
