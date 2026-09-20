@@ -610,7 +610,7 @@ Ket qua mong doi: manager co nut export va cac bao cao co filter ro rang.
 - [x] Test export Excel
   - Kiem tra file tao duoc, co sheet/cot/data dung.
   - Dam bao export khong bi hong format.
-- [x] Test export du lieu dung filter
+- [ ] Test export du lieu dung filter
   - Kiem tra export theo period/employee/status dung.
   - Tranh xuat nham du lieu ngoai filter.
 
