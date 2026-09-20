@@ -442,19 +442,19 @@ Backend/database compatibility notes from rule foundation slices:
 - [x] API backend goi AI service tao lich
   - Dung de manager kick off auto scheduling tu backend.
   - Backend gom du lieu, gui AI service, nhan ket qua va luu DB.
-- [ ] AI service nhan danh sach nhan vien active
+- [x] AI service nhan danh sach nhan vien active
   - Dung de chi lap lich cho nhan vien dang lam viec va account hop le.
   - Tranh gan ca cho nhan vien inactive.
-- [ ] AI service nhan shift types active
+- [x] AI service nhan shift types active
   - Dung de biet cac loai ca hop le va min/max staff.
   - Loai ca inactive khong duoc dung de tao lich moi.
-- [ ] AI service nhan approved leave requests
+- [x] AI service nhan approved leave requests
   - Dung de hard-block ngay nhan vien da nghi duoc duyet.
   - Giam conflict giua nghi phep va assignment.
-- [ ] AI service nhan preferences
+- [x] AI service nhan preferences
   - Dung de toi uu theo nguyen vong nhan vien neu co the.
   - Thuong la soft constraint vi khong phai luc nao cung dap ung duoc.
-- [ ] AI service nhan locked assignments
+- [x] AI service nhan locked assignments
   - Dung de giu cac phan cong manager da chot.
   - AI chi lap phan con lai xung quanh cac assignment bi khoa.
 - [ ] Implement hard constraint: du nhan su moi ca
@@ -503,10 +503,10 @@ Backend/database compatibility notes from rule foundation slices:
 - [ ] Tra ket qua lich toi uu ve backend
   - Dung de backend biet assignment nao can luu va penalty bao nhieu.
   - Ket qua phai co cau truc de debug/demo.
-- [ ] Backend luu `ShiftAssignment`
+- [x] Backend luu `ShiftAssignment`
   - Dung de bien ket qua AI thanh lich that trong database.
   - Frontend/employee APIs doc tu bang nay.
-- [ ] Backend luu `OptimizationRun`
+- [x] Backend luu `OptimizationRun`
   - Dung de ghi lai lan chay AI, status, penalty, error.
   - Ho tro audit va so sanh ket qua.
 - [ ] Backend luu `total_penalty`
