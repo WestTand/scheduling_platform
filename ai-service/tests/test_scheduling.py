@@ -323,4 +323,9 @@ def test_infeasible_diagnostics_include_locked_leave_conflict() -> None:
     assert response.status_code == 200
     body = response.json()
     assert body["status"] == "INFEASIBLE"
-    assert any(item["code"] == "LOCKED_ASSIGNMENT_CONFLICTS_WITH_LEAVE" for item in body["diagnostics"])
+    assert any(
+        item["code"] == "LOCKED_ASSIGNMENT_CONFLICTS_WITH_LEAVE"
+        and item["employeeId"] == 1
+        and item["workShiftId"] == 1000
+        for item in body["diagnostics"]
+    )

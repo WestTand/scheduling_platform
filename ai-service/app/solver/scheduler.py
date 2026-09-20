@@ -179,8 +179,7 @@ def solve_schedule(request: SchedulingRequest) -> SchedulingResponse:
 
     for leave in request.approved_leaves:
         for shift in shifts:
-            last_shift_date = (shift.ends_at - timedelta(microseconds=1)).date()
-            if leave.start_date <= last_shift_date and shift.starts_at.date() <= leave.end_date:
+            if _leave_overlaps_shift(leave, shift):
                 model.add(assigned[leave.employee_id, shift.work_shift_id] == 0)
 
     rest_minutes = request.rules.hard_rules.min_rest_hours_between_shifts * 60
