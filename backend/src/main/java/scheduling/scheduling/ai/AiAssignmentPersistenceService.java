@@ -67,6 +67,7 @@ public class AiAssignmentPersistenceService {
             }
         }
         shiftAssignmentRepository.deleteAll(toDelete);
+        shiftAssignmentRepository.flush();
 
         Map<Long, WorkShift> shiftsById = new HashMap<>();
         for (WorkShift shift : snapshot.workShifts()) {

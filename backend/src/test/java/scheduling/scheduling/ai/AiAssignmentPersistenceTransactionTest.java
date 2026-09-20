@@ -1,6 +1,7 @@
 package scheduling.scheduling.ai;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
 import java.math.BigDecimal;
@@ -96,6 +97,7 @@ class AiAssignmentPersistenceTransactionTest {
 
     @AfterEach
     void tearDown() {
+        deleteLeftoversByKeys();
         for (Long id : assignmentIds) {
             shiftAssignmentRepository.findById(id).ifPresent(shiftAssignmentRepository::delete);
         }
@@ -270,6 +272,121 @@ class AiAssignmentPersistenceTransactionTest {
         assertThat(shiftAssignmentRepository
                 .existsByWorkShiftIdAndEmployeeId(shiftA.getId(), UNKNOWN_EMPLOYEE_ID))
                 .isFalse();
+    }
+
+    @Test
+    void replacingSameUnlockedAutoPairSucceeds() {
+        Account manager = accountRepository.save(Account.builder()
+                .username(MANAGER_USERNAME)
+                .passwordHash("hash")
+                .role(AccountRole.MANAGER)
+                .isActive(true)
+                .status(AccountStatus.ACTIVE)
+                .build());
+        managerId = manager.getId();
+
+        Employee employee = employeeRepository.save(Employee.builder()
+                .employeeCode(EMPLOYEE_CODE)
+                .fullName("AI Rollback Employee")
+                .status("ACTIVE")
+                .build());
+        employeeId = employee.getId();
+
+        Account employeeAccount = accountRepository.save(Account.builder()
+                .username(EMPLOYEE_USERNAME)
+                .passwordHash("hash")
+                .role(AccountRole.EMPLOYEE)
+                .isActive(true)
+                .status(AccountStatus.ACTIVE)
+                .employee(employee)
+                .build());
+        employeeAccountId = employeeAccount.getId();
+
+        ShiftType shiftType = shiftTypeRepository.save(ShiftType.builder()
+                .shiftName(SHIFT_NAME)
+                .startTime(LocalTime.of(8, 0))
+                .endTime(LocalTime.of(16, 0))
+                .durationHours(new BigDecimal("8.0"))
+                .overnight(false)
+                .heavy(false)
+                .minStaff(1)
+                .maxStaff(5)
+                .quotaCategory("REGULAR")
+                .status("ACTIVE")
+                .shiftCode(SHIFT_CODE)
+                .build());
+        shiftTypeId = shiftType.getId();
+
+        SchedulePeriod period = schedulePeriodRepository.save(SchedulePeriod.builder()
+                .periodName(PERIOD_NAME)
+                .startDate(PERIOD_START)
+                .endDate(PERIOD_END)
+                .status("DRAFT")
+                .createdBy(manager)
+                .build());
+        periodId = period.getId();
+
+        WorkShift shift = workShiftRepository.save(WorkShift.builder()
+                .workDate(LocalDate.of(2032, 5, 4))
+                .requiredStaff(1)
+                .schedulePeriod(period)
+                .shiftType(shiftType)
+                .startsAt(OffsetDateTime.of(LocalDate.of(2032, 5, 4), LocalTime.of(8, 0), ZoneOffset.UTC))
+                .endsAt(OffsetDateTime.of(LocalDate.of(2032, 5, 4), LocalTime.of(16, 0), ZoneOffset.UTC))
+                .build());
+        workShiftIds.add(shift.getId());
+
+        ShiftAssignment originalAuto = shiftAssignmentRepository.save(ShiftAssignment.builder()
+                .workShift(shift)
+                .employee(employee)
+                .assignmentStatus("ASSIGNED")
+                .assignedSource("AUTO")
+                .locked(false)
+                .build());
+        assignmentIds.add(originalAuto.getId());
+
+        AiSchedulingPayloadBuilder.PayloadSnapshot snapshot = new AiSchedulingPayloadBuilder.PayloadSnapshot(
+                List.of(employee),
+                List.of(shiftType),
+                List.of(shift),
+                List.of(),
+                List.of(),
+                List.of(),
+                new AiSchedulingRequestDto.RulesDto(
+                        new AiSchedulingRequestDto.HardRulesDto(8, 12, 6),
+                        new AiSchedulingRequestDto.QuotasDto(2, 2, 7),
+                        new AiSchedulingRequestDto.SoftWeightsDto(
+                                BigDecimal.ONE,
+                                BigDecimal.ONE,
+                                BigDecimal.ONE,
+                                BigDecimal.ONE,
+                                BigDecimal.ONE)),
+                new AiSchedulingRequestDto.SolverOptionsDto(30, 1, 8));
+
+        AiSchedulingResponseDto response = new AiSchedulingResponseDto(
+                "1.0",
+                900L,
+                periodId,
+                "SUCCESS",
+                "OPTIMAL",
+                List.of(new AiSchedulingResponseDto.AssignmentDto(employee.getId(), shift.getId())),
+                BigDecimal.ZERO,
+                Map.of(),
+                List.of(),
+                List.of(),
+                null,
+                new AiSchedulingResponseDto.StatisticsDto(BigDecimal.ZERO, 0, 0));
+
+        Throwable thrown = catchThrowable(() -> persistence.apply(period, snapshot, response));
+
+        assertThat(thrown).isNull();
+        List<ShiftAssignment> after = shiftAssignmentRepository.listForPeriod(periodId);
+        assertThat(after).hasSize(1);
+        assertThat(after.get(0).getEmployee().getId()).isEqualTo(employee.getId());
+        assertThat(after.get(0).getWorkShift().getId()).isEqualTo(shift.getId());
+        assertThat(after.get(0).getAssignedSource()).isEqualTo("AUTO");
+        assertThat(after.get(0).getAssignmentStatus()).isEqualTo("ASSIGNED");
+        assertThat(after.get(0).getLocked()).isFalse();
     }
 
     private void deleteLeftoversByKeys() {
