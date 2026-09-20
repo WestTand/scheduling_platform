@@ -583,22 +583,22 @@ Muc dich: cho phep xuat lich va bao cao ra file de su dung ngoai he thong, nop/d
 
 Ket qua mong doi: manager co nut export va cac bao cao co filter ro rang.
 
-- [ ] API xuat lich Excel
+- [x] API xuat lich Excel
   - Dung de tai lich theo ky ra file `.xlsx`.
   - Phu hop in an/chia se voi nguoi khong dung he thong.
-- [ ] API xuat lich PDF neu can
+- [x] API xuat lich PDF neu can
   - Dung de tao ban lich co dinh de in/gui.
   - Huu ich cho demo va bao cao chinh thuc.
-- [ ] Export lich theo ky
+- [x] Export lich theo ky
   - Dung de lay toan bo lich cua mot schedule period.
   - La format tong quan cho manager.
 - [ ] Export lich theo nhan vien
   - Dung de lay lich ca nhan cua mot hoac nhieu nhan vien.
   - Huu ich khi gui lich rieng cho tung nguoi.
-- [ ] Export bao cao tong so ca moi nhan vien
+- [x] Export bao cao tong so ca moi nhan vien
   - Dung de thong ke workload theo so ca.
   - Ho tro danh gia cong bang.
-- [ ] Export bao cao so gio lam moi nhan vien
+- [x] Export bao cao so gio lam moi nhan vien
   - Dung de thong ke duration/tong gio.
   - Co the dung cho doi chieu cong/OT.
 - [ ] Export bao cao penalty/optimization result
@@ -607,10 +607,10 @@ Ket qua mong doi: manager co nut export va cac bao cao co filter ro rang.
 - [ ] UI nut export Excel/PDF
   - Dung de manager thao tac export tu frontend.
   - Khong can goi API thu cong.
-- [ ] Test export Excel
+- [x] Test export Excel
   - Kiem tra file tao duoc, co sheet/cot/data dung.
   - Dam bao export khong bi hong format.
-- [ ] Test export du lieu dung filter
+- [x] Test export du lieu dung filter
   - Kiem tra export theo period/employee/status dung.
   - Tranh xuat nham du lieu ngoai filter.
 
