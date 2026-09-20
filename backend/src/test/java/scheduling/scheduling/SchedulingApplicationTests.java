@@ -11,8 +11,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import scheduling.scheduling.repository.RefreshTokenRepository;
 import scheduling.scheduling.repository.AccountActivationOtpRepository;
 import scheduling.scheduling.repository.AccountRepository;
+import scheduling.scheduling.repository.ActivityLogRepository;
 import scheduling.scheduling.repository.EmployeeRepository;
 import scheduling.scheduling.repository.LeaveRequestRepository;
+import scheduling.scheduling.repository.NotificationRepository;
 import scheduling.scheduling.repository.PreferenceRepository;
 import scheduling.scheduling.repository.SchedulingRuleRepository;
 import scheduling.scheduling.repository.SchedulePeriodRepository;
@@ -35,6 +37,9 @@ class SchedulingApplicationTests {
 
 	@MockitoBean
 	private AccountRepository accountRepository;
+
+	@MockitoBean
+	private ActivityLogRepository activityLogRepository;
 
 	@MockitoBean
 	private EmployeeRepository employeeRepository;
@@ -71,6 +76,9 @@ class SchedulingApplicationTests {
 
 	@MockitoBean
 	private OptimizationRunRepository optimizationRunRepository;
+
+	@MockitoBean
+	private NotificationRepository notificationRepository;
 
 	@Autowired
 	private JavaMailSender mailSender;
