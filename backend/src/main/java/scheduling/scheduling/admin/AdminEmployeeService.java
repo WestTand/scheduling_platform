@@ -1,26 +1,41 @@
 package scheduling.scheduling.admin;
 
 import java.util.List;
+import java.util.Map;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.web.server.ResponseStatusException;
 import scheduling.scheduling.admin.dto.AdminEmployeeResponse;
 import scheduling.scheduling.admin.dto.UpdateEmployeeRequest;
+import scheduling.scheduling.audit.ActivityLogService;
+import scheduling.scheduling.auth.CurrentAccountPrincipal;
 import scheduling.scheduling.auth.RefreshTokenService;
 import scheduling.scheduling.entity.Account;
+import scheduling.scheduling.entity.AccountRole;
 import scheduling.scheduling.entity.AccountStatus;
 import scheduling.scheduling.entity.Employee;
+import scheduling.scheduling.repository.AccountRepository;
 import scheduling.scheduling.repository.EmployeeRepository;
 
 @Service
 public class AdminEmployeeService {
 
     private final EmployeeRepository employeeRepository;
+    private final AccountRepository accountRepository;
     private final RefreshTokenService refreshTokenService;
+    private final ActivityLogService activityLogService;
 
-    public AdminEmployeeService(EmployeeRepository employeeRepository, RefreshTokenService refreshTokenService) {
+    public AdminEmployeeService(
+            EmployeeRepository employeeRepository,
+            AccountRepository accountRepository,
+            RefreshTokenService refreshTokenService,
+            ActivityLogService activityLogService) {
         this.employeeRepository = employeeRepository;
+        this.accountRepository = accountRepository;
         this.refreshTokenService = refreshTokenService;
+        this.activityLogService = activityLogService;
     }
 
     @Transactional(readOnly = true)
@@ -43,17 +58,21 @@ public class AdminEmployeeService {
     }
 
     @Transactional
-    public AdminEmployeeResponse updateEmployee(Long employeeId, UpdateEmployeeRequest request) {
+    public AdminEmployeeResponse updateEmployee(CurrentAccountPrincipal principal, Long employeeId, UpdateEmployeeRequest request) {
+        Account manager = requireManager(principal);
         Employee employee = findEmployee(employeeId);
         employee.setFullName(request.fullName());
         employee.setEmail(request.email());
         employee.setPhone(request.phone());
         employee.setStatus(request.status());
-        return AdminEmployeeResponse.from(employeeRepository.save(employee));
+        Employee saved = employeeRepository.save(employee);
+        activityLogService.record(manager, "UPDATE", "employees", saved.getId(), null, employeeSnapshot(saved));
+        return AdminEmployeeResponse.from(saved);
     }
 
     @Transactional
-    public void lockEmployee(Long employeeId) {
+    public void lockEmployee(CurrentAccountPrincipal principal, Long employeeId) {
+        Account manager = requireManager(principal);
         Employee employee = findEmployee(employeeId);
         employee.setStatus("INACTIVE");
         Account account = employee.getAccount();
@@ -65,10 +84,12 @@ public class AdminEmployeeService {
             refreshTokenService.revokeAllForAccount(account.getId());
         }
         employeeRepository.save(employee);
+        activityLogService.record(manager, "LOCK", "employees", employee.getId(), null, employeeSnapshot(employee));
     }
 
     @Transactional
-    public void unlockEmployee(Long employeeId) {
+    public void unlockEmployee(CurrentAccountPrincipal principal, Long employeeId) {
+        Account manager = requireManager(principal);
         Employee employee = findEmployee(employeeId);
         employee.setStatus("ACTIVE");
         Account account = employee.getAccount();
@@ -79,10 +100,31 @@ public class AdminEmployeeService {
             }
         }
         employeeRepository.save(employee);
+        activityLogService.record(manager, "UNLOCK", "employees", employee.getId(), null, employeeSnapshot(employee));
     }
 
     private Employee findEmployee(Long employeeId) {
         return employeeRepository.findById(employeeId)
                 .orElseThrow(EmployeeNotFoundException::new);
+    }
+
+    private Account requireManager(CurrentAccountPrincipal principal) {
+        if (principal == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Manager access required");
+        }
+        Account account = accountRepository.findById(principal.accountId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "Manager access required"));
+        if (account.getRole() != AccountRole.MANAGER && account.getRole() != AccountRole.ADMIN) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Manager access required");
+        }
+        return account;
+    }
+
+    private static Map<String, Object> employeeSnapshot(Employee employee) {
+        return Map.of(
+                "id", employee.getId(),
+                "employeeCode", employee.getEmployeeCode(),
+                "fullName", employee.getFullName(),
+                "status", employee.getStatus());
     }
 }

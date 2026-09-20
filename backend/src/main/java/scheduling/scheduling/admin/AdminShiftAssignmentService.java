@@ -19,6 +19,7 @@ import scheduling.scheduling.admin.dto.AdminPeriodScheduleResponse;
 import scheduling.scheduling.admin.dto.AdminShiftAssignmentResponse;
 import scheduling.scheduling.admin.dto.CreateShiftAssignmentRequest;
 import scheduling.scheduling.admin.dto.UpdateShiftAssignmentRequest;
+import scheduling.scheduling.audit.ActivityLogService;
 import scheduling.scheduling.auth.CurrentAccountPrincipal;
 import scheduling.scheduling.employee.ScheduleWindows;
 import scheduling.scheduling.employee.dto.EmployeeScheduleItemResponse;
@@ -59,6 +60,7 @@ public class AdminShiftAssignmentService {
     private final AccountRepository accountRepository;
     private final SchedulingRuleRepository schedulingRuleRepository;
     private final Clock clock;
+    private final ActivityLogService activityLogService;
 
     public AdminShiftAssignmentService(
             ShiftAssignmentRepository shiftAssignmentRepository,
@@ -68,7 +70,8 @@ public class AdminShiftAssignmentService {
             LeaveRequestRepository leaveRequestRepository,
             AccountRepository accountRepository,
             SchedulingRuleRepository schedulingRuleRepository,
-            Clock clock) {
+            Clock clock,
+            ActivityLogService activityLogService) {
         this.shiftAssignmentRepository = shiftAssignmentRepository;
         this.workShiftRepository = workShiftRepository;
         this.schedulePeriodRepository = schedulePeriodRepository;
@@ -77,12 +80,13 @@ public class AdminShiftAssignmentService {
         this.accountRepository = accountRepository;
         this.schedulingRuleRepository = schedulingRuleRepository;
         this.clock = clock;
+        this.activityLogService = activityLogService;
     }
 
     @Transactional
     public AdminShiftAssignmentResponse createAssignment(
             CurrentAccountPrincipal principal, Long workShiftId, CreateShiftAssignmentRequest request) {
-        requireManager(principal);
+        Account manager = requireManager(principal);
         if (request == null || request.employeeId() == null) {
             throw invalidAssignment("Employee id is required");
         }
@@ -108,13 +112,16 @@ public class AdminShiftAssignmentService {
                 .assignedSource(MANUAL)
                 .locked(false)
                 .build();
-        return AdminShiftAssignmentResponse.from(shiftAssignmentRepository.save(assignment));
+        ShiftAssignment saved = shiftAssignmentRepository.save(assignment);
+        activityLogService.record(
+                manager, "CREATE", "shift_assignments", saved.getId(), null, assignmentSnapshot(saved));
+        return AdminShiftAssignmentResponse.from(saved);
     }
 
     @Transactional
     public AdminShiftAssignmentResponse updateAssignment(
             CurrentAccountPrincipal principal, Long assignmentId, UpdateShiftAssignmentRequest request) {
-        requireManager(principal);
+        Account manager = requireManager(principal);
         if (request == null || request.employeeId() == null) {
             throw invalidAssignment("Employee id is required");
         }
@@ -135,7 +142,10 @@ public class AdminShiftAssignmentService {
         validateEmployeeAvailability(shift, employee, assignmentId);
         assignment.setEmployee(employee);
         assignment.setAssignedSource(MANUAL);
-        return AdminShiftAssignmentResponse.from(shiftAssignmentRepository.save(assignment));
+        ShiftAssignment saved = shiftAssignmentRepository.save(assignment);
+        activityLogService.record(
+                manager, "UPDATE", "shift_assignments", saved.getId(), null, assignmentSnapshot(saved));
+        return AdminShiftAssignmentResponse.from(saved);
     }
 
     private void validateEmployeeAvailability(WorkShift shift, Employee employee, Long ignoredAssignmentId) {
@@ -217,12 +227,14 @@ public class AdminShiftAssignmentService {
 
     @Transactional
     public void deleteAssignment(CurrentAccountPrincipal principal, Long assignmentId) {
-        requireManager(principal);
+        Account manager = requireManager(principal);
         // Intentional: locked assignments in DRAFT can still be deleted; locked only protects against future AI overwrite.
         ShiftAssignment assignment = shiftAssignmentRepository.findDetailById(assignmentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Assignment not found"));
         requireDraft(assignment.getWorkShift().getSchedulePeriod());
+        Map<String, Object> before = assignmentSnapshot(assignment);
         shiftAssignmentRepository.delete(assignment);
+        activityLogService.record(manager, "DELETE", "shift_assignments", assignment.getId(), before, null);
     }
 
     @Transactional
@@ -237,12 +249,20 @@ public class AdminShiftAssignmentService {
 
     private AdminShiftAssignmentResponse setLocked(
             CurrentAccountPrincipal principal, Long assignmentId, boolean locked) {
-        requireManager(principal);
+        Account manager = requireManager(principal);
         ShiftAssignment assignment = shiftAssignmentRepository.findDetailById(assignmentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Assignment not found"));
         requireDraft(assignment.getWorkShift().getSchedulePeriod());
         assignment.setLocked(locked);
-        return AdminShiftAssignmentResponse.from(shiftAssignmentRepository.save(assignment));
+        ShiftAssignment saved = shiftAssignmentRepository.save(assignment);
+        activityLogService.record(
+                manager,
+                locked ? "LOCK" : "UNLOCK",
+                "shift_assignments",
+                saved.getId(),
+                null,
+                assignmentSnapshot(saved));
+        return AdminShiftAssignmentResponse.from(saved);
     }
 
     static LocalDateTime[] interval(WorkShift shift) {
@@ -296,7 +316,7 @@ public class AdminShiftAssignmentService {
         return durationHours.multiply(BigDecimal.valueOf(60)).intValue();
     }
 
-    private void requireManager(CurrentAccountPrincipal principal) {
+    private Account requireManager(CurrentAccountPrincipal principal) {
         if (principal == null) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Manager access required");
         }
@@ -305,6 +325,17 @@ public class AdminShiftAssignmentService {
         if (account.getRole() != AccountRole.MANAGER) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Manager access required");
         }
+        return account;
+    }
+
+    private static Map<String, Object> assignmentSnapshot(ShiftAssignment assignment) {
+        return Map.of(
+                "id", assignment.getId(),
+                "workShiftId", assignment.getWorkShift().getId(),
+                "employeeId", assignment.getEmployee().getId(),
+                "assignmentStatus", assignment.getAssignmentStatus(),
+                "assignedSource", assignment.getAssignedSource(),
+                "locked", assignment.getLocked());
     }
 
     private static void requireDraft(SchedulePeriod period) {

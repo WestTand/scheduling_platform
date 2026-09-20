@@ -3,6 +3,7 @@ package scheduling.scheduling.admin;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -10,6 +11,7 @@ import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -38,6 +40,7 @@ import scheduling.scheduling.ai.ApplyResult;
 import scheduling.scheduling.ai.OptimizationRunRecorder;
 import scheduling.scheduling.ai.dto.AiSchedulingRequestDto;
 import scheduling.scheduling.ai.dto.AiSchedulingResponseDto;
+import scheduling.scheduling.audit.ActivityLogService;
 import scheduling.scheduling.auth.CurrentAccountPrincipal;
 import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
@@ -56,13 +59,15 @@ class AdminOptimizationServiceTest {
     private final AiSchedulingClient aiSchedulingClient = mock(AiSchedulingClient.class);
     private final AiAssignmentPersistenceService assignmentPersistenceService =
             mock(AiAssignmentPersistenceService.class);
+    private final ActivityLogService activityLogService = mock(ActivityLogService.class);
     private final AdminOptimizationService service = new AdminOptimizationService(
             accountRepository,
             schedulePeriodRepository,
             payloadBuilder,
             optimizationRunRecorder,
             aiSchedulingClient,
-            assignmentPersistenceService);
+            assignmentPersistenceService,
+            activityLogService);
 
     @Test
     void optimizeCreatesRunCallsAiAndReturnsSuccess() {
@@ -766,6 +771,7 @@ class AdminOptimizationServiceTest {
 
         verifyNoInteractions(optimizationRunRecorder, aiSchedulingClient);
         verifyNoInteractions(assignmentPersistenceService);
+        verifyNoInteractions(activityLogService);
         verify(payloadBuilder, never()).buildFrom(any(), any(), any());
         verify(payloadBuilder, never()).weightsSnapshotFrom(any());
     }
@@ -882,6 +888,7 @@ class AdminOptimizationServiceTest {
 
         verifyNoInteractions(payloadBuilder, optimizationRunRecorder, aiSchedulingClient);
         verifyNoInteractions(assignmentPersistenceService);
+        verifyNoInteractions(activityLogService);
     }
 
     @Test
@@ -899,6 +906,315 @@ class AdminOptimizationServiceTest {
 
         verifyNoInteractions(payloadBuilder, optimizationRunRecorder, aiSchedulingClient);
         verifyNoInteractions(assignmentPersistenceService);
+        verifyNoInteractions(activityLogService);
+    }
+
+    @Test
+    void optimizeSuccessRecordsActivityLog() {
+        CurrentAccountPrincipal principal = new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
+        Account manager = managerAccount(principal);
+        SchedulePeriod period = draftPeriod(5L, manager);
+        AiSchedulingRequestDto payload = testPayload();
+        AiSchedulingResponseDto aiResponse = successResponse();
+        AiSchedulingPayloadBuilder.PayloadSnapshot snapshot = testSnapshot();
+        OptimizationRun startedRun = startedRun(900L, period, manager);
+        OptimizationRun finishedRun = finishedRun(900L, period, manager, "SUCCESS");
+        finishedRun.setTotalPenalty(new BigDecimal("12.50"));
+
+        stubRunPlumbing(manager, period, payload, snapshot, startedRun);
+        when(aiSchedulingClient.optimize(eq(payload))).thenReturn(aiResponse);
+        when(assignmentPersistenceService.apply(eq(period), any(), eq(aiResponse)))
+                .thenReturn(new ApplyResult(1, 0));
+        when(optimizationRunRecorder.finishSuccess(eq(900L), eq(aiResponse))).thenReturn(finishedRun);
+
+        service.optimize(principal, 5L, new OptimizeScheduleRequest(null));
+
+        verifyOptimizationLog(manager, 900L, "SUCCESS", new BigDecimal("12.50"));
+    }
+
+    @Test
+    void optimizeSuccessIgnoresActivityLogFailure() {
+        CurrentAccountPrincipal principal = new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
+        Account manager = managerAccount(principal);
+        SchedulePeriod period = draftPeriod(5L, manager);
+        AiSchedulingRequestDto payload = testPayload();
+        AiSchedulingResponseDto aiResponse = successResponse();
+        AiSchedulingPayloadBuilder.PayloadSnapshot snapshot = testSnapshot();
+        OptimizationRun startedRun = startedRun(900L, period, manager);
+        OptimizationRun finishedRun = finishedRun(900L, period, manager, "SUCCESS");
+
+        stubRunPlumbing(manager, period, payload, snapshot, startedRun);
+        when(aiSchedulingClient.optimize(eq(payload))).thenReturn(aiResponse);
+        when(assignmentPersistenceService.apply(eq(period), any(), eq(aiResponse)))
+                .thenReturn(new ApplyResult(1, 0));
+        when(optimizationRunRecorder.finishSuccess(eq(900L), eq(aiResponse))).thenReturn(finishedRun);
+        doThrow(new IllegalStateException("audit unavailable"))
+                .when(activityLogService).record(same(manager), eq("OPTIMIZE"), eq("optimization_runs"),
+                        eq(900L), isNull(), any());
+
+        OptimizeScheduleResponse response = service.optimize(principal, 5L, new OptimizeScheduleRequest(null));
+
+        assertThat(response.aiStatus()).isEqualTo("SUCCESS");
+        verify(optimizationRunRecorder).finishSuccess(eq(900L), eq(aiResponse));
+        verify(optimizationRunRecorder, never()).finishFailure(any(), any(), any(), any());
+    }
+
+    @Test
+    void optimizeInfeasibleRecordsActivityLog() {
+        CurrentAccountPrincipal principal = new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
+        Account manager = managerAccount(principal);
+        SchedulePeriod period = draftPeriod(5L, manager);
+        AiSchedulingRequestDto payload = testPayload();
+        AiSchedulingResponseDto aiResponse = new AiSchedulingResponseDto(
+                "1.0",
+                900L,
+                5L,
+                "INFEASIBLE",
+                "INFEASIBLE",
+                List.of(),
+                null,
+                Map.of(),
+                List.of(),
+                List.of(new AiSchedulingResponseDto.DiagnosticDto("NO_STAFF", "Not enough staff", null, null)),
+                "Infeasible",
+                new AiSchedulingResponseDto.StatisticsDto(new BigDecimal("0.5"), 3, 5));
+        AiSchedulingPayloadBuilder.PayloadSnapshot snapshot = testSnapshot();
+        OptimizationRun startedRun = startedRun(900L, period, manager);
+        OptimizationRun finishedRun = finishedRun(900L, period, manager, "INFEASIBLE");
+
+        stubRunPlumbing(manager, period, payload, snapshot, startedRun);
+        when(aiSchedulingClient.optimize(eq(payload))).thenReturn(aiResponse);
+        when(optimizationRunRecorder.finishFailure(eq(900L), eq("INFEASIBLE"), any(), eq(aiResponse)))
+                .thenReturn(finishedRun);
+
+        service.optimize(principal, 5L, new OptimizeScheduleRequest(null));
+
+        verifyOptimizationLog(manager, 900L, "INFEASIBLE", null);
+    }
+
+    @Test
+    void optimizeFailedStatusRecordsActivityLog() {
+        CurrentAccountPrincipal principal = new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
+        Account manager = managerAccount(principal);
+        SchedulePeriod period = draftPeriod(5L, manager);
+        AiSchedulingRequestDto payload = testPayload();
+        AiSchedulingResponseDto aiResponse = new AiSchedulingResponseDto(
+                "1.0",
+                900L,
+                5L,
+                "FAILED",
+                "UNKNOWN",
+                List.of(),
+                null,
+                Map.of(),
+                List.of(),
+                List.of(),
+                "Solver crashed",
+                new AiSchedulingResponseDto.StatisticsDto(new BigDecimal("0.5"), 0, 0));
+        AiSchedulingPayloadBuilder.PayloadSnapshot snapshot = testSnapshot();
+        OptimizationRun startedRun = startedRun(900L, period, manager);
+        OptimizationRun finishedRun = finishedRun(900L, period, manager, "FAILED");
+
+        stubRunPlumbing(manager, period, payload, snapshot, startedRun);
+        when(aiSchedulingClient.optimize(eq(payload))).thenReturn(aiResponse);
+        when(optimizationRunRecorder.finishFailure(eq(900L), eq("FAILED"), any(), eq(aiResponse)))
+                .thenReturn(finishedRun);
+
+        service.optimize(principal, 5L, new OptimizeScheduleRequest(null));
+
+        verifyOptimizationLog(manager, 900L, "FAILED", null);
+    }
+
+    @Test
+    void optimizeClientFailureRecordsActivityLog() {
+        CurrentAccountPrincipal principal = new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
+        Account manager = managerAccount(principal);
+        SchedulePeriod period = draftPeriod(5L, manager);
+        AiSchedulingRequestDto payload = testPayload();
+        AiSchedulingPayloadBuilder.PayloadSnapshot snapshot = testSnapshot();
+        OptimizationRun startedRun = startedRun(900L, period, manager);
+        OptimizationRun failedRun = finishedRun(900L, period, manager, "FAILED");
+
+        stubRunPlumbing(manager, period, payload, snapshot, startedRun);
+        when(aiSchedulingClient.optimize(eq(payload))).thenThrow(new AiServiceException("boom"));
+        when(optimizationRunRecorder.finishFailure(eq(900L), eq("FAILED"), eq("boom"), eq(null)))
+                .thenReturn(failedRun);
+
+        assertThatThrownBy(() -> service.optimize(principal, 5L, new OptimizeScheduleRequest(null)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_GATEWAY);
+
+        verifyOptimizationLog(manager, 900L, "FAILED", null);
+    }
+
+    @Test
+    void optimizeClientFailureKeepsBadGatewayPathWhenActivityLogFails() {
+        CurrentAccountPrincipal principal = new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
+        Account manager = managerAccount(principal);
+        SchedulePeriod period = draftPeriod(5L, manager);
+        AiSchedulingRequestDto payload = testPayload();
+        AiSchedulingPayloadBuilder.PayloadSnapshot snapshot = testSnapshot();
+        OptimizationRun startedRun = startedRun(900L, period, manager);
+        OptimizationRun failedRun = finishedRun(900L, period, manager, "FAILED");
+
+        stubRunPlumbing(manager, period, payload, snapshot, startedRun);
+        when(aiSchedulingClient.optimize(eq(payload))).thenThrow(new AiServiceException("boom"));
+        when(optimizationRunRecorder.finishFailure(eq(900L), eq("FAILED"), eq("boom"), eq(null)))
+                .thenReturn(failedRun);
+        doThrow(new IllegalStateException("audit unavailable"))
+                .when(activityLogService).record(same(manager), eq("OPTIMIZE"), eq("optimization_runs"),
+                        eq(900L), isNull(), any());
+
+        assertThatThrownBy(() -> service.optimize(principal, 5L, new OptimizeScheduleRequest(null)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_GATEWAY);
+
+        verify(optimizationRunRecorder).finishFailure(eq(900L), eq("FAILED"), eq("boom"), eq(null));
+        verify(optimizationRunRecorder, never()).finishSuccess(any(), any());
+    }
+
+    @Test
+    void optimizeApplyFailureRecordsActivityLog() {
+        CurrentAccountPrincipal principal = new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
+        Account manager = managerAccount(principal);
+        SchedulePeriod period = draftPeriod(5L, manager);
+        AiSchedulingRequestDto payload = testPayload();
+        AiSchedulingResponseDto aiResponse = successResponse();
+        AiSchedulingPayloadBuilder.PayloadSnapshot snapshot = testSnapshot();
+        OptimizationRun startedRun = startedRun(900L, period, manager);
+        OptimizationRun failedRun = finishedRun(900L, period, manager, "FAILED");
+
+        stubRunPlumbing(manager, period, payload, snapshot, startedRun);
+        when(aiSchedulingClient.optimize(eq(payload))).thenReturn(aiResponse);
+        when(assignmentPersistenceService.apply(eq(period), any(), eq(aiResponse)))
+                .thenThrow(new AiApplyException("AI assignments exceed required staff for shift 100"));
+        when(optimizationRunRecorder.finishFailure(eq(900L), eq("FAILED"), contains("Failed to apply AI assignments"), eq(aiResponse)))
+                .thenReturn(failedRun);
+
+        assertThatThrownBy(() -> service.optimize(principal, 5L, new OptimizeScheduleRequest(null)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_GATEWAY);
+
+        verifyOptimizationLog(manager, 900L, "FAILED", null);
+    }
+
+    @Test
+    void optimizeInvalidProtocolRecordsActivityLog() {
+        CurrentAccountPrincipal principal = new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
+        Account manager = managerAccount(principal);
+        SchedulePeriod period = draftPeriod(5L, manager);
+        AiSchedulingRequestDto payload = testPayload();
+        AiSchedulingResponseDto invalidResponse = new AiSchedulingResponseDto(
+                "2.0",
+                900L,
+                5L,
+                "SUCCESS",
+                "OPTIMAL",
+                List.of(),
+                new BigDecimal("1.00"),
+                Map.of(),
+                List.of(),
+                List.of(),
+                null,
+                new AiSchedulingResponseDto.StatisticsDto(new BigDecimal("0.5"), 0, 0));
+        AiSchedulingPayloadBuilder.PayloadSnapshot snapshot = testSnapshot();
+        OptimizationRun startedRun = startedRun(900L, period, manager);
+        OptimizationRun failedRun = finishedRun(900L, period, manager, "FAILED");
+
+        stubRunPlumbing(manager, period, payload, snapshot, startedRun);
+        when(aiSchedulingClient.optimize(eq(payload))).thenReturn(invalidResponse);
+        when(optimizationRunRecorder.finishFailure(eq(900L), eq("FAILED"), contains("Invalid AI response"), eq(null)))
+                .thenReturn(failedRun);
+
+        assertThatThrownBy(() -> service.optimize(principal, 5L, new OptimizeScheduleRequest(null)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_GATEWAY);
+
+        verifyOptimizationLog(manager, 900L, "FAILED", null);
+    }
+
+    @Test
+    void optimizeUnexpectedErrorRecordsActivityLog() {
+        CurrentAccountPrincipal principal = new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
+        Account manager = managerAccount(principal);
+        SchedulePeriod period = draftPeriod(5L, manager);
+        AiSchedulingRequestDto payload = testPayload();
+        AiSchedulingPayloadBuilder.PayloadSnapshot snapshot = testSnapshot();
+        OptimizationRun startedRun = startedRun(900L, period, manager);
+        OptimizationRun failedRun = finishedRun(900L, period, manager, "FAILED");
+
+        stubRunPlumbing(manager, period, payload, snapshot, startedRun);
+        when(aiSchedulingClient.optimize(eq(payload))).thenThrow(new IllegalStateException("boom"));
+        when(optimizationRunRecorder.finishFailure(eq(900L), eq("FAILED"), contains("Unexpected optimization failure"), isNull()))
+                .thenReturn(failedRun);
+
+        assertThatThrownBy(() -> service.optimize(principal, 5L, new OptimizeScheduleRequest(null)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_GATEWAY);
+
+        verifyOptimizationLog(manager, 900L, "FAILED", null);
+    }
+
+    private void stubRunPlumbing(Account manager, SchedulePeriod period, AiSchedulingRequestDto payload,
+            AiSchedulingPayloadBuilder.PayloadSnapshot snapshot, OptimizationRun startedRun) {
+        Map<String, Object> weights = Map.of("fairness", BigDecimal.ONE);
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
+        when(schedulePeriodRepository.findDetailById(5L)).thenReturn(Optional.of(period));
+        when(payloadBuilder.prepareSnapshot(eq(period), eq(null))).thenReturn(snapshot);
+        when(payloadBuilder.weightsSnapshotFrom(any())).thenReturn(weights);
+        when(optimizationRunRecorder.start(eq(period), eq(manager), eq(weights))).thenReturn(startedRun);
+        when(payloadBuilder.buildFrom(any(), eq(period), eq(900L))).thenReturn(payload);
+    }
+
+    private void verifyOptimizationLog(Account manager, Long runId, String status, BigDecimal expectedPenalty) {
+        verify(activityLogService).record(
+                same(manager),
+                eq("OPTIMIZE"),
+                eq("optimization_runs"),
+                eq(runId),
+                isNull(),
+                argThat((Object snapshot) -> {
+                    if (!(snapshot instanceof Map<?, ?> map)) {
+                        return false;
+                    }
+                    if (!runId.equals(map.get("runId"))) {
+                        return false;
+                    }
+                    if (!Long.valueOf(5L).equals(map.get("periodId"))) {
+                        return false;
+                    }
+                    if (!status.equals(map.get("status"))) {
+                        return false;
+                    }
+                    if (expectedPenalty == null) {
+                        return !map.containsKey("totalPenalty");
+                    }
+                    return map.get("totalPenalty") instanceof BigDecimal penalty
+                            && penalty.compareTo(expectedPenalty) == 0;
+                }));
+    }
+
+    private static AiSchedulingResponseDto successResponse() {
+        return new AiSchedulingResponseDto(
+                "1.0",
+                900L,
+                5L,
+                "SUCCESS",
+                "OPTIMAL",
+                List.of(
+                        new AiSchedulingResponseDto.AssignmentDto(10L, 100L),
+                        new AiSchedulingResponseDto.AssignmentDto(11L, 101L)),
+                new BigDecimal("12.50"),
+                Map.of("fairness", new BigDecimal("12.50")),
+                List.of(),
+                List.of(),
+                null,
+                new AiSchedulingResponseDto.StatisticsDto(new BigDecimal("1.5"), 0, 10));
     }
 
     private static AiSchedulingPayloadBuilder.PayloadSnapshot testSnapshot() {

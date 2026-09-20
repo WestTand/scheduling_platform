@@ -3,6 +3,7 @@ package scheduling.scheduling.auth;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -23,8 +24,10 @@ public class ManagerAccountController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
-    ResponseEntity<AccountResponse> createEmployeeAccount(@Valid @RequestBody CreateEmployeeAccountRequest request) {
-        return ResponseEntity.status(201).body(managerAccountService.createEmployeeAccount(request));
+    ResponseEntity<AccountResponse> createEmployeeAccount(
+            @AuthenticationPrincipal CurrentAccountPrincipal principal,
+            @Valid @RequestBody CreateEmployeeAccountRequest request) {
+        return ResponseEntity.status(201).body(managerAccountService.createEmployeeAccount(principal, request));
     }
 
     @PostMapping("/{accountId}/activation/resend")

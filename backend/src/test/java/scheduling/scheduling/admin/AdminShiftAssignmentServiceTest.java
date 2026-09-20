@@ -3,9 +3,14 @@ package scheduling.scheduling.admin;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
@@ -16,15 +21,18 @@ import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import scheduling.scheduling.admin.dto.AdminPeriodScheduleResponse;
 import scheduling.scheduling.admin.dto.AdminShiftAssignmentResponse;
 import scheduling.scheduling.admin.dto.CreateShiftAssignmentRequest;
 import scheduling.scheduling.admin.dto.UpdateShiftAssignmentRequest;
+import scheduling.scheduling.audit.ActivityLogService;
 import scheduling.scheduling.auth.CurrentAccountPrincipal;
 import scheduling.scheduling.employee.dto.EmployeeScheduleItemResponse;
 import scheduling.scheduling.entity.Account;
@@ -56,10 +64,11 @@ class AdminShiftAssignmentServiceTest {
     private final SchedulingRuleRepository schedulingRuleRepository = mock(SchedulingRuleRepository.class);
     private static final Clock FIXED_CLOCK =
             Clock.fixed(Instant.parse("2026-09-17T00:00:00Z"), ZoneOffset.UTC);
+    private final ActivityLogService activityLogService = mock(ActivityLogService.class);
     private final AdminShiftAssignmentService service = new AdminShiftAssignmentService(
             shiftAssignmentRepository, workShiftRepository, schedulePeriodRepository,
             employeeRepository, leaveRequestRepository, accountRepository,
-            schedulingRuleRepository, FIXED_CLOCK);
+            schedulingRuleRepository, FIXED_CLOCK, activityLogService);
 
     @BeforeEach
     void setUpSchedulingRules() {
@@ -452,6 +461,7 @@ class AdminShiftAssignmentServiceTest {
                 .isEqualTo(HttpStatus.BAD_REQUEST);
 
         verify(shiftAssignmentRepository, never()).save(any());
+        verifyNoInteractions(activityLogService);
     }
 
     @Test
@@ -546,6 +556,160 @@ class AdminShiftAssignmentServiceTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
                 .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void createAssignmentRecordsActivityLog() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        Account manager = account(principal);
+        WorkShift shift = workShift();
+        Employee employee = employee(7L, "NV007", "Nguyen Van A");
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
+        when(workShiftRepository.findDetailById(200L)).thenReturn(Optional.of(shift));
+        when(employeeRepository.findById(7L)).thenReturn(Optional.of(employee));
+        when(shiftAssignmentRepository.existsByWorkShiftIdAndEmployeeId(200L, 7L)).thenReturn(false);
+        when(shiftAssignmentRepository.countByWorkShiftId(200L)).thenReturn(1L);
+        when(leaveRequestRepository.searchForEmployee(7L, "APPROVED",
+                LocalDate.of(2026, 9, 14), LocalDate.of(2026, 9, 14)))
+                .thenReturn(List.of());
+        when(shiftAssignmentRepository.findForEmployeeInWindow(7L,
+                LocalDate.of(2026, 9, 13), LocalDate.of(2026, 9, 15)))
+                .thenReturn(List.of());
+        when(shiftAssignmentRepository.save(any(ShiftAssignment.class)))
+                .thenAnswer(invocation -> {
+                    ShiftAssignment saved = invocation.getArgument(0);
+                    saved.setId(500L);
+                    return saved;
+                });
+
+        service.createAssignment(principal, 200L, new CreateShiftAssignmentRequest(7L));
+
+        verify(activityLogService).record(
+                same(manager),
+                eq("CREATE"),
+                eq("shift_assignments"),
+                eq(500L),
+                isNull(),
+                argThat((Object snapshot) -> snapshot instanceof Map<?, ?> map
+                        && Long.valueOf(500L).equals(map.get("id"))
+                        && Long.valueOf(200L).equals(map.get("workShiftId"))
+                        && Long.valueOf(7L).equals(map.get("employeeId"))
+                        && "ASSIGNED".equals(map.get("assignmentStatus"))
+                        && "MANUAL".equals(map.get("assignedSource"))
+                        && Boolean.FALSE.equals(map.get("locked"))));
+    }
+
+    @Test
+    void updateAssignmentRecordsActivityLog() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        Account manager = account(principal);
+        Employee oldEmployee = employee(7L, "NV007", "Nguyen Van A");
+        Employee newEmployee = employee(8L, "NV008", "Tran Thi B");
+        ShiftAssignment assignment = assignment(500L, workShift(), oldEmployee, true);
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
+        when(shiftAssignmentRepository.findDetailById(500L)).thenReturn(Optional.of(assignment));
+        when(employeeRepository.findById(8L)).thenReturn(Optional.of(newEmployee));
+        when(shiftAssignmentRepository.existsByWorkShiftIdAndEmployeeId(200L, 8L)).thenReturn(false);
+        when(leaveRequestRepository.searchForEmployee(8L, "APPROVED",
+                LocalDate.of(2026, 9, 14), LocalDate.of(2026, 9, 14)))
+                .thenReturn(List.of());
+        when(shiftAssignmentRepository.findForEmployeeInWindow(8L,
+                LocalDate.of(2026, 9, 13), LocalDate.of(2026, 9, 15)))
+                .thenReturn(List.of());
+        when(shiftAssignmentRepository.save(any(ShiftAssignment.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.updateAssignment(principal, 500L, new UpdateShiftAssignmentRequest(8L));
+
+        verify(activityLogService).record(
+                same(manager),
+                eq("UPDATE"),
+                eq("shift_assignments"),
+                eq(500L),
+                isNull(),
+                argThat((Object snapshot) -> snapshot instanceof Map<?, ?> map
+                        && Long.valueOf(500L).equals(map.get("id"))
+                        && Long.valueOf(200L).equals(map.get("workShiftId"))
+                        && Long.valueOf(8L).equals(map.get("employeeId"))
+                        && "ASSIGNED".equals(map.get("assignmentStatus"))
+                        && "MANUAL".equals(map.get("assignedSource"))
+                        && Boolean.TRUE.equals(map.get("locked"))));
+    }
+
+    @Test
+    void deleteAssignmentRecordsActivityLog() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        Account manager = account(principal);
+        Employee employee = employee(7L, "NV007", "Nguyen Van A");
+        ShiftAssignment locked = assignment(500L, workShift(), employee, true);
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
+        when(shiftAssignmentRepository.findDetailById(500L)).thenReturn(Optional.of(locked));
+
+        service.deleteAssignment(principal, 500L);
+
+        verify(activityLogService).record(
+                same(manager),
+                eq("DELETE"),
+                eq("shift_assignments"),
+                eq(500L),
+                argThat((Object snapshot) -> snapshot instanceof Map<?, ?> map
+                        && Long.valueOf(500L).equals(map.get("id"))
+                        && Long.valueOf(200L).equals(map.get("workShiftId"))
+                        && Long.valueOf(7L).equals(map.get("employeeId"))
+                        && "ASSIGNED".equals(map.get("assignmentStatus"))
+                        && "MANUAL".equals(map.get("assignedSource"))
+                        && Boolean.TRUE.equals(map.get("locked"))),
+                isNull());
+    }
+
+    @Test
+    void lockAssignmentRecordsActivityLog() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        Account manager = account(principal);
+        ShiftAssignment assignment = assignment(500L, workShift(), employee(7L, "NV007", "Nguyen Van A"), false);
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
+        when(shiftAssignmentRepository.findDetailById(500L)).thenReturn(Optional.of(assignment));
+        when(shiftAssignmentRepository.save(any(ShiftAssignment.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.lockAssignment(principal, 500L);
+
+        verify(activityLogService).record(
+                same(manager),
+                eq("LOCK"),
+                eq("shift_assignments"),
+                eq(500L),
+                isNull(),
+                argThat((Object snapshot) -> snapshot instanceof Map<?, ?> map
+                        && Long.valueOf(500L).equals(map.get("id"))
+                        && Long.valueOf(200L).equals(map.get("workShiftId"))
+                        && Long.valueOf(7L).equals(map.get("employeeId"))
+                        && Boolean.TRUE.equals(map.get("locked"))));
+    }
+
+    @Test
+    void unlockAssignmentRecordsActivityLog() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        Account manager = account(principal);
+        ShiftAssignment assignment = assignment(500L, workShift(), employee(7L, "NV007", "Nguyen Van A"), true);
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
+        when(shiftAssignmentRepository.findDetailById(500L)).thenReturn(Optional.of(assignment));
+        when(shiftAssignmentRepository.save(any(ShiftAssignment.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.unlockAssignment(principal, 500L);
+
+        verify(activityLogService).record(
+                same(manager),
+                eq("UNLOCK"),
+                eq("shift_assignments"),
+                eq(500L),
+                isNull(),
+                argThat((Object snapshot) -> snapshot instanceof Map<?, ?> map
+                        && Long.valueOf(500L).equals(map.get("id"))
+                        && Long.valueOf(200L).equals(map.get("workShiftId"))
+                        && Long.valueOf(7L).equals(map.get("employeeId"))
+                        && Boolean.FALSE.equals(map.get("locked"))));
     }
 
     @Test

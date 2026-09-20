@@ -1,6 +1,7 @@
 package scheduling.scheduling.admin;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -89,7 +90,7 @@ class AdminEmployeeControllerTest {
     @Test
     void managerUpdatesEmployee() throws Exception {
         givenToken("manager-token", manager());
-        when(adminEmployeeService.updateEmployee(any(Long.class), any(UpdateEmployeeRequest.class)))
+        when(adminEmployeeService.updateEmployee(any(CurrentAccountPrincipal.class), any(Long.class), any(UpdateEmployeeRequest.class)))
                 .thenReturn(employeeResponse());
 
         mockMvc.perform(put("/api/admin/employees/10")
@@ -115,7 +116,7 @@ class AdminEmployeeControllerTest {
                         .header(HttpHeaders.AUTHORIZATION, "Bearer manager-token"))
                 .andExpect(status().isNoContent());
 
-        verify(adminEmployeeService).lockEmployee(10L);
+        verify(adminEmployeeService).lockEmployee(any(CurrentAccountPrincipal.class), eq(10L));
     }
 
     @Test
@@ -126,7 +127,7 @@ class AdminEmployeeControllerTest {
                         .header(HttpHeaders.AUTHORIZATION, "Bearer manager-token"))
                 .andExpect(status().isNoContent());
 
-        verify(adminEmployeeService).unlockEmployee(10L);
+        verify(adminEmployeeService).unlockEmployee(any(CurrentAccountPrincipal.class), eq(10L));
     }
 
     @Test

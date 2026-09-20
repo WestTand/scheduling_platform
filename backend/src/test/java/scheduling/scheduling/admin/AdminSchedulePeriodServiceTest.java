@@ -3,6 +3,10 @@ package scheduling.scheduling.admin;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -27,6 +31,8 @@ import scheduling.scheduling.entity.Employee;
 import scheduling.scheduling.entity.SchedulePeriod;
 import scheduling.scheduling.entity.ShiftAssignment;
 import scheduling.scheduling.entity.WorkShift;
+import scheduling.scheduling.audit.ActivityLogService;
+import scheduling.scheduling.notification.NotificationService;
 import scheduling.scheduling.repository.AccountRepository;
 import scheduling.scheduling.repository.SchedulePeriodRepository;
 import scheduling.scheduling.repository.ShiftAssignmentRepository;
@@ -38,8 +44,15 @@ class AdminSchedulePeriodServiceTest {
     private final AccountRepository accountRepository = mock(AccountRepository.class);
     private final WorkShiftRepository workShiftRepository = mock(WorkShiftRepository.class);
     private final ShiftAssignmentRepository shiftAssignmentRepository = mock(ShiftAssignmentRepository.class);
+    private final NotificationService notificationService = mock(NotificationService.class);
+    private final ActivityLogService activityLogService = mock(ActivityLogService.class);
     private final AdminSchedulePeriodService service = new AdminSchedulePeriodService(
-            schedulePeriodRepository, accountRepository, workShiftRepository, shiftAssignmentRepository);
+            schedulePeriodRepository,
+            accountRepository,
+            workShiftRepository,
+            shiftAssignmentRepository,
+            notificationService,
+            activityLogService);
 
     @Test
     void createSchedulePeriodCreatesDraftWithDefaultVersionAndCreator() {
@@ -686,6 +699,55 @@ class AdminSchedulePeriodServiceTest {
         assertThat(response.status()).isEqualTo("PUBLISHED");
         assertThat(response.publishedAt()).isNotNull();
         verify(schedulePeriodRepository).saveAndFlush(period);
+    }
+
+    @Test
+    void publishSchedulePeriodNotifiesAssigneesAndRecordsLog() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        Account manager = account(principal);
+        SchedulePeriod period = draftPeriod(20L, manager);
+        period.setStatus("APPROVED");
+        WorkShift shift = staffedShift(200L, 2);
+        Account firstAccount = account(new CurrentAccountPrincipal(2L, "employee01", AccountRole.EMPLOYEE));
+        Account secondAccount = account(new CurrentAccountPrincipal(3L, "employee02", AccountRole.EMPLOYEE));
+        Employee first = activeEmployee(10L, "EMP010", "Employee Ten");
+        first.setAccount(firstAccount);
+        Employee second = activeEmployee(11L, "EMP011", "Employee Eleven");
+        second.setAccount(secondAccount);
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(period));
+        when(shiftAssignmentRepository.listForPeriod(20L)).thenReturn(List.of(
+                shiftAssignment(300L, shift, first),
+                shiftAssignment(301L, shift, first),
+                shiftAssignment(302L, shift, second)));
+        when(schedulePeriodRepository.saveAndFlush(period)).thenReturn(period);
+
+        AdminSchedulePeriodResponse response = service.publishSchedulePeriod(principal, 20L);
+
+        assertThat(response.status()).isEqualTo("PUBLISHED");
+        verify(activityLogService).record(
+                same(manager), eq("PUBLISH"), eq("schedule_periods"), eq(period.getId()), any(), any());
+        verify(notificationService).notifyAll(
+                argThat(recipients -> recipients != null && recipients.size() == 2),
+                eq("SCHEDULE_PUBLISHED"),
+                eq("Lịch làm việc mới đã được công bố"),
+                contains(period.getPeriodName()));
+    }
+
+    @Test
+    void republishSchedulePeriodDoesNotNotifyOrLog() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        Account manager = account(principal);
+        SchedulePeriod period = draftPeriod(20L, manager);
+        period.setStatus("PUBLISHED");
+        period.setPublishedAt(LocalDateTime.of(2026, 9, 21, 9, 0));
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(period));
+
+        service.publishSchedulePeriod(principal, 20L);
+
+        verify(notificationService, never()).notifyAll(any(), any(), any(), any());
+        verify(activityLogService, never()).record(any(), any(), any(), any(), any(), any());
     }
 
     @Test

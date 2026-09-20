@@ -528,52 +528,52 @@ Muc dich: tao thong bao cho user va ghi audit log cho hanh dong quan trong. Phas
 
 Ket qua mong doi: manager xem duoc activity logs, user xem/danh dau notification, cac event quan trong duoc ghi lai.
 
-- [ ] Tao service ghi `ActivityLog`
+- [x] Tao service ghi `ActivityLog`
   - Dung de cac service khac goi chung khi co hanh dong quan trong.
   - Giam duplicate code log trong tung module.
-- [ ] Ghi log khi tao/sua/xoa nhan vien
+- [x] Ghi log khi tao/sua/xoa nhan vien
   - Dung de audit thay doi du lieu nhan su.
   - Quan trong khi co tranh chap ai sua thong tin.
-- [ ] Ghi log khi duyet nghi
+- [x] Ghi log khi duyet nghi
   - Dung de biet ai duyet/tu choi don nghi va luc nao.
   - Ho tro giai thich vi sao AI khong phan ca ngay do.
-- [ ] Ghi log khi tao lich tu dong
+- [x] Ghi log khi tao lich tu dong
   - Dung de trace lan chay AI va nguoi khoi tao.
   - Ho tro debug neu lich ket qua co van de.
-- [ ] Ghi log khi dieu chinh lich
+- [x] Ghi log khi dieu chinh lich
   - Dung de audit manual adjustment sau khi AI/manual schedule.
   - Giu lich su thay doi assignment.
-- [ ] Ghi log khi cong bo lich
+- [x] Ghi log khi cong bo lich
   - Dung de biet khi nao lich chinh thuc cho nhan vien.
   - Co the lien ket voi notification.
-- [ ] Ghi log khi xu ly doi ca
+- [x] Ghi log khi xu ly doi ca
   - Dung de trace phe duyet/tu choi swap request.
   - Giam tranh chap ve thay doi ca.
-- [ ] Tao notification khi lich duoc cong bo
+- [x] Tao notification khi lich duoc cong bo
   - Dung de bao nhan vien co lich moi.
   - Tang kha nang user xem lich kip thoi.
-- [ ] Tao notification khi don nghi duoc duyet/tu choi
+- [x] Tao notification khi don nghi duoc duyet/tu choi
   - Dung de nhan vien biet ket qua leave request.
   - Giam can trao doi ngoai he thong.
-- [ ] Tao notification khi co yeu cau doi ca
+- [x] Tao notification khi co yeu cau doi ca
   - Dung de nhan vien duoc yeu cau doi ca biet va phan hoi.
   - Ho tro workflow doi ca hai phia.
-- [ ] Tao notification khi yeu cau doi ca duoc duyet/tu choi
+- [x] Tao notification khi yeu cau doi ca duoc duyet/tu choi
   - Dung de cac ben lien quan biet ket qua.
   - Dam bao lich ca nhan cap nhat dung ky vong.
-- [ ] API xem danh sach notification
+- [x] API xem danh sach notification
   - Dung de frontend hien inbox/thong bao.
   - User co noi xem cac event can chu y.
-- [ ] API danh dau notification da doc
+- [x] API danh dau notification da doc
   - Dung de user quan ly thong bao da xem.
   - Ho tro badge unread count.
-- [ ] API xem activity logs cho quan ly
+- [x] API xem activity logs cho quan ly
   - Dung de manager/admin xem audit trail.
   - Can cho demo tinh minh bach cua he thong.
-- [ ] Test notification service
+- [x] Test notification service
   - Kiem tra tao/xem/mark read notification.
   - Dam bao user khong thay notification cua nguoi khac.
-- [ ] Test activity log service
+- [x] Test activity log service
   - Kiem tra log dung actor/action/entity.
   - Dam bao audit khong bi mat khi thao tac quan trong.
 

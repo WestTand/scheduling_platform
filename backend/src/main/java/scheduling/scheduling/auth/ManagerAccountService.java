@@ -1,10 +1,14 @@
 package scheduling.scheduling.auth;
 
+import java.util.Map;
 import java.util.Objects;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+import scheduling.scheduling.audit.ActivityLogService;
 import scheduling.scheduling.auth.dto.AccountResponse;
 import scheduling.scheduling.auth.dto.CreateEmployeeAccountRequest;
 import scheduling.scheduling.entity.Account;
@@ -22,6 +26,7 @@ public class ManagerAccountService {
     private final PasswordEncoder passwordEncoder;
     private final AccountActivationOtpService otpService;
     private final RefreshTokenService refreshTokenService;
+    private final ActivityLogService activityLogService;
     private final String defaultEmployeePassword;
 
     public ManagerAccountService(
@@ -30,17 +35,20 @@ public class ManagerAccountService {
             PasswordEncoder passwordEncoder,
             AccountActivationOtpService otpService,
             RefreshTokenService refreshTokenService,
+            ActivityLogService activityLogService,
             @Value("${app.auth.default-employee-password}") String defaultEmployeePassword) {
         this.accountRepository = Objects.requireNonNull(accountRepository, "accountRepository");
         this.employeeRepository = Objects.requireNonNull(employeeRepository, "employeeRepository");
         this.passwordEncoder = Objects.requireNonNull(passwordEncoder, "passwordEncoder");
         this.otpService = Objects.requireNonNull(otpService, "otpService");
         this.refreshTokenService = Objects.requireNonNull(refreshTokenService, "refreshTokenService");
+        this.activityLogService = Objects.requireNonNull(activityLogService, "activityLogService");
         this.defaultEmployeePassword = Objects.requireNonNull(defaultEmployeePassword, "defaultEmployeePassword");
     }
 
     @Transactional
-    public AccountResponse createEmployeeAccount(CreateEmployeeAccountRequest request) {
+    public AccountResponse createEmployeeAccount(CurrentAccountPrincipal principal, CreateEmployeeAccountRequest request) {
+        Account manager = requireManager(principal);
         if (accountRepository.existsByUsername(request.username())) {
             throw new DuplicateResourceException("Username already exists");
         }
@@ -68,8 +76,25 @@ public class ManagerAccountService {
 
         Account savedAccount = accountRepository.save(account);
         otpService.createActivationOtp(savedAccount);
+        activityLogService.record(manager, "CREATE", "employees", savedEmployee.getId(), null, Map.of(
+                "id", savedEmployee.getId(),
+                "employeeCode", savedEmployee.getEmployeeCode(),
+                "fullName", savedEmployee.getFullName(),
+                "status", savedEmployee.getStatus()));
 
         return AccountResponse.from(savedAccount);
+    }
+
+    private Account requireManager(CurrentAccountPrincipal principal) {
+        if (principal == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Manager access required");
+        }
+        Account account = accountRepository.findById(principal.accountId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "Manager access required"));
+        if (account.getRole() != AccountRole.MANAGER && account.getRole() != AccountRole.ADMIN) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Manager access required");
+        }
+        return account;
     }
 
     @Transactional

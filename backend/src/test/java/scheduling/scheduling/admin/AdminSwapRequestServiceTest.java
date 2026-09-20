@@ -3,6 +3,10 @@ package scheduling.scheduling.admin;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -27,6 +31,8 @@ import scheduling.scheduling.entity.SchedulePeriod;
 import scheduling.scheduling.entity.ShiftAssignment;
 import scheduling.scheduling.entity.SwapRequest;
 import scheduling.scheduling.entity.WorkShift;
+import scheduling.scheduling.audit.ActivityLogService;
+import scheduling.scheduling.notification.NotificationService;
 import scheduling.scheduling.repository.AccountRepository;
 import scheduling.scheduling.repository.SwapRequestRepository;
 
@@ -37,8 +43,11 @@ class AdminSwapRequestServiceTest {
 
     private final SwapRequestRepository swapRequestRepository = mock(SwapRequestRepository.class);
     private final AccountRepository accountRepository = mock(AccountRepository.class);
+    private final NotificationService notificationService = mock(NotificationService.class);
+    private final ActivityLogService activityLogService = mock(ActivityLogService.class);
     private final AdminSwapRequestService service =
-            new AdminSwapRequestService(swapRequestRepository, accountRepository, FIXED_CLOCK);
+            new AdminSwapRequestService(swapRequestRepository, accountRepository, FIXED_CLOCK,
+                    notificationService, activityLogService);
 
     private static CurrentAccountPrincipal managerPrincipal() {
         return new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
@@ -193,6 +202,86 @@ class AdminSwapRequestServiceTest {
                 .isEqualTo(HttpStatus.BAD_REQUEST);
 
         verify(swapRequestRepository, never()).save(any());
+    }
+
+    @Test
+    void approveSwapRequestNotifiesBothPartiesAndRecordsLog() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        Account manager = managerAccount(principal);
+        Account requesterAccount = Account.builder()
+                .username("requester01").passwordHash("hash").role(AccountRole.EMPLOYEE)
+                .status(AccountStatus.ACTIVE).isActive(true).build();
+        requesterAccount.setId(2L);
+        Account targetAccount = Account.builder()
+                .username("target01").passwordHash("hash").role(AccountRole.EMPLOYEE)
+                .status(AccountStatus.ACTIVE).isActive(true).build();
+        targetAccount.setId(3L);
+        Employee requester = employee(7L, "ACTIVE");
+        requester.setAccount(requesterAccount);
+        Employee target = employee(9L, "ACTIVE");
+        target.setAccount(targetAccount);
+        SwapRequest swapRequest = swapRequest(50L, requester, target, "PENDING_APPROVAL");
+        when(accountRepository.findById(1L))
+                .thenReturn(Optional.of(manager));
+        when(swapRequestRepository.findDetailByIdForUpdate(50L)).thenReturn(Optional.of(swapRequest));
+        when(swapRequestRepository.save(any(SwapRequest.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        SwapRequestResponse response = service.approveSwapRequest(principal, 50L);
+
+        assertThat(response.status()).isEqualTo("APPROVED");
+        verify(notificationService).notifyAll(
+                argThat(recipients -> recipients != null
+                        && recipients.stream().map(Account::getId).toList().containsAll(List.of(2L, 3L))),
+                eq("SWAP_APPROVED"),
+                eq("Yêu cầu đổi ca đã được duyệt"),
+                contains("đổi ca"));
+        verify(activityLogService).record(
+                same(manager),
+                eq("APPROVE"),
+                eq("swap_requests"),
+                eq(50L),
+                eq(null),
+                any());
+    }
+
+    @Test
+    void rejectSwapRequestNotifiesBothPartiesAndRecordsLog() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        Account manager = managerAccount(principal);
+        Account requesterAccount = Account.builder()
+                .username("requester01").passwordHash("hash").role(AccountRole.EMPLOYEE)
+                .status(AccountStatus.ACTIVE).isActive(true).build();
+        requesterAccount.setId(2L);
+        Account targetAccount = Account.builder()
+                .username("target01").passwordHash("hash").role(AccountRole.EMPLOYEE)
+                .status(AccountStatus.ACTIVE).isActive(true).build();
+        targetAccount.setId(3L);
+        Employee requester = employee(7L, "ACTIVE");
+        requester.setAccount(requesterAccount);
+        Employee target = employee(9L, "ACTIVE");
+        target.setAccount(targetAccount);
+        SwapRequest swapRequest = swapRequest(50L, requester, target, "PENDING_APPROVAL");
+        when(accountRepository.findById(1L))
+                .thenReturn(Optional.of(manager));
+        when(swapRequestRepository.findDetailByIdForUpdate(50L)).thenReturn(Optional.of(swapRequest));
+        when(swapRequestRepository.save(any(SwapRequest.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        SwapRequestResponse response = service.rejectSwapRequest(principal, 50L);
+
+        assertThat(response.status()).isEqualTo("REJECTED");
+        verify(notificationService).notifyAll(
+                argThat(recipients -> recipients != null
+                        && recipients.stream().map(Account::getId).toList().containsAll(List.of(2L, 3L))),
+                eq("SWAP_REJECTED"),
+                eq("Yêu cầu đổi ca đã bị từ chối"),
+                contains("từ chối"));
+        verify(activityLogService).record(
+                same(manager),
+                eq("REJECT"),
+                eq("swap_requests"),
+                eq(50L),
+                eq(null),
+                any());
     }
 
     @Test

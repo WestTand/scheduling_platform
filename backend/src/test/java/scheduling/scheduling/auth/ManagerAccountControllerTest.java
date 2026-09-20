@@ -1,6 +1,7 @@
 package scheduling.scheduling.auth;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -52,7 +53,7 @@ class ManagerAccountControllerTest {
     void managerCreatesEmployeeAccount() throws Exception {
         CurrentAccountPrincipal manager = new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
         givenToken("manager-token", manager);
-        when(managerAccountService.createEmployeeAccount(any(CreateEmployeeAccountRequest.class)))
+        when(managerAccountService.createEmployeeAccount(same(manager), any(CreateEmployeeAccountRequest.class)))
                 .thenReturn(new AccountResponse(20L, "employee01", AccountRole.EMPLOYEE));
 
         mockMvc.perform(post("/api/manager/accounts")
@@ -72,7 +73,7 @@ class ManagerAccountControllerTest {
                 .andExpect(jsonPath("$.username").value("employee01"))
                 .andExpect(jsonPath("$.role").value("EMPLOYEE"));
 
-        verify(managerAccountService).createEmployeeAccount(any(CreateEmployeeAccountRequest.class));
+        verify(managerAccountService).createEmployeeAccount(same(manager), any(CreateEmployeeAccountRequest.class));
     }
 
     @Test
