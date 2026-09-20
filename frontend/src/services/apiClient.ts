@@ -1,5 +1,5 @@
 import { apiConfig } from '@/config/api'
-import { getStoredToken } from '@/services/authService'
+import { getStoredToken } from '@/services/authStorage'
 
 const DEFAULT_ERROR_MESSAGE = 'Không thể kết nối máy chủ. Vui lòng thử lại.'
 
@@ -22,7 +22,7 @@ interface RequestOptions extends Omit<RequestInit, 'body'> {
 
 const buildUrl = (path: string) => {
   if (path.startsWith('http://') || path.startsWith('https://')) {
-    return path
+    throw new ApiError(DEFAULT_ERROR_MESSAGE, 0, 'INVALID_API_PATH')
   }
 
   return `${apiConfig.apiBaseUrl}${path.startsWith('/') ? path : `/${path}`}`
@@ -84,7 +84,7 @@ export async function requestJson<T>(path: string, options: RequestOptions = {})
   const response = await fetch(buildUrl(path), {
     ...options,
     headers,
-    credentials: 'include',
+    credentials: options.credentials ?? 'include',
     body: hasBody ? JSON.stringify(options.body) : undefined,
   })
 

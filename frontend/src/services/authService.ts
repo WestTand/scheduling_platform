@@ -1,13 +1,11 @@
 import { mockUsers } from '@/mocks/users'
 import { accountService } from '@/services/accountService'
+import { AUTH_STORAGE_KEYS, getStoredToken } from '@/services/authStorage'
 import type { LoginCredentials, User } from '@/types/auth'
 
 const AUTH_DELAY_MS = 700
 
-export const AUTH_STORAGE_KEYS = {
-  TOKEN: 'schedule_auth_token',
-  USER: 'schedule_auth_user',
-}
+export { AUTH_STORAGE_KEYS, getStoredToken }
 
 export const mockLogin = async (credentials: LoginCredentials): Promise<User> => {
   await new Promise((resolve) => {
@@ -58,10 +56,6 @@ export const mockLogin = async (credentials: LoginCredentials): Promise<User> =>
   }
 
   return employeeUser
-}
-
-export const getStoredToken = () => {
-  return localStorage.getItem(AUTH_STORAGE_KEYS.TOKEN) ?? sessionStorage.getItem(AUTH_STORAGE_KEYS.TOKEN)
 }
 
 export const setStoredAuth = (user: User, rememberMe: boolean) => {
