@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.same;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -17,20 +18,23 @@ import org.junit.jupiter.api.Test;
 import scheduling.scheduling.admin.dto.AdminEmployeeResponse;
 import scheduling.scheduling.admin.dto.UpdateEmployeeRequest;
 import scheduling.scheduling.audit.ActivityLogService;
+import scheduling.scheduling.auth.CurrentAccountPrincipal;
 import scheduling.scheduling.auth.RefreshTokenService;
 import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
 import scheduling.scheduling.entity.AccountStatus;
 import scheduling.scheduling.entity.Employee;
+import scheduling.scheduling.repository.AccountRepository;
 import scheduling.scheduling.repository.EmployeeRepository;
 
 class AdminEmployeeServiceTest {
 
     private final EmployeeRepository employeeRepository = mock(EmployeeRepository.class);
+    private final AccountRepository accountRepository = mock(AccountRepository.class);
     private final RefreshTokenService refreshTokenService = mock(RefreshTokenService.class);
     private final ActivityLogService activityLogService = mock(ActivityLogService.class);
     private final AdminEmployeeService service =
-            new AdminEmployeeService(employeeRepository, refreshTokenService, activityLogService);
+            new AdminEmployeeService(employeeRepository, accountRepository, refreshTokenService, activityLogService);
 
     @Test
     void listEmployeesReturnsAllEmployeesWhenNoFilters() {
@@ -84,6 +88,7 @@ class AdminEmployeeServiceTest {
 
     @Test
     void updateEmployeeChangesEditableFields() {
+        givenManager();
         Employee employee = employee(10L, "EMP001", "Nguyen Van A", "ACTIVE");
         when(employeeRepository.findById(10L)).thenReturn(Optional.of(employee));
         when(employeeRepository.save(employee)).thenReturn(employee);
@@ -93,7 +98,7 @@ class AdminEmployeeServiceTest {
                 "0900000002",
                 "INACTIVE");
 
-        AdminEmployeeResponse response = service.updateEmployee(10L, request);
+        AdminEmployeeResponse response = service.updateEmployee(managerPrincipal(), 10L, request);
 
         assertThat(employee.getFullName()).isEqualTo("Nguyen Van A Updated");
         assertThat(employee.getEmail()).isEqualTo("employee01.updated@example.com");
@@ -105,6 +110,7 @@ class AdminEmployeeServiceTest {
 
     @Test
     void updateEmployeeRejectsMissingEmployee() {
+        givenManager();
         when(employeeRepository.findById(10L)).thenReturn(Optional.empty());
         UpdateEmployeeRequest request = new UpdateEmployeeRequest(
                 "Nguyen Van A Updated",
@@ -112,7 +118,7 @@ class AdminEmployeeServiceTest {
                 "0900000002",
                 "ACTIVE");
 
-        assertThatThrownBy(() -> service.updateEmployee(10L, request))
+        assertThatThrownBy(() -> service.updateEmployee(managerPrincipal(), 10L, request))
                 .isInstanceOf(EmployeeNotFoundException.class)
                 .hasMessage("Employee not found");
 
@@ -121,12 +127,13 @@ class AdminEmployeeServiceTest {
 
     @Test
     void lockEmployeeMarksEmployeeInactiveLocksAccountAndRevokesTokens() {
+        givenManager();
         Employee employee = employee(10L, "EMP001", "Nguyen Van A", "ACTIVE");
         Account account = account(20L, "employee01", AccountStatus.ACTIVE, true);
         employee.setAccount(account);
         when(employeeRepository.findById(10L)).thenReturn(Optional.of(employee));
 
-        service.lockEmployee(10L);
+        service.lockEmployee(managerPrincipal(), 10L);
 
         assertThat(employee.getStatus()).isEqualTo("INACTIVE");
         assertThat(account.getIsActive()).isFalse();
@@ -137,12 +144,13 @@ class AdminEmployeeServiceTest {
 
     @Test
     void unlockEmployeeMarksEmployeeActiveAndUnlocksAccount() {
+        givenManager();
         Employee employee = employee(10L, "EMP001", "Nguyen Van A", "INACTIVE");
         Account account = account(20L, "employee01", AccountStatus.INACTIVE, false);
         employee.setAccount(account);
         when(employeeRepository.findById(10L)).thenReturn(Optional.of(employee));
 
-        service.unlockEmployee(10L);
+        service.unlockEmployee(managerPrincipal(), 10L);
 
         assertThat(employee.getStatus()).isEqualTo("ACTIVE");
         assertThat(account.getIsActive()).isTrue();
@@ -152,13 +160,14 @@ class AdminEmployeeServiceTest {
 
     @Test
     void lockThenUnlockEmployeeDoesNotBypassPendingActivation() {
+        givenManager();
         Employee employee = employee(10L, "EMP001", "Nguyen Van A", "ACTIVE");
         Account account = account(20L, "employee01", AccountStatus.PENDING_ACTIVATION, true);
         employee.setAccount(account);
         when(employeeRepository.findById(10L)).thenReturn(Optional.of(employee));
 
-        service.lockEmployee(10L);
-        service.unlockEmployee(10L);
+        service.lockEmployee(managerPrincipal(), 10L);
+        service.unlockEmployee(managerPrincipal(), 10L);
 
         assertThat(employee.getStatus()).isEqualTo("ACTIVE");
         assertThat(account.getIsActive()).isTrue();
@@ -168,6 +177,7 @@ class AdminEmployeeServiceTest {
 
     @Test
     void updateEmployeeRecordsActivityLog() {
+        Account manager = givenManager();
         Employee employee = employee(10L, "EMP001", "Nguyen Van A", "ACTIVE");
         when(employeeRepository.findById(10L)).thenReturn(Optional.of(employee));
         when(employeeRepository.save(employee)).thenReturn(employee);
@@ -177,10 +187,10 @@ class AdminEmployeeServiceTest {
                 "0900000002",
                 "INACTIVE");
 
-        service.updateEmployee(10L, request);
+        service.updateEmployee(managerPrincipal(), 10L, request);
 
         verify(activityLogService).record(
-                isNull(),
+                same(manager),
                 eq("UPDATE"),
                 eq("employees"),
                 eq(10L),
@@ -194,14 +204,15 @@ class AdminEmployeeServiceTest {
 
     @Test
     void lockEmployeeRecordsActivityLog() {
+        Account manager = givenManager();
         Employee employee = employee(10L, "EMP001", "Nguyen Van A", "ACTIVE");
         employee.setAccount(account(20L, "employee01", AccountStatus.ACTIVE, true));
         when(employeeRepository.findById(10L)).thenReturn(Optional.of(employee));
 
-        service.lockEmployee(10L);
+        service.lockEmployee(managerPrincipal(), 10L);
 
         verify(activityLogService).record(
-                isNull(),
+                same(manager),
                 eq("LOCK"),
                 eq("employees"),
                 eq(10L),
@@ -215,14 +226,15 @@ class AdminEmployeeServiceTest {
 
     @Test
     void unlockEmployeeRecordsActivityLog() {
+        Account manager = givenManager();
         Employee employee = employee(10L, "EMP001", "Nguyen Van A", "INACTIVE");
         employee.setAccount(account(20L, "employee01", AccountStatus.INACTIVE, false));
         when(employeeRepository.findById(10L)).thenReturn(Optional.of(employee));
 
-        service.unlockEmployee(10L);
+        service.unlockEmployee(managerPrincipal(), 10L);
 
         verify(activityLogService).record(
-                isNull(),
+                same(manager),
                 eq("UNLOCK"),
                 eq("employees"),
                 eq(10L),
@@ -256,5 +268,22 @@ class AdminEmployeeServiceTest {
                 .build();
         account.setId(id);
         return account;
+    }
+
+    private static CurrentAccountPrincipal managerPrincipal() {
+        return new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
+    }
+
+    private Account givenManager() {
+        Account manager = Account.builder()
+                .username("manager01")
+                .passwordHash("hash")
+                .role(AccountRole.MANAGER)
+                .status(AccountStatus.ACTIVE)
+                .isActive(true)
+                .build();
+        manager.setId(1L);
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
+        return manager;
     }
 }
