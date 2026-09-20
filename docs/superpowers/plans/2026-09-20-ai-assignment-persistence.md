@@ -124,7 +124,7 @@ public record ApplyResult(int inserted, int skipped) {}
 
 Test name: `deletesUnlockedAutoAndPreservesManualAndLocked()`.
 
-Mock `ShiftAssignmentRepository` with Mockito `mock()`. The service takes the snapshot as input, so construct it directly as a public record — no builder call needed. Fixture: period id 5; `listForPeriod(5L)` returns 3 rows: unlocked AUTO (id 1), unlocked MANUAL (id 2), locked AUTO (id 3). Snapshot: `new AiSchedulingPayloadBuilder.PayloadSnapshot(employees, shiftTypes, workShifts, leaves, preferences, fixedAssignments, rules, solverOptions)` with one schedulable employee (id 10), one active shift type, one work shift (id 100, requiredStaff 2, with the shift type set), empty leaves/preferences/fixed lists, rules with `hardRules.maxWorkHoursPerDay = 12` (other rule fields any valid ints/weights), and solver options `(30, 1, 8)`. Build minimal entities with `Employee.builder()` / `WorkShift.builder()` / `ShiftType.builder()` setting ids via `setId` (BaseEntity); set `assignmentStatus`, `assignedSource`, `locked` explicitly on each assignment. AI response: SUCCESS with empty assignments list.
+Mock `ShiftAssignmentRepository` with Mockito `mock()`. The service takes the snapshot as input, so construct it directly as a public record — no builder call needed. Fixture: period id 5; `listForPeriod(5L)` returns 3 rows: unlocked AUTO (id 1), unlocked MANUAL (id 2), locked AUTO (id 3). Snapshot: `new AiSchedulingPayloadBuilder.PayloadSnapshot(employees, shiftTypes, workShifts, leaves, preferences, fixedAssignments, rules, solverOptions)` with one schedulable employee (id 10), one active shift type, one work shift (id 100, requiredStaff 2, with the shift type and `schedulePeriod` set), empty leaves/preferences/fixed lists, rules with `hardRules.maxWorkHoursPerDay = 12` (other rule fields any valid ints/weights), and solver options `(30, 1, 8)`. Build minimal entities with `Employee.builder()` / `WorkShift.builder()` / `ShiftType.builder()` setting ids via `setId` (BaseEntity); every `ShiftAssignment` returned by `listForPeriod` must point at a `WorkShift` whose `schedulePeriod.id` is 5 because the service filters defensively by period id. Set `assignmentStatus`, `assignedSource`, `locked` explicitly on each assignment. AI response: SUCCESS with empty assignments list.
 
 Expected: `deleteAll` called with exactly the unlocked AUTO row; `saveAll` called with empty list (or never called); result `inserted == 0`, `skipped == 0`.
 
@@ -263,6 +263,8 @@ public class AiAssignmentPersistenceService {
             shiftAssignmentRepository.saveAll(toInsert);
         } catch (DataIntegrityViolationException ex) {
             throw new AiApplyException("AI assignments violate assignment uniqueness", ex);
+        } catch (RuntimeException ex) {
+            throw new AiApplyException("Failed to persist AI assignments", ex);
         }
         return new ApplyResult(toInsert.size(), skipped);
     }
@@ -275,6 +277,8 @@ public class AiAssignmentPersistenceService {
 - daily hours: sum workMinutes (persisted `workMinutes` else `durationHours*60`) for same workDate across preserved + new shifts + candidate; limit from `snapshot.rules().hardRules().maxWorkHoursPerDay() * 60`; exceed → `AiApplyException("AI assignments exceed maximum work hours ...")`.
 
 `findEmployee(snapshot, id)`: linear scan of `snapshot.employees()`; throw `AiApplyException` unknown employee if absent (defensive; ids already checked).
+
+Wrap repository write failures in `AiApplyException` so every apply failure path reaches the `AdminOptimizationService` apply-failure catch and records `finishFailure(..., response)` per the spec. Validation failures already throw `AiApplyException`; if `deleteAll` can throw in implementation, wrap the whole delete/validate/insert body in `try/catch (RuntimeException ex)` and rethrow existing `AiApplyException` unchanged.
 
 `pairKey(employeeId, workShiftId)`: `employeeId + ":" + workShiftId`.
 
@@ -343,6 +347,7 @@ Expected: FAIL (service does not call persistence yet; verify with `Wanted but n
 
 In `AdminOptimizationService.java`:
 - Add field + constructor parameter `AiAssignmentPersistenceService assignmentPersistenceService` (last position, matching test).
+- Change `AiSchedulingResponseDto response;` before the `try` block to `AiSchedulingResponseDto response = null;` so the apply-failure catch can pass the AI response to `finishFailure` without a definite-assignment compile error.
 - In `validateProtocol`, add after the existing list-null checks:
   - if `"SUCCESS".equals(response.status())`: reject null items, null `employeeId`/`workShiftId`, duplicate pairs → return `"null assignment item"`, `"assignment has null ids"`, `"duplicate assignment pair"` respectively.
   - if not SUCCESS and `!response.assignments().isEmpty()` → return `"assignments present for non-SUCCESS"`.
@@ -359,7 +364,7 @@ In `AdminOptimizationService.java`:
       throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "AI service unavailable");
   }
   ```
-  Import `scheduling.scheduling.ai.AiApplyException`. The existing generic safety net stays as the last catch.
+  Import `scheduling.scheduling.ai.AiApplyException`. The existing generic safety net stays as the last catch for non-apply unexpected failures; apply-service unexpected failures must be wrapped as `AiApplyException` by the persistence service so they use this lifecycle.
 
 - [ ] **Step 4: Update existing SUCCESS tests to stub persistence**
 
