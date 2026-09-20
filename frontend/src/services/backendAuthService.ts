@@ -18,12 +18,20 @@ export interface BackendBootstrapResult {
   user: User
 }
 
-const loginStateError = (response: BackendLoginStateResponse): never => {
-  if (response.status === 'OTP_REQUIRED') {
-    throw new Error('Tài khoản chưa được kích hoạt.')
-  }
+const loginStateMessage = (state: BackendLoginStateResponse) => {
+  return state.status === 'OTP_REQUIRED'
+    ? 'Tài khoản chưa được kích hoạt.'
+    : 'Tài khoản cần đổi mật khẩu trước khi tiếp tục.'
+}
 
-  throw new Error('Tài khoản cần đổi mật khẩu trước khi tiếp tục.')
+export class BackendLoginStateError extends Error {
+  state: BackendLoginStateResponse
+
+  constructor(state: BackendLoginStateResponse) {
+    super(loginStateMessage(state))
+    this.name = 'BackendLoginStateError'
+    this.state = state
+  }
 }
 
 export const backendAuthService = {
@@ -38,7 +46,7 @@ export const backendAuthService = {
     })
 
     if (isBackendLoginStateResponse(response)) {
-      return loginStateError(response)
+      throw new BackendLoginStateError(response)
     }
 
     return {
