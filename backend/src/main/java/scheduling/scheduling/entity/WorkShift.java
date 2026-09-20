@@ -51,5 +51,6 @@ public class WorkShift extends BaseEntity {
     private Boolean transitionShift;
 
     @OneToMany(mappedBy = "workShift", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    @OrderBy("id ASC")
     private Set<ShiftAssignment> shiftAssignments;
 }

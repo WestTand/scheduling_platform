@@ -41,4 +41,16 @@ public interface WorkShiftRepository extends JpaRepository<WorkShift, Long> {
             order by ws.workDate asc, ws.id asc
             """)
     List<WorkShift> findForAiPayload(@Param("periodId") Long periodId);
+
+    @Query("""
+            select distinct ws
+            from WorkShift ws
+            join fetch ws.schedulePeriod sp
+            join fetch ws.shiftType st
+            left join fetch ws.shiftAssignments sa
+            left join fetch sa.employee e
+            where sp.id = :periodId
+            order by ws.workDate asc, st.startTime asc, ws.id asc, e.employeeCode asc, e.fullName asc, sa.id asc
+            """)
+    List<WorkShift> findExportDetailForPeriod(@Param("periodId") Long periodId);
 }

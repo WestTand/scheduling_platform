@@ -29,4 +29,11 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
             order by e.employeeCode asc
             """)
     List<Employee> findSchedulableForAi();
+
+    @Query("""
+            select e from Employee e
+            where e.status = 'ACTIVE'
+            order by e.employeeCode asc, e.fullName asc
+            """)
+    List<Employee> findActiveForWorkloadReport();
 }
