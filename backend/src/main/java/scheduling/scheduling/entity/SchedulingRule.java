@@ -2,6 +2,8 @@ package scheduling.scheduling.entity;
 
 import lombok.*;
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.math.BigDecimal;
 
 /**
@@ -28,6 +30,7 @@ public class SchedulingRule extends BaseEntity {
     @Column(name = "rule_type", nullable = false, length = 10)
     private String ruleType; // HARD / SOFT
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "rule_value_json", nullable = false, columnDefinition = "JSONB")
     private String ruleValueJson;
 
