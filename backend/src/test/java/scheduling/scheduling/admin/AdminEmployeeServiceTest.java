@@ -2,15 +2,21 @@ package scheduling.scheduling.admin;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import scheduling.scheduling.admin.dto.AdminEmployeeResponse;
 import scheduling.scheduling.admin.dto.UpdateEmployeeRequest;
+import scheduling.scheduling.audit.ActivityLogService;
 import scheduling.scheduling.auth.RefreshTokenService;
 import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
@@ -22,7 +28,9 @@ class AdminEmployeeServiceTest {
 
     private final EmployeeRepository employeeRepository = mock(EmployeeRepository.class);
     private final RefreshTokenService refreshTokenService = mock(RefreshTokenService.class);
-    private final AdminEmployeeService service = new AdminEmployeeService(employeeRepository, refreshTokenService);
+    private final ActivityLogService activityLogService = mock(ActivityLogService.class);
+    private final AdminEmployeeService service =
+            new AdminEmployeeService(employeeRepository, refreshTokenService, activityLogService);
 
     @Test
     void listEmployeesReturnsAllEmployeesWhenNoFilters() {
@@ -107,6 +115,8 @@ class AdminEmployeeServiceTest {
         assertThatThrownBy(() -> service.updateEmployee(10L, request))
                 .isInstanceOf(EmployeeNotFoundException.class)
                 .hasMessage("Employee not found");
+
+        verifyNoInteractions(activityLogService);
     }
 
     @Test
@@ -154,6 +164,74 @@ class AdminEmployeeServiceTest {
         assertThat(account.getIsActive()).isTrue();
         assertThat(account.getStatus()).isEqualTo(AccountStatus.PENDING_ACTIVATION);
         verify(refreshTokenService).revokeAllForAccount(20L);
+    }
+
+    @Test
+    void updateEmployeeRecordsActivityLog() {
+        Employee employee = employee(10L, "EMP001", "Nguyen Van A", "ACTIVE");
+        when(employeeRepository.findById(10L)).thenReturn(Optional.of(employee));
+        when(employeeRepository.save(employee)).thenReturn(employee);
+        UpdateEmployeeRequest request = new UpdateEmployeeRequest(
+                "Nguyen Van A Updated",
+                "employee01.updated@example.com",
+                "0900000002",
+                "INACTIVE");
+
+        service.updateEmployee(10L, request);
+
+        verify(activityLogService).record(
+                isNull(),
+                eq("UPDATE"),
+                eq("employees"),
+                eq(10L),
+                isNull(),
+                argThat((Object snapshot) -> snapshot instanceof Map<?, ?> map
+                        && Long.valueOf(10L).equals(map.get("id"))
+                        && "EMP001".equals(map.get("employeeCode"))
+                        && "Nguyen Van A Updated".equals(map.get("fullName"))
+                        && "INACTIVE".equals(map.get("status"))));
+    }
+
+    @Test
+    void lockEmployeeRecordsActivityLog() {
+        Employee employee = employee(10L, "EMP001", "Nguyen Van A", "ACTIVE");
+        employee.setAccount(account(20L, "employee01", AccountStatus.ACTIVE, true));
+        when(employeeRepository.findById(10L)).thenReturn(Optional.of(employee));
+
+        service.lockEmployee(10L);
+
+        verify(activityLogService).record(
+                isNull(),
+                eq("LOCK"),
+                eq("employees"),
+                eq(10L),
+                isNull(),
+                argThat((Object snapshot) -> snapshot instanceof Map<?, ?> map
+                        && Long.valueOf(10L).equals(map.get("id"))
+                        && "EMP001".equals(map.get("employeeCode"))
+                        && "Nguyen Van A".equals(map.get("fullName"))
+                        && "INACTIVE".equals(map.get("status"))));
+    }
+
+    @Test
+    void unlockEmployeeRecordsActivityLog() {
+        Employee employee = employee(10L, "EMP001", "Nguyen Van A", "INACTIVE");
+        employee.setAccount(account(20L, "employee01", AccountStatus.INACTIVE, false));
+        when(employeeRepository.findById(10L)).thenReturn(Optional.of(employee));
+
+        service.unlockEmployee(10L);
+
+        verify(activityLogService).record(
+                isNull(),
+                eq("UNLOCK"),
+                eq("employees"),
+                eq(10L),
+                isNull(),
+                argThat((Object snapshot) -> snapshot instanceof Map<?, ?> map
+                        && Long.valueOf(10L).equals(map.get("id"))
+                        && "EMP001".equals(map.get("employeeCode"))
+                        && "Nguyen Van A".equals(map.get("fullName"))
+                        && "ACTIVE".equals(map.get("status"))));
     }
 
     private static Employee employee(Long id, String employeeCode, String fullName, String status) {

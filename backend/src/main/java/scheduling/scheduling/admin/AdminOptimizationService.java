@@ -2,6 +2,7 @@ package scheduling.scheduling.admin;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -22,6 +23,7 @@ import scheduling.scheduling.ai.ApplyResult;
 import scheduling.scheduling.ai.OptimizationRunRecorder;
 import scheduling.scheduling.ai.dto.AiSchedulingRequestDto;
 import scheduling.scheduling.ai.dto.AiSchedulingResponseDto;
+import scheduling.scheduling.audit.ActivityLogService;
 import scheduling.scheduling.auth.CurrentAccountPrincipal;
 import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
@@ -45,6 +47,7 @@ public class AdminOptimizationService {
     private final OptimizationRunRecorder optimizationRunRecorder;
     private final AiSchedulingClient aiSchedulingClient;
     private final AiAssignmentPersistenceService assignmentPersistenceService;
+    private final ActivityLogService activityLogService;
 
     public AdminOptimizationService(
             AccountRepository accountRepository,
@@ -52,13 +55,15 @@ public class AdminOptimizationService {
             AiSchedulingPayloadBuilder payloadBuilder,
             OptimizationRunRecorder optimizationRunRecorder,
             AiSchedulingClient aiSchedulingClient,
-            AiAssignmentPersistenceService assignmentPersistenceService) {
+            AiAssignmentPersistenceService assignmentPersistenceService,
+            ActivityLogService activityLogService) {
         this.accountRepository = accountRepository;
         this.schedulePeriodRepository = schedulePeriodRepository;
         this.payloadBuilder = payloadBuilder;
         this.optimizationRunRecorder = optimizationRunRecorder;
         this.aiSchedulingClient = aiSchedulingClient;
         this.assignmentPersistenceService = assignmentPersistenceService;
+        this.activityLogService = activityLogService;
     }
 
     // Deliberately no @Transactional: the AI HTTP call is long-lived and must not hold a DB transaction; run persistence is handled by the recorder's REQUIRES_NEW methods.
@@ -86,7 +91,9 @@ public class AdminOptimizationService {
 
             String violation = validateProtocol(response, run, period);
             if (violation != null) {
-                optimizationRunRecorder.finishFailure(run.getId(), "FAILED", "Invalid AI response: " + violation, null);
+                OptimizationRun failed = optimizationRunRecorder.finishFailure(
+                        run.getId(), "FAILED", "Invalid AI response: " + violation, null);
+                recordOptimizationRun(manager, failed);
                 throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Invalid AI response");
             }
 
@@ -94,6 +101,7 @@ public class AdminOptimizationService {
                 ApplyResult applyResult = assignmentPersistenceService.apply(period, snapshot, response);
                 log.debug("Applied AI assignments: {} inserted, {} skipped", applyResult.inserted(), applyResult.skipped());
                 OptimizationRun finished = optimizationRunRecorder.finishSuccess(run.getId(), response);
+                recordOptimizationRun(manager, finished);
                 return new OptimizeScheduleResponse(
                         finished.getId(),
                         period.getId(),
@@ -110,6 +118,7 @@ public class AdminOptimizationService {
             String errorMessage = combineErrorMessage(response);
             OptimizationRun finished =
                     optimizationRunRecorder.finishFailure(run.getId(), response.status(), errorMessage, response);
+            recordOptimizationRun(manager, finished);
             return new OptimizeScheduleResponse(
                     finished.getId(),
                     period.getId(),
@@ -122,18 +131,21 @@ public class AdminOptimizationService {
                     finished.getStartedAt(),
                     finished.getFinishedAt());
         } catch (AiServiceException ex) {
-            optimizationRunRecorder.finishFailure(run.getId(), "FAILED", ex.getMessage(), null);
+            OptimizationRun failed = optimizationRunRecorder.finishFailure(run.getId(), "FAILED", ex.getMessage(), null);
+            recordOptimizationRun(manager, failed);
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "AI service unavailable");
         } catch (AiApplyException ex) {
-            optimizationRunRecorder.finishFailure(
+            OptimizationRun failed = optimizationRunRecorder.finishFailure(
                     run.getId(), "FAILED", "Failed to apply AI assignments: " + ex.getMessage(), response);
+            recordOptimizationRun(manager, failed);
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "AI service unavailable");
         } catch (ResponseStatusException ex) {
             throw ex;
         } catch (RuntimeException ex) {
             try {
-                optimizationRunRecorder.finishFailure(
+                OptimizationRun failed = optimizationRunRecorder.finishFailure(
                         run.getId(), "FAILED", "Unexpected optimization failure: " + ex, null);
+                recordOptimizationRun(manager, failed);
             } catch (RuntimeException recordingFailure) {
                 // Do not mask the original failure if the safety-net recording itself fails.
                 log.warn("Failed to record failed optimization run {}", run.getId(), recordingFailure);
@@ -232,6 +244,17 @@ public class AdminOptimizationService {
             capped.append(part.substring(0, Math.min(part.length(), remaining)));
         }
         return capped.toString();
+    }
+
+    private void recordOptimizationRun(Account manager, OptimizationRun finished) {
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("runId", finished.getId());
+        snapshot.put("periodId", finished.getSchedulePeriod().getId());
+        snapshot.put("status", finished.getStatus());
+        if (finished.getTotalPenalty() != null) {
+            snapshot.put("totalPenalty", finished.getTotalPenalty());
+        }
+        activityLogService.record(manager, "OPTIMIZE", "optimization_runs", finished.getId(), null, snapshot);
     }
 
     private Account requireManager(CurrentAccountPrincipal principal) {

@@ -1,11 +1,13 @@
 package scheduling.scheduling.admin;
 
 import java.util.List;
+import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import scheduling.scheduling.admin.dto.AdminEmployeeResponse;
 import scheduling.scheduling.admin.dto.UpdateEmployeeRequest;
+import scheduling.scheduling.audit.ActivityLogService;
 import scheduling.scheduling.auth.RefreshTokenService;
 import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountStatus;
@@ -17,10 +19,15 @@ public class AdminEmployeeService {
 
     private final EmployeeRepository employeeRepository;
     private final RefreshTokenService refreshTokenService;
+    private final ActivityLogService activityLogService;
 
-    public AdminEmployeeService(EmployeeRepository employeeRepository, RefreshTokenService refreshTokenService) {
+    public AdminEmployeeService(
+            EmployeeRepository employeeRepository,
+            RefreshTokenService refreshTokenService,
+            ActivityLogService activityLogService) {
         this.employeeRepository = employeeRepository;
         this.refreshTokenService = refreshTokenService;
+        this.activityLogService = activityLogService;
     }
 
     @Transactional(readOnly = true)
@@ -49,7 +56,9 @@ public class AdminEmployeeService {
         employee.setEmail(request.email());
         employee.setPhone(request.phone());
         employee.setStatus(request.status());
-        return AdminEmployeeResponse.from(employeeRepository.save(employee));
+        Employee saved = employeeRepository.save(employee);
+        activityLogService.record(null, "UPDATE", "employees", saved.getId(), null, employeeSnapshot(saved));
+        return AdminEmployeeResponse.from(saved);
     }
 
     @Transactional
@@ -65,6 +74,7 @@ public class AdminEmployeeService {
             refreshTokenService.revokeAllForAccount(account.getId());
         }
         employeeRepository.save(employee);
+        activityLogService.record(null, "LOCK", "employees", employee.getId(), null, employeeSnapshot(employee));
     }
 
     @Transactional
@@ -79,10 +89,19 @@ public class AdminEmployeeService {
             }
         }
         employeeRepository.save(employee);
+        activityLogService.record(null, "UNLOCK", "employees", employee.getId(), null, employeeSnapshot(employee));
     }
 
     private Employee findEmployee(Long employeeId) {
         return employeeRepository.findById(employeeId)
                 .orElseThrow(EmployeeNotFoundException::new);
+    }
+
+    private static Map<String, Object> employeeSnapshot(Employee employee) {
+        return Map.of(
+                "id", employee.getId(),
+                "employeeCode", employee.getEmployeeCode(),
+                "fullName", employee.getFullName(),
+                "status", employee.getStatus());
     }
 }
