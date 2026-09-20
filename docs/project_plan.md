@@ -442,83 +442,83 @@ Backend/database compatibility notes from rule foundation slices:
 - [x] API backend goi AI service tao lich
   - Dung de manager kick off auto scheduling tu backend.
   - Backend gom du lieu, gui AI service, nhan ket qua va luu DB.
-- [ ] AI service nhan danh sach nhan vien active
+- [x] AI service nhan danh sach nhan vien active
   - Dung de chi lap lich cho nhan vien dang lam viec va account hop le.
   - Tranh gan ca cho nhan vien inactive.
-- [ ] AI service nhan shift types active
+- [x] AI service nhan shift types active
   - Dung de biet cac loai ca hop le va min/max staff.
   - Loai ca inactive khong duoc dung de tao lich moi.
-- [ ] AI service nhan approved leave requests
+- [x] AI service nhan approved leave requests
   - Dung de hard-block ngay nhan vien da nghi duoc duyet.
   - Giam conflict giua nghi phep va assignment.
-- [ ] AI service nhan preferences
+- [x] AI service nhan preferences
   - Dung de toi uu theo nguyen vong nhan vien neu co the.
   - Thuong la soft constraint vi khong phai luc nao cung dap ung duoc.
-- [ ] AI service nhan locked assignments
+- [x] AI service nhan locked assignments
   - Dung de giu cac phan cong manager da chot.
   - AI chi lap phan con lai xung quanh cac assignment bi khoa.
-- [ ] Implement hard constraint: du nhan su moi ca
+- [x] Implement hard constraint: du nhan su moi ca
   - Dung de moi ca co so nguoi toi thieu/toi da dung cau hinh.
   - La dieu kien bat buoc de lich kha thi.
-- [ ] Implement hard constraint: khong trung ca
+- [x] Implement hard constraint: khong trung ca
   - Dung de mot nhan vien khong lam hai ca overlap.
   - Bao ve tinh hop ly cua lich.
-- [ ] Implement hard constraint: nghi toi thieu 12 gio
+- [x] Implement hard constraint: nghi toi thieu 12 gio
   - Dung de dam bao khoang nghi giua hai ca.
   - Giam lich gay qua tai/sai quy dinh.
-- [ ] Implement hard constraint: toi da 12 gio/ngay
+- [x] Implement hard constraint: toi da 12 gio/ngay
   - Dung de gioi han tong thoi gian lam trong ngay.
   - Tranh gan lich vuot suc/khong hop le.
-- [ ] Implement hard constraint: khong phan ca vao ngay nghi da duyet
+- [x] Implement hard constraint: khong phan ca vao ngay nghi da duyet
   - Dung de ton trong leave requests approved.
   - La rang buoc bat buoc tu nghiep vu.
-- [ ] Implement hard constraint: giu phan cong bi khoa
+- [x] Implement hard constraint: giu phan cong bi khoa
   - Dung de AI khong thay doi assignment manager da lock.
   - Cho phep ket hop manual va auto scheduling.
-- [ ] Implement quota: ngoai gio 1 ngay/tuan
+- [x] Implement quota: ngoai gio 1 ngay/tuan
   - Dung de gioi han tan suat ca ngoai gio theo tuan.
   - Ho tro quy dinh noi bo cua phong/bo phan.
-- [ ] Implement quota: thong tam 2 ngay/tuan
+- [x] Implement quota: thong tam 2 ngay/tuan
   - Dung de gioi han so ngay thong tam neu ap dung.
   - Giam lich khong cong bang hoac qua tai.
   - Quota semantics slice: AI counts `OVERTIME` and `BATHING` by distinct work dates per employee per ISO week while keeping legacy schema field names.
-- [ ] Implement quota: truc 1 ngay/6 ngay neu ap dung
+- [x] Implement quota: truc 1 ngay/6 ngay neu ap dung
   - Dung de can bang ca truc dac biet theo chu ky.
   - Bao dam phan bo cong bang hon.
-- [ ] Implement soft constraint: fairness penalty
+- [x] Implement soft constraint: fairness penalty
   - Dung de can bang so ca/gio lam giua nhan vien.
   - Neu khong the tuyet doi cong bang, AI toi thieu hoa chenh lech.
-- [ ] Implement soft constraint: consecutive heavy shift penalty
+- [x] Implement soft constraint: consecutive heavy shift penalty
   - Dung de tranh xep nhieu ca nang lien tiep.
   - Giam met moi va lich xau.
-- [ ] Implement soft constraint: weekend penalty
+- [x] Implement soft constraint: weekend penalty
   - Dung de phan bo ca cuoi tuan cong bang.
   - Giam viec mot nhan vien bi gan cuoi tuan qua nhieu.
-- [ ] Implement soft constraint: preference penalty
+- [x] Implement soft constraint: preference penalty
   - Dung de phat khi lich khong thoa nguyen vong.
   - Giup AI uu tien trai nghiem nhan vien.
-- [ ] Implement soft constraint: work hour imbalance
+- [x] Implement soft constraint: work hour imbalance
   - Dung de phat chenh lech tong gio lam.
   - Ho tro cong bang theo workload.
-- [ ] Tra ket qua lich toi uu ve backend
+- [x] Tra ket qua lich toi uu ve backend
   - Dung de backend biet assignment nao can luu va penalty bao nhieu.
   - Ket qua phai co cau truc de debug/demo.
-- [ ] Backend luu `ShiftAssignment`
+- [x] Backend luu `ShiftAssignment`
   - Dung de bien ket qua AI thanh lich that trong database.
   - Frontend/employee APIs doc tu bang nay.
-- [ ] Backend luu `OptimizationRun`
+- [x] Backend luu `OptimizationRun`
   - Dung de ghi lai lan chay AI, status, penalty, error.
   - Ho tro audit va so sanh ket qua.
-- [ ] Backend luu `total_penalty`
+- [x] Backend luu `total_penalty`
   - Dung de biet chat luong lich toi uu.
   - Co the hien tren UI/report.
-- [ ] Xu ly INFEASIBLE va tra ly do
+- [x] Xu ly INFEASIBLE va tra ly do
   - Dung khi khong co lich thoa hard constraints.
   - Manager can ly do de sua input: them nhan vien, giam ca, sua nghi phep/rules.
-- [ ] Test AI service bang pytest
+- [x] Test AI service bang pytest
   - Kiem tra solver logic doc lap voi backend.
   - Nhanh hon integration test khi tune constraint.
-- [ ] Test backend integration voi mocked AI service
+- [x] Test backend integration voi mocked AI service
   - Kiem tra backend gom payload, goi AI, luu ket qua.
   - Khong phu thuoc AI service that trong unit/integration tests.
 

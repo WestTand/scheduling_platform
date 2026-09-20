@@ -1,6 +1,7 @@
 package scheduling.scheduling.admin;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -12,9 +13,12 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
 import scheduling.scheduling.admin.dto.OptimizeScheduleRequest;
 import scheduling.scheduling.admin.dto.OptimizeScheduleResponse;
+import scheduling.scheduling.ai.AiApplyException;
+import scheduling.scheduling.ai.AiAssignmentPersistenceService;
 import scheduling.scheduling.ai.AiSchedulingClient;
 import scheduling.scheduling.ai.AiSchedulingPayloadBuilder;
 import scheduling.scheduling.ai.AiServiceException;
+import scheduling.scheduling.ai.ApplyResult;
 import scheduling.scheduling.ai.OptimizationRunRecorder;
 import scheduling.scheduling.ai.dto.AiSchedulingRequestDto;
 import scheduling.scheduling.ai.dto.AiSchedulingResponseDto;
@@ -40,18 +44,21 @@ public class AdminOptimizationService {
     private final AiSchedulingPayloadBuilder payloadBuilder;
     private final OptimizationRunRecorder optimizationRunRecorder;
     private final AiSchedulingClient aiSchedulingClient;
+    private final AiAssignmentPersistenceService assignmentPersistenceService;
 
     public AdminOptimizationService(
             AccountRepository accountRepository,
             SchedulePeriodRepository schedulePeriodRepository,
             AiSchedulingPayloadBuilder payloadBuilder,
             OptimizationRunRecorder optimizationRunRecorder,
-            AiSchedulingClient aiSchedulingClient) {
+            AiSchedulingClient aiSchedulingClient,
+            AiAssignmentPersistenceService assignmentPersistenceService) {
         this.accountRepository = accountRepository;
         this.schedulePeriodRepository = schedulePeriodRepository;
         this.payloadBuilder = payloadBuilder;
         this.optimizationRunRecorder = optimizationRunRecorder;
         this.aiSchedulingClient = aiSchedulingClient;
+        this.assignmentPersistenceService = assignmentPersistenceService;
     }
 
     // Deliberately no @Transactional: the AI HTTP call is long-lived and must not hold a DB transaction; run persistence is handled by the recorder's REQUIRES_NEW methods.
@@ -73,7 +80,7 @@ public class AdminOptimizationService {
 
         AiSchedulingRequestDto payload = payloadBuilder.buildFrom(snapshot, period, run.getId());
 
-        AiSchedulingResponseDto response;
+        AiSchedulingResponseDto response = null;
         try {
             response = aiSchedulingClient.optimize(payload);
 
@@ -84,6 +91,8 @@ public class AdminOptimizationService {
             }
 
             if ("SUCCESS".equals(response.status())) {
+                ApplyResult applyResult = assignmentPersistenceService.apply(period, snapshot, response);
+                log.debug("Applied AI assignments: {} inserted, {} skipped", applyResult.inserted(), applyResult.skipped());
                 OptimizationRun finished = optimizationRunRecorder.finishSuccess(run.getId(), response);
                 return new OptimizeScheduleResponse(
                         finished.getId(),
@@ -114,6 +123,10 @@ public class AdminOptimizationService {
                     finished.getFinishedAt());
         } catch (AiServiceException ex) {
             optimizationRunRecorder.finishFailure(run.getId(), "FAILED", ex.getMessage(), null);
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "AI service unavailable");
+        } catch (AiApplyException ex) {
+            optimizationRunRecorder.finishFailure(
+                    run.getId(), "FAILED", "Failed to apply AI assignments: " + ex.getMessage(), response);
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "AI service unavailable");
         } catch (ResponseStatusException ex) {
             throw ex;
@@ -166,6 +179,23 @@ public class AdminOptimizationService {
         }
         if ("SUCCESS".equals(response.status()) && response.totalPenalty() == null) {
             return "totalPenalty is null for SUCCESS";
+        }
+        if ("SUCCESS".equals(response.status())) {
+            Set<String> seen = new HashSet<>();
+            for (AiSchedulingResponseDto.AssignmentDto item : response.assignments()) {
+                if (item == null) {
+                    return "null assignment item";
+                }
+                if (item.employeeId() == null || item.workShiftId() == null) {
+                    return "assignment has null ids";
+                }
+                String pair = item.employeeId() + ":" + item.workShiftId();
+                if (!seen.add(pair)) {
+                    return "duplicate assignment pair";
+                }
+            }
+        } else if (!response.assignments().isEmpty()) {
+            return "assignments present for non-SUCCESS";
         }
         return null;
     }

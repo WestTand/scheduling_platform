@@ -115,7 +115,7 @@ public class AiSchedulingPayloadBuilder {
                 snapshot.workShifts().stream().map(this::toWorkShiftDto).toList(),
                 snapshot.leaves().stream().map(this::toApprovedLeaveDto).toList(),
                 snapshot.preferences().stream().map(this::toPreferenceDto).toList(),
-                snapshot.lockedAssignments().stream()
+                snapshot.fixedAssignments().stream()
                         .map(assignment -> new AiSchedulingRequestDto.LockedAssignmentDto(
                                 assignment.getId(),
                                 assignment.getEmployee().getId(),
@@ -166,18 +166,18 @@ public class AiSchedulingPayloadBuilder {
                 .map(WorkShift::getId)
                 .collect(Collectors.toSet());
 
-        List<ShiftAssignment> lockedAssignments =
-                shiftAssignmentRepository.findLockedForPeriod(period.getId());
-        if (lockedAssignments == null) {
-            lockedAssignments = List.of();
+        List<ShiftAssignment> fixedAssignments =
+                shiftAssignmentRepository.findFixedForPeriod(period.getId());
+        if (fixedAssignments == null) {
+            fixedAssignments = List.of();
         }
-        for (ShiftAssignment assignment : lockedAssignments) {
+        for (ShiftAssignment assignment : fixedAssignments) {
             Long employeeId =
                     assignment.getEmployee() == null ? null : assignment.getEmployee().getId();
             Long workShiftId =
                     assignment.getWorkShift() == null ? null : assignment.getWorkShift().getId();
             if (!activeEmployeeIds.contains(employeeId) || !periodWorkShiftIds.contains(workShiftId)) {
-                throw badRequest("Locked assignment "
+                throw badRequest("Preserved assignment "
                         + assignment.getId()
                         + " references inactive scheduling data");
             }
@@ -214,7 +214,7 @@ public class AiSchedulingPayloadBuilder {
                 workShifts,
                 schedulableLeaves,
                 schedulablePreferences,
-                lockedAssignments,
+                fixedAssignments,
                 rules,
                 effectiveOptions);
     }
@@ -340,7 +340,7 @@ public class AiSchedulingPayloadBuilder {
             List<WorkShift> workShifts,
             List<LeaveRequest> leaves,
             List<Preference> preferences,
-            List<ShiftAssignment> lockedAssignments,
+            List<ShiftAssignment> fixedAssignments,
             AiSchedulingRequestDto.RulesDto rules,
             AiSchedulingRequestDto.SolverOptionsDto solverOptions) {}
 }

@@ -173,7 +173,7 @@ class AiSchedulingPayloadBuilderTest {
                 .build();
         badShift.setId(31L);
         when(workShiftRepository.findForAiPayload(5L)).thenReturn(List.of(badShift));
-        when(shiftAssignmentRepository.findLockedForPeriod(5L)).thenReturn(List.of());
+        when(shiftAssignmentRepository.findFixedForPeriod(5L)).thenReturn(List.of());
 
         assertThatThrownBy(() -> builder.build(fixture.period(), 900L, null))
                 .isInstanceOf(ResponseStatusException.class)
@@ -185,7 +185,7 @@ class AiSchedulingPayloadBuilderTest {
     }
 
     @Test
-    void rejectsLockedAssignmentReferencingInactiveEmployee() {
+    void rejectsFixedLockedAssignmentReferencingInactiveEmployee() {
         Fixture fixture = happyPath();
         Employee inactiveEmployee = Employee.builder()
                 .employeeCode("EMP099")
@@ -193,15 +193,15 @@ class AiSchedulingPayloadBuilderTest {
                 .status("INACTIVE")
                 .build();
         inactiveEmployee.setId(11L);
-        ShiftAssignment badLock = ShiftAssignment.builder()
+        ShiftAssignment badFixed = ShiftAssignment.builder()
                 .workShift(fixture.workShift())
                 .employee(inactiveEmployee)
                 .assignmentStatus("ASSIGNED")
-                .assignedSource("MANUAL")
+                .assignedSource("AUTO")
                 .locked(true)
                 .build();
-        badLock.setId(601L);
-        when(shiftAssignmentRepository.findLockedForPeriod(5L)).thenReturn(List.of(badLock));
+        badFixed.setId(601L);
+        when(shiftAssignmentRepository.findFixedForPeriod(5L)).thenReturn(List.of(badFixed));
 
         assertThatThrownBy(() -> builder.build(fixture.period(), 900L, null))
                 .isInstanceOf(ResponseStatusException.class)
@@ -209,7 +209,7 @@ class AiSchedulingPayloadBuilderTest {
                     ResponseStatusException rse = (ResponseStatusException) ex;
                     assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
                     assertThat(rse.getReason())
-                            .isEqualTo("Locked assignment 601 references inactive scheduling data");
+                            .isEqualTo("Preserved assignment 601 references inactive scheduling data");
                 });
     }
 
@@ -320,7 +320,7 @@ class AiSchedulingPayloadBuilderTest {
                 .build();
         badShift.setId(32L);
         when(workShiftRepository.findForAiPayload(5L)).thenReturn(List.of(badShift));
-        when(shiftAssignmentRepository.findLockedForPeriod(5L)).thenReturn(List.of());
+        when(shiftAssignmentRepository.findFixedForPeriod(5L)).thenReturn(List.of());
 
         assertThatThrownBy(() -> builder.build(fixture.period(), 900L, null))
                 .isInstanceOf(ResponseStatusException.class)
@@ -332,7 +332,7 @@ class AiSchedulingPayloadBuilderTest {
     }
 
     @Test
-    void rejectsLockedAssignmentReferencingInvalidWorkShift() {
+    void rejectsFixedLockedAssignmentReferencingInvalidWorkShift() {
         Fixture fixture = happyPath();
         WorkShift unknownShift = WorkShift.builder()
                 .workDate(LocalDate.of(2026, 9, 17))
@@ -343,15 +343,15 @@ class AiSchedulingPayloadBuilderTest {
                 .endsAt(fixture.startsAt().plusHours(8))
                 .build();
         unknownShift.setId(999L);
-        ShiftAssignment badLock = ShiftAssignment.builder()
+        ShiftAssignment badFixed = ShiftAssignment.builder()
                 .workShift(unknownShift)
                 .employee(fixture.employee())
                 .assignmentStatus("ASSIGNED")
                 .assignedSource("MANUAL")
-                .locked(true)
+                .locked(false)
                 .build();
-        badLock.setId(602L);
-        when(shiftAssignmentRepository.findLockedForPeriod(5L)).thenReturn(List.of(badLock));
+        badFixed.setId(602L);
+        when(shiftAssignmentRepository.findFixedForPeriod(5L)).thenReturn(List.of(badFixed));
 
         assertThatThrownBy(() -> builder.build(fixture.period(), 900L, null))
                 .isInstanceOf(ResponseStatusException.class)
@@ -359,7 +359,7 @@ class AiSchedulingPayloadBuilderTest {
                     ResponseStatusException rse = (ResponseStatusException) ex;
                     assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
                     assertThat(rse.getReason())
-                            .isEqualTo("Locked assignment 602 references inactive scheduling data");
+                            .isEqualTo("Preserved assignment 602 references inactive scheduling data");
                 });
     }
 
@@ -403,6 +403,57 @@ class AiSchedulingPayloadBuilderTest {
         assertThat(payload.preferences())
                 .extracting(AiSchedulingRequestDto.PreferenceDto::preferenceId)
                 .containsExactly(800L);
+    }
+
+    @Test
+    void includesManualAssignmentsAsFixedInputs() {
+        Fixture fixture = happyPath();
+        ShiftAssignment manualAssignment = ShiftAssignment.builder()
+                .workShift(fixture.workShift())
+                .employee(fixture.employee())
+                .assignmentStatus("ASSIGNED")
+                .assignedSource("MANUAL")
+                .locked(false)
+                .build();
+        manualAssignment.setId(601L);
+        when(shiftAssignmentRepository.findFixedForPeriod(5L))
+                .thenReturn(List.of(fixture.fixedAssignment(), manualAssignment));
+
+        AiSchedulingRequestDto payload = builder.build(fixture.period(), 900L, null);
+
+        assertThat(payload.lockedAssignments())
+                .containsExactly(
+                        new AiSchedulingRequestDto.LockedAssignmentDto(600L, 10L, 30L),
+                        new AiSchedulingRequestDto.LockedAssignmentDto(601L, 10L, 30L));
+    }
+
+    @Test
+    void rejectsFixedAssignmentReferencingInactiveEmployee() {
+        Fixture fixture = happyPath();
+        Employee inactiveEmployee = Employee.builder()
+                .employeeCode("EMP099")
+                .fullName("Inactive Employee")
+                .status("INACTIVE")
+                .build();
+        inactiveEmployee.setId(11L);
+        ShiftAssignment manualAssignment = ShiftAssignment.builder()
+                .workShift(fixture.workShift())
+                .employee(inactiveEmployee)
+                .assignmentStatus("ASSIGNED")
+                .assignedSource("MANUAL")
+                .locked(false)
+                .build();
+        manualAssignment.setId(603L);
+        when(shiftAssignmentRepository.findFixedForPeriod(5L)).thenReturn(List.of(manualAssignment));
+
+        assertThatThrownBy(() -> builder.build(fixture.period(), 900L, null))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> {
+                    ResponseStatusException rse = (ResponseStatusException) ex;
+                    assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(rse.getReason())
+                            .isEqualTo("Preserved assignment 603 references inactive scheduling data");
+                });
     }
 
     private Fixture happyPath() {
@@ -469,14 +520,14 @@ class AiSchedulingPayloadBuilderTest {
                 .build();
         preference.setId(800L);
 
-        ShiftAssignment lockedAssignment = ShiftAssignment.builder()
+        ShiftAssignment fixedAssignment = ShiftAssignment.builder()
                 .workShift(workShift)
                 .employee(employee)
                 .assignmentStatus("ASSIGNED")
                 .assignedSource("AUTO")
                 .locked(true)
                 .build();
-        lockedAssignment.setId(600L);
+        fixedAssignment.setId(600L);
 
         when(employeeRepository.findSchedulableForAi()).thenReturn(List.of(employee));
         when(shiftTypeRepository.findByStatus("ACTIVE")).thenReturn(List.of(shiftType));
@@ -487,10 +538,10 @@ class AiSchedulingPayloadBuilderTest {
         when(preferenceRepository.findActiveInRange(
                         LocalDate.of(2026, 9, 14), LocalDate.of(2026, 9, 20)))
                 .thenReturn(List.of(preference));
-        when(shiftAssignmentRepository.findLockedForPeriod(5L)).thenReturn(List.of(lockedAssignment));
+        when(shiftAssignmentRepository.findFixedForPeriod(5L)).thenReturn(List.of(fixedAssignment));
         stubRules();
 
-        return new Fixture(period, employee, shiftType, workShift, leave, preference, lockedAssignment, startsAt);
+        return new Fixture(period, employee, shiftType, workShift, leave, preference, fixedAssignment, startsAt);
     }
 
     private void stubRules() {
@@ -537,6 +588,6 @@ class AiSchedulingPayloadBuilderTest {
             WorkShift workShift,
             LeaveRequest leave,
             Preference preference,
-            ShiftAssignment lockedAssignment,
+            ShiftAssignment fixedAssignment,
             OffsetDateTime startsAt) {}
 }
