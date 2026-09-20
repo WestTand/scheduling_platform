@@ -18,6 +18,7 @@ import scheduling.scheduling.ai.AiAssignmentPersistenceService;
 import scheduling.scheduling.ai.AiSchedulingClient;
 import scheduling.scheduling.ai.AiSchedulingPayloadBuilder;
 import scheduling.scheduling.ai.AiServiceException;
+import scheduling.scheduling.ai.ApplyResult;
 import scheduling.scheduling.ai.OptimizationRunRecorder;
 import scheduling.scheduling.ai.dto.AiSchedulingRequestDto;
 import scheduling.scheduling.ai.dto.AiSchedulingResponseDto;
@@ -90,7 +91,8 @@ public class AdminOptimizationService {
             }
 
             if ("SUCCESS".equals(response.status())) {
-                assignmentPersistenceService.apply(period, snapshot, response);
+                ApplyResult applyResult = assignmentPersistenceService.apply(period, snapshot, response);
+                log.debug("Applied AI assignments: {} inserted, {} skipped", applyResult.inserted(), applyResult.skipped());
                 OptimizationRun finished = optimizationRunRecorder.finishSuccess(run.getId(), response);
                 return new OptimizeScheduleResponse(
                         finished.getId(),
