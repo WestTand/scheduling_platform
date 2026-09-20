@@ -436,10 +436,10 @@ Backend/database compatibility notes from rule foundation slices:
 - `WorkShift.startsAt` and `WorkShift.endsAt` are persisted exact windows. The backend AI payload slice should send these persisted values; if old rows can have null windows, add a backfill or derive fallback before calling AI.
 - Production-hardening follow-up: after existing shift types are backfilled with stable `shiftCode`, enforce `shift_code` as not null if the deployment needs DB-level protection.
 
-- [ ] Thiet ke request payload tu backend sang AI service
+- [x] Thiet ke request payload tu backend sang AI service
   - Dung de thong nhat schema du lieu dau vao cho solver.
   - Giam coupling giua Spring Boot backend va AI service.
-- [ ] API backend goi AI service tao lich
+- [x] API backend goi AI service tao lich
   - Dung de manager kick off auto scheduling tu backend.
   - Backend gom du lieu, gui AI service, nhan ket qua va luu DB.
 - [ ] AI service nhan danh sach nhan vien active

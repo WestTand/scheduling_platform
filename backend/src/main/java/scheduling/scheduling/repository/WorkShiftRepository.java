@@ -33,4 +33,12 @@ public interface WorkShiftRepository extends JpaRepository<WorkShift, Long> {
             where ws.id = :id
             """)
     Optional<WorkShift> findDetailById(@Param("id") Long id);
+
+    @Query("""
+            select ws from WorkShift ws
+            join fetch ws.shiftType
+            where ws.schedulePeriod.id = :periodId
+            order by ws.workDate asc, ws.id asc
+            """)
+    List<WorkShift> findForAiPayload(@Param("periodId") Long periodId);
 }
