@@ -24,19 +24,46 @@ class SchedulePdfWriterTest {
                 3,
                 "PUBLISHED",
                 LocalDateTime.of(2026, 9, 20, 8, 30),
-                List.of(new ScheduleExportData.Row(
-                        LocalDate.of(2026, 9, 21),
-                        "MONDAY",
-                        100L,
-                        "DAY",
-                        "Day Shift",
-                        LocalTime.of(8, 0),
-                        LocalTime.of(16, 0),
-                        "E001",
-                        "An Nguyen",
-                        "ASSIGNED",
-                        "MANUAL",
-                        true)));
+                List.of(
+                        new ScheduleExportData.Row(
+                                LocalDate.of(2026, 9, 21),
+                                "MONDAY",
+                                100L,
+                                "DAY",
+                                "Day Shift",
+                                LocalTime.of(8, 0),
+                                LocalTime.of(16, 0),
+                                "E001",
+                                "An Nguyen",
+                                "ASSIGNED",
+                                "MANUAL",
+                                true),
+                        new ScheduleExportData.Row(
+                                LocalDate.of(2026, 9, 22),
+                                "TUESDAY",
+                                101L,
+                                "DAY",
+                                "Day Shift",
+                                LocalTime.of(8, 0),
+                                LocalTime.of(16, 0),
+                                "E002",
+                                null,
+                                "ASSIGNED",
+                                "MANUAL",
+                                false),
+                        new ScheduleExportData.Row(
+                                LocalDate.of(2026, 9, 23),
+                                "WEDNESDAY",
+                                102L,
+                                "DAY",
+                                "Day Shift",
+                                LocalTime.of(8, 0),
+                                LocalTime.of(16, 0),
+                                null,
+                                null,
+                                "UNASSIGNED",
+                                null,
+                                false)));
 
         byte[] bytes = writer.write(data);
 
@@ -46,6 +73,7 @@ class SchedulePdfWriterTest {
             assertThat(text).contains("Schedule Export");
             assertThat(text).contains("Week 39");
             assertThat(text).contains("An Nguyen");
+            assertThat(text).containsOnlyOnce("Unassigned");
         }
     }
 }

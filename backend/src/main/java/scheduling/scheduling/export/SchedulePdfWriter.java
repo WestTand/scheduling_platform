@@ -91,8 +91,10 @@ public class SchedulePdfWriter {
     }
 
     private static String employeeName(ScheduleExportData.Row row) {
-        String employeeName = blank(row.employeeName());
-        return employeeName.isBlank() ? "Unassigned" : employeeName;
+        if ("UNASSIGNED".equals(row.assignmentStatus())) {
+            return "Unassigned";
+        }
+        return blank(row.employeeName());
     }
 
     private static String blank(Object value) {
