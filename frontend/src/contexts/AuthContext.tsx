@@ -6,7 +6,7 @@ import {
   type PropsWithChildren,
 } from 'react'
 
-import { clearStoredAuth, mockLogin, restoreStoredUser, setStoredAuth } from '@/services/authService'
+import { authService, restoreStoredUser } from '@/services/authService'
 import type { AuthContextValue, AuthState, LoginCredentials } from '@/types/auth'
 
 export const AuthContext = createContext<AuthContextValue | undefined>(undefined)
@@ -27,9 +27,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const login = useCallback(async (credentials: LoginCredentials, rememberMe: boolean) => {
     setAuthState((current) => ({ ...current, isLoading: true }))
 
-    const user = await mockLogin(credentials)
+    const user = await authService.login(credentials, rememberMe)
 
-    setStoredAuth(user, rememberMe)
     setAuthState({
       user,
       isAuthenticated: true,
@@ -37,8 +36,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
     })
   }, [])
 
-  const logout = useCallback(() => {
-    clearStoredAuth()
+  const logout = useCallback(async () => {
+    await authService.logout()
     setAuthState({
       user: null,
       isAuthenticated: false,
