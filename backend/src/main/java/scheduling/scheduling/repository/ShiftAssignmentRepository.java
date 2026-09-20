@@ -59,8 +59,8 @@ public interface ShiftAssignmentRepository extends JpaRepository<ShiftAssignment
             join fetch sa.workShift ws
             join fetch ws.shiftType st
             where ws.schedulePeriod.id = :periodId
-              and sa.locked = true
+              and (sa.locked = true or sa.assignedSource = 'MANUAL')
             order by sa.id asc
             """)
-    List<ShiftAssignment> findLockedForPeriod(@Param("periodId") Long periodId);
+    List<ShiftAssignment> findFixedForPeriod(@Param("periodId") Long periodId);
 }
