@@ -1,6 +1,7 @@
 package scheduling.scheduling.ai;
 
 import java.time.Duration;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -16,6 +17,7 @@ public class RestClientAiSchedulingClient implements AiSchedulingClient {
     private final RestClient restClient;
     private final int maxAttempts;
 
+    @Autowired
     public RestClientAiSchedulingClient(
             @Value("${app.ai-service-url}") String aiServiceUrl,
             @Value("${app.ai.connect-timeout-seconds:30}") long connectTimeoutSeconds,
