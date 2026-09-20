@@ -11,6 +11,7 @@ import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -932,6 +933,33 @@ class AdminOptimizationServiceTest {
     }
 
     @Test
+    void optimizeSuccessIgnoresActivityLogFailure() {
+        CurrentAccountPrincipal principal = new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
+        Account manager = managerAccount(principal);
+        SchedulePeriod period = draftPeriod(5L, manager);
+        AiSchedulingRequestDto payload = testPayload();
+        AiSchedulingResponseDto aiResponse = successResponse();
+        AiSchedulingPayloadBuilder.PayloadSnapshot snapshot = testSnapshot();
+        OptimizationRun startedRun = startedRun(900L, period, manager);
+        OptimizationRun finishedRun = finishedRun(900L, period, manager, "SUCCESS");
+
+        stubRunPlumbing(manager, period, payload, snapshot, startedRun);
+        when(aiSchedulingClient.optimize(eq(payload))).thenReturn(aiResponse);
+        when(assignmentPersistenceService.apply(eq(period), any(), eq(aiResponse)))
+                .thenReturn(new ApplyResult(1, 0));
+        when(optimizationRunRecorder.finishSuccess(eq(900L), eq(aiResponse))).thenReturn(finishedRun);
+        doThrow(new IllegalStateException("audit unavailable"))
+                .when(activityLogService).record(same(manager), eq("OPTIMIZE"), eq("optimization_runs"),
+                        eq(900L), isNull(), any());
+
+        OptimizeScheduleResponse response = service.optimize(principal, 5L, new OptimizeScheduleRequest(null));
+
+        assertThat(response.aiStatus()).isEqualTo("SUCCESS");
+        verify(optimizationRunRecorder).finishSuccess(eq(900L), eq(aiResponse));
+        verify(optimizationRunRecorder, never()).finishFailure(any(), any(), any(), any());
+    }
+
+    @Test
     void optimizeInfeasibleRecordsActivityLog() {
         CurrentAccountPrincipal principal = new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
         Account manager = managerAccount(principal);
@@ -1018,6 +1046,33 @@ class AdminOptimizationServiceTest {
                 .isEqualTo(HttpStatus.BAD_GATEWAY);
 
         verifyOptimizationLog(manager, 900L, "FAILED", null);
+    }
+
+    @Test
+    void optimizeClientFailureKeepsBadGatewayPathWhenActivityLogFails() {
+        CurrentAccountPrincipal principal = new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
+        Account manager = managerAccount(principal);
+        SchedulePeriod period = draftPeriod(5L, manager);
+        AiSchedulingRequestDto payload = testPayload();
+        AiSchedulingPayloadBuilder.PayloadSnapshot snapshot = testSnapshot();
+        OptimizationRun startedRun = startedRun(900L, period, manager);
+        OptimizationRun failedRun = finishedRun(900L, period, manager, "FAILED");
+
+        stubRunPlumbing(manager, period, payload, snapshot, startedRun);
+        when(aiSchedulingClient.optimize(eq(payload))).thenThrow(new AiServiceException("boom"));
+        when(optimizationRunRecorder.finishFailure(eq(900L), eq("FAILED"), eq("boom"), eq(null)))
+                .thenReturn(failedRun);
+        doThrow(new IllegalStateException("audit unavailable"))
+                .when(activityLogService).record(same(manager), eq("OPTIMIZE"), eq("optimization_runs"),
+                        eq(900L), isNull(), any());
+
+        assertThatThrownBy(() -> service.optimize(principal, 5L, new OptimizeScheduleRequest(null)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_GATEWAY);
+
+        verify(optimizationRunRecorder).finishFailure(eq(900L), eq("FAILED"), eq("boom"), eq(null));
+        verify(optimizationRunRecorder, never()).finishSuccess(any(), any());
     }
 
     @Test

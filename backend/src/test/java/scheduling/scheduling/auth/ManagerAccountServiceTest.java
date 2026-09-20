@@ -3,16 +3,22 @@ package scheduling.scheduling.auth;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import scheduling.scheduling.audit.ActivityLogService;
 import scheduling.scheduling.auth.dto.AccountResponse;
 import scheduling.scheduling.auth.dto.CreateEmployeeAccountRequest;
 import scheduling.scheduling.entity.Account;
@@ -29,12 +35,14 @@ class ManagerAccountServiceTest {
     private final PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
     private final AccountActivationOtpService otpService = mock(AccountActivationOtpService.class);
     private final RefreshTokenService refreshTokenService = mock(RefreshTokenService.class);
+    private final ActivityLogService activityLogService = mock(ActivityLogService.class);
     private final ManagerAccountService service = new ManagerAccountService(
             accountRepository,
             employeeRepository,
             passwordEncoder,
             otpService,
             refreshTokenService,
+            activityLogService,
             "configured-default");
 
     @Test
@@ -51,11 +59,14 @@ class ManagerAccountServiceTest {
                 .employee(savedEmployee)
                 .build();
         savedAccount.setId(20L);
+        Account manager = managerAccount();
+        CurrentAccountPrincipal principal = new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
         when(passwordEncoder.encode("configured-default")).thenReturn("encoded-1111");
         when(employeeRepository.save(any(Employee.class))).thenReturn(savedEmployee);
         when(accountRepository.save(any(Account.class))).thenReturn(savedAccount);
 
-        AccountResponse response = service.createEmployeeAccount(request);
+        AccountResponse response = service.createEmployeeAccount(principal, request);
 
         ArgumentCaptor<Employee> employeeCaptor = ArgumentCaptor.forClass(Employee.class);
         verify(employeeRepository).save(employeeCaptor.capture());
@@ -78,10 +89,47 @@ class ManagerAccountServiceTest {
     }
 
     @Test
+    void createEmployeeAccountRecordsEmployeeCreateActivityLog() {
+        CreateEmployeeAccountRequest request = request();
+        Employee savedEmployee = employee();
+        savedEmployee.setId(10L);
+        Account savedAccount = Account.builder()
+                .username("employee01")
+                .passwordHash("encoded-1111")
+                .role(AccountRole.EMPLOYEE)
+                .status(AccountStatus.PENDING_ACTIVATION)
+                .isActive(true)
+                .employee(savedEmployee)
+                .build();
+        savedAccount.setId(20L);
+        Account manager = managerAccount();
+        CurrentAccountPrincipal principal = new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
+        when(passwordEncoder.encode("configured-default")).thenReturn("encoded-1111");
+        when(employeeRepository.save(any(Employee.class))).thenReturn(savedEmployee);
+        when(accountRepository.save(any(Account.class))).thenReturn(savedAccount);
+
+        service.createEmployeeAccount(principal, request);
+
+        verify(activityLogService).record(
+                same(manager),
+                eq("CREATE"),
+                eq("employees"),
+                eq(10L),
+                isNull(),
+                argThat((Object snapshot) -> snapshot instanceof Map<?, ?> map
+                        && Long.valueOf(10L).equals(map.get("id"))
+                        && "EMP001".equals(map.get("employeeCode"))
+                        && "Nguyen Van A".equals(map.get("fullName"))
+                        && "ACTIVE".equals(map.get("status"))));
+    }
+
+    @Test
     void createEmployeeAccountRejectsDuplicateUsername() {
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(managerAccount()));
         when(accountRepository.existsByUsername("employee01")).thenReturn(true);
 
-        assertThatThrownBy(() -> service.createEmployeeAccount(request()))
+        assertThatThrownBy(() -> service.createEmployeeAccount(managerPrincipal(), request()))
                 .isInstanceOf(DuplicateResourceException.class)
                 .hasMessage("Username already exists");
 
@@ -91,9 +139,10 @@ class ManagerAccountServiceTest {
 
     @Test
     void createEmployeeAccountRejectsDuplicateEmployeeCode() {
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(managerAccount()));
         when(employeeRepository.existsByEmployeeCode("EMP001")).thenReturn(true);
 
-        assertThatThrownBy(() -> service.createEmployeeAccount(request()))
+        assertThatThrownBy(() -> service.createEmployeeAccount(managerPrincipal(), request()))
                 .isInstanceOf(DuplicateResourceException.class)
                 .hasMessage("Employee code already exists");
 
@@ -198,6 +247,22 @@ class ManagerAccountServiceTest {
                 .employee(employee())
                 .build();
         account.setId(id);
+        return account;
+    }
+
+    private static CurrentAccountPrincipal managerPrincipal() {
+        return new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
+    }
+
+    private static Account managerAccount() {
+        Account account = Account.builder()
+                .username("manager01")
+                .passwordHash("hash")
+                .role(AccountRole.MANAGER)
+                .status(AccountStatus.ACTIVE)
+                .isActive(true)
+                .build();
+        account.setId(1L);
         return account;
     }
 }

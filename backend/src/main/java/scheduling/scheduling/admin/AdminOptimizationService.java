@@ -254,7 +254,11 @@ public class AdminOptimizationService {
         if (finished.getTotalPenalty() != null) {
             snapshot.put("totalPenalty", finished.getTotalPenalty());
         }
-        activityLogService.record(manager, "OPTIMIZE", "optimization_runs", finished.getId(), null, snapshot);
+        try {
+            activityLogService.record(manager, "OPTIMIZE", "optimization_runs", finished.getId(), null, snapshot);
+        } catch (RuntimeException ignored) {
+            // Optimization status is authoritative; audit failures must not rewrite or mask it.
+        }
     }
 
     private Account requireManager(CurrentAccountPrincipal principal) {
