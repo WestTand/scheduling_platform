@@ -57,6 +57,7 @@ public class OptimizationRunRecorder {
         run.setStatus("SUCCESS");
         run.setFinishedAt(LocalDateTime.now(clock));
         run.setTotalPenalty(response.totalPenalty());
+        run.getSchedulePeriod().setTotalPenalty(response.totalPenalty());
         run.setPenaltyDetailsJson(writeValue(response.penaltyDetails()));
         return optimizationRunRepository.save(run);
     }

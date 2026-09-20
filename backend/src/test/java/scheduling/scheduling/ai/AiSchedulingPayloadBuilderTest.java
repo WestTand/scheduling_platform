@@ -3,6 +3,7 @@ package scheduling.scheduling.ai;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -454,6 +455,41 @@ class AiSchedulingPayloadBuilderTest {
                     assertThat(rse.getReason())
                             .isEqualTo("Preserved assignment 603 references inactive scheduling data");
                 });
+    }
+
+    @Test
+    void includesAssignmentsBeforePeriodAsBoundaryAssignments() {
+        Fixture fixture = happyPath();
+        WorkShift previousShift = WorkShift.builder()
+                .workDate(fixture.period().getStartDate().minusDays(1))
+                .requiredStaff(1)
+                .schedulePeriod(SchedulePeriod.builder()
+                        .periodName("Previous Period")
+                        .startDate(fixture.period().getStartDate().minusDays(7))
+                        .endDate(fixture.period().getStartDate().minusDays(1))
+                        .status("PUBLISHED")
+                        .build())
+                .shiftType(fixture.shiftType())
+                .startsAt(OffsetDateTime.of(fixture.period().getStartDate().minusDays(1), LocalTime.of(20, 0), ZoneOffset.ofHours(7)))
+                .endsAt(OffsetDateTime.of(fixture.period().getStartDate(), LocalTime.of(4, 0), ZoneOffset.ofHours(7)))
+                .build();
+        previousShift.setId(901L);
+        ShiftAssignment previousAssignment = ShiftAssignment.builder()
+                .employee(fixture.employee())
+                .workShift(previousShift)
+                .assignmentStatus("ASSIGNED")
+                .assignedSource("AUTO")
+                .locked(false)
+                .build();
+        previousAssignment.setId(701L);
+        when(shiftAssignmentRepository.findBoundaryForAiPayload(
+                eq(5L), eq(fixture.period().getStartDate().minusDays(1)), eq(fixture.period().getEndDate().plusDays(1))))
+                .thenReturn(List.of(previousAssignment));
+
+        AiSchedulingRequestDto payload = builder.build(fixture.period(), 900L, null);
+
+        assertThat(payload.boundaryAssignments()).containsExactly(new AiSchedulingRequestDto.BoundaryAssignmentDto(
+                fixture.employee().getId(), fixture.shiftType().getId(), previousShift.getStartsAt(), previousShift.getEndsAt()));
     }
 
     private Fixture happyPath() {

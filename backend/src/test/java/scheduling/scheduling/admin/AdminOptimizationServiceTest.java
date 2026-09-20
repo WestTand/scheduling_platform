@@ -903,7 +903,7 @@ class AdminOptimizationServiceTest {
 
     private static AiSchedulingPayloadBuilder.PayloadSnapshot testSnapshot() {
         return new AiSchedulingPayloadBuilder.PayloadSnapshot(
-                List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), null, null);
+                List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), null, null);
     }
 
     private static AiSchedulingRequestDto testPayload() {

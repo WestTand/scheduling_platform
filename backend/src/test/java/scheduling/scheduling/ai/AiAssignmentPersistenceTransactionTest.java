@@ -228,6 +228,7 @@ class AiAssignmentPersistenceTransactionTest {
                 List.of(),
                 List.of(),
                 List.of(manualAssignment),
+                List.of(),
                 new AiSchedulingRequestDto.RulesDto(
                         new AiSchedulingRequestDto.HardRulesDto(8, 12, 6),
                         new AiSchedulingRequestDto.QuotasDto(2, 2, 7),
@@ -349,6 +350,7 @@ class AiAssignmentPersistenceTransactionTest {
                 List.of(employee),
                 List.of(shiftType),
                 List.of(shift),
+                List.of(),
                 List.of(),
                 List.of(),
                 List.of(),

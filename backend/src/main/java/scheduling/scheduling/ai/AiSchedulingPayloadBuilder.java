@@ -121,7 +121,13 @@ public class AiSchedulingPayloadBuilder {
                                 assignment.getEmployee().getId(),
                                 assignment.getWorkShift().getId()))
                         .toList(),
-                List.of(),
+                snapshot.boundaryAssignments().stream()
+                        .map(assignment -> new AiSchedulingRequestDto.BoundaryAssignmentDto(
+                                assignment.getEmployee().getId(),
+                                assignment.getWorkShift().getShiftType().getId(),
+                                assignment.getWorkShift().getStartsAt(),
+                                assignment.getWorkShift().getEndsAt()))
+                        .toList(),
                 snapshot.rules(),
                 snapshot.solverOptions());
     }
@@ -183,6 +189,21 @@ public class AiSchedulingPayloadBuilder {
             }
         }
 
+        List<ShiftAssignment> boundaryAssignments = shiftAssignmentRepository.findBoundaryForAiPayload(
+                period.getId(), period.getStartDate().minusDays(1), period.getEndDate().plusDays(1));
+        if (boundaryAssignments == null) {
+            boundaryAssignments = List.of();
+        }
+        List<ShiftAssignment> schedulableBoundaryAssignments = boundaryAssignments.stream()
+                .filter(assignment -> assignment.getEmployee() != null
+                        && activeEmployeeIds.contains(assignment.getEmployee().getId()))
+                .filter(assignment -> assignment.getWorkShift() != null
+                        && assignment.getWorkShift().getShiftType() != null
+                        && activeShiftTypeIds.contains(assignment.getWorkShift().getShiftType().getId()))
+                .filter(assignment -> assignment.getWorkShift().getStartsAt() != null
+                        && assignment.getWorkShift().getEndsAt() != null)
+                .toList();
+
         List<LeaveRequest> leaves =
                 leaveRequestRepository.findApprovedOverlapping(period.getStartDate(), period.getEndDate());
         if (leaves == null) {
@@ -215,6 +236,7 @@ public class AiSchedulingPayloadBuilder {
                 schedulableLeaves,
                 schedulablePreferences,
                 fixedAssignments,
+                schedulableBoundaryAssignments,
                 rules,
                 effectiveOptions);
     }
@@ -341,6 +363,7 @@ public class AiSchedulingPayloadBuilder {
             List<LeaveRequest> leaves,
             List<Preference> preferences,
             List<ShiftAssignment> fixedAssignments,
+            List<ShiftAssignment> boundaryAssignments,
             AiSchedulingRequestDto.RulesDto rules,
             AiSchedulingRequestDto.SolverOptionsDto solverOptions) {}
 }

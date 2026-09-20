@@ -100,7 +100,10 @@ def test_approved_leave_can_make_schedule_infeasible() -> None:
     body = response.json()
     assert body["status"] == "INFEASIBLE"
     assert body["solverStatus"] == "INFEASIBLE"
-    assert any(item["code"] == "INSUFFICIENT_AVAILABLE_STAFF" for item in body["diagnostics"])
+    assert any(
+        item["code"] == "INSUFFICIENT_AVAILABLE_STAFF" and item["workShiftId"] == 1000
+        for item in body["diagnostics"]
+    )
 
 
 def test_locked_assignment_is_preserved() -> None:
@@ -305,3 +308,24 @@ def test_naive_shift_datetime_is_rejected() -> None:
     response = client.post("/api/v1/scheduling/optimize", json=request)
 
     assert response.status_code == 422
+
+
+def test_infeasible_diagnostics_include_locked_leave_conflict() -> None:
+    request = base_request()
+    request["employees"] = [{"employeeId": 1}]
+    request["lockedAssignments"] = [{"assignmentId": 50, "employeeId": 1, "workShiftId": 1000}]
+    request["approvedLeaves"] = [
+        {"leaveRequestId": 1, "employeeId": 1, "startDate": "2026-09-14", "endDate": "2026-09-14"}
+    ]
+
+    response = client.post("/api/v1/scheduling/optimize", json=request)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "INFEASIBLE"
+    assert any(
+        item["code"] == "LOCKED_ASSIGNMENT_CONFLICTS_WITH_LEAVE"
+        and item["employeeId"] == 1
+        and item["workShiftId"] == 1000
+        for item in body["diagnostics"]
+    )
