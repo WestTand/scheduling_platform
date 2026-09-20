@@ -1,8 +1,16 @@
 import { Role, type User } from '@/types/auth'
 import type { BackendAccountResponse, BackendMeResponse } from '@/types/backendAuth'
 
-const toFrontendRole = (role: BackendAccountResponse['role']) => {
-  return role === 'EMPLOYEE' ? Role.EMPLOYEE : Role.MANAGER
+const toFrontendRole = (role: BackendAccountResponse['role']): Role => {
+  switch (role) {
+    case 'ADMIN':
+    case 'MANAGER':
+      return Role.MANAGER
+    case 'EMPLOYEE':
+      return Role.EMPLOYEE
+    default:
+      throw new Error(`Unsupported backend account role: ${String(role)}`)
+  }
 }
 
 export const adaptBackendMeToUser = (response: BackendMeResponse): User => {

@@ -10,8 +10,8 @@ export interface BackendEmployeeResponse {
   id: number
   employeeCode: string
   fullName: string
-  email: string
-  phone: string
+  email: string | null
+  phone: string | null
   status: string
 }
 
@@ -38,7 +38,11 @@ export const isBackendLoginStateResponse = (value: unknown): value is BackendLog
     value &&
       typeof value === 'object' &&
       'status' in value &&
+      'accountId' in value &&
+      'username' in value &&
       ((value as { status?: unknown }).status === 'OTP_REQUIRED' ||
-        (value as { status?: unknown }).status === 'PASSWORD_CHANGE_REQUIRED'),
+        (value as { status?: unknown }).status === 'PASSWORD_CHANGE_REQUIRED') &&
+      typeof (value as { accountId?: unknown }).accountId === 'number' &&
+      typeof (value as { username?: unknown }).username === 'string',
   )
 }
