@@ -2,9 +2,11 @@ package scheduling.scheduling.admin;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -20,6 +22,8 @@ import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
 import scheduling.scheduling.entity.SchedulePeriod;
 import scheduling.scheduling.entity.WorkShift;
+import scheduling.scheduling.audit.ActivityLogService;
+import scheduling.scheduling.notification.NotificationService;
 import scheduling.scheduling.repository.AccountRepository;
 import scheduling.scheduling.repository.SchedulePeriodRepository;
 import scheduling.scheduling.repository.ShiftAssignmentRepository;
@@ -39,16 +43,22 @@ public class AdminSchedulePeriodService {
     private final AccountRepository accountRepository;
     private final WorkShiftRepository workShiftRepository;
     private final ShiftAssignmentRepository shiftAssignmentRepository;
+    private final NotificationService notificationService;
+    private final ActivityLogService activityLogService;
 
     public AdminSchedulePeriodService(
             SchedulePeriodRepository schedulePeriodRepository,
             AccountRepository accountRepository,
             WorkShiftRepository workShiftRepository,
-            ShiftAssignmentRepository shiftAssignmentRepository) {
+            ShiftAssignmentRepository shiftAssignmentRepository,
+            NotificationService notificationService,
+            ActivityLogService activityLogService) {
         this.schedulePeriodRepository = schedulePeriodRepository;
         this.accountRepository = accountRepository;
         this.workShiftRepository = workShiftRepository;
         this.shiftAssignmentRepository = shiftAssignmentRepository;
+        this.notificationService = notificationService;
+        this.activityLogService = activityLogService;
     }
 
     @Transactional
@@ -131,7 +141,7 @@ public class AdminSchedulePeriodService {
 
     @Transactional
     public AdminSchedulePeriodResponse publishSchedulePeriod(CurrentAccountPrincipal principal, Long periodId) {
-        requireManager(principal);
+        Account manager = requireManager(principal);
         SchedulePeriod period = findDetail(periodId);
         if (PUBLISHED.equals(period.getStatus())) {
             return AdminSchedulePeriodResponse.from(period);
@@ -141,6 +151,20 @@ public class AdminSchedulePeriodService {
         }
         period.setStatus(PUBLISHED);
         period.setPublishedAt(LocalDateTime.now());
+        List<Account> recipients = shiftAssignmentRepository.listForPeriod(periodId).stream()
+                .map(assignment -> assignment.getEmployee() == null ? null : assignment.getEmployee().getAccount())
+                .filter(Objects::nonNull)
+                .filter(account -> account.getId() != null)
+                .collect(Collectors.toMap(
+                        Account::getId, account -> account, (first, second) -> first, LinkedHashMap::new))
+                .values().stream()
+                .toList();
+        notificationService.notifyAll(recipients, "SCHEDULE_PUBLISHED", "Lịch làm việc mới đã được công bố",
+                "Lịch làm việc kỳ \"" + period.getPeriodName() + "\" đã được công bố. Vui lòng kiểm tra lịch cá nhân.");
+        activityLogService.record(manager, "PUBLISH", "schedule_periods", period.getId(), null, Map.of(
+                "id", period.getId(),
+                "periodName", period.getPeriodName(),
+                "status", period.getStatus()));
         return AdminSchedulePeriodResponse.from(savePeriod(period));
     }
 
