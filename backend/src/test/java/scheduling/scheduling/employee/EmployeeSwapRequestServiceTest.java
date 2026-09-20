@@ -3,6 +3,9 @@ package scheduling.scheduling.employee;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -25,6 +28,7 @@ import scheduling.scheduling.entity.SchedulePeriod;
 import scheduling.scheduling.entity.ShiftAssignment;
 import scheduling.scheduling.entity.SwapRequest;
 import scheduling.scheduling.entity.WorkShift;
+import scheduling.scheduling.notification.NotificationService;
 import scheduling.scheduling.repository.AccountRepository;
 import scheduling.scheduling.repository.EmployeeRepository;
 import scheduling.scheduling.repository.ShiftAssignmentRepository;
@@ -37,8 +41,10 @@ class EmployeeSwapRequestServiceTest {
     private final ShiftAssignmentRepository shiftAssignmentRepository = mock(ShiftAssignmentRepository.class);
     private final SwapRequestRepository swapRequestRepository = mock(SwapRequestRepository.class);
     private final EmployeeAccess employeeAccess = new EmployeeAccess(accountRepository);
+    private final NotificationService notificationService = mock(NotificationService.class);
     private final EmployeeSwapRequestService service = new EmployeeSwapRequestService(
-            employeeAccess, swapRequestRepository, shiftAssignmentRepository, employeeRepository);
+            employeeAccess, swapRequestRepository, shiftAssignmentRepository, employeeRepository,
+            notificationService);
 
     private static final long ACCOUNT_ID = 2L;
 
@@ -521,6 +527,93 @@ class EmployeeSwapRequestServiceTest {
                 .isEqualTo(HttpStatus.BAD_REQUEST);
 
         verify(swapRequestRepository, never()).save(any());
+    }
+
+    @Test
+    void createSwapRequestNotifiesTargetAccount() {
+        CurrentAccountPrincipal principal = employeePrincipal();
+        Employee requester = employee(7L, "ACTIVE");
+        Employee target = employee(9L, "ACTIVE");
+        Account targetAccount = Account.builder()
+                .username("target01").passwordHash("hash").role(AccountRole.EMPLOYEE)
+                .status(AccountStatus.ACTIVE).isActive(true).build();
+        targetAccount.setId(3L);
+        target.setAccount(targetAccount);
+        ShiftAssignment requesterAssignment = assignment(100L, requester, "PUBLISHED");
+        when(accountRepository.findByIdForUpdate(ACCOUNT_ID))
+                .thenReturn(Optional.of(account(principal, requester)));
+        when(shiftAssignmentRepository.findDetailById(100L))
+                .thenReturn(Optional.of(requesterAssignment));
+        when(employeeRepository.findById(9L)).thenReturn(Optional.of(target));
+        when(swapRequestRepository.save(any(SwapRequest.class))).thenAnswer(invocation -> {
+            SwapRequest saved = invocation.getArgument(0);
+            saved.setId(50L);
+            return saved;
+        });
+
+        service.createSwapRequest(principal, new CreateSwapRequestRequest(100L, 9L, null, "Swap please"));
+
+        verify(notificationService).notify(
+                same(targetAccount),
+                eq("SWAP_REQUESTED"),
+                eq("Bạn có yêu cầu đổi ca mới"),
+                contains("đổi ca"));
+    }
+
+    @Test
+    void respondSwapRequestAcceptNotifiesRequesterAccount() {
+        CurrentAccountPrincipal principal = employeePrincipal();
+        Employee me = employee(9L, "ACTIVE");
+        Employee requester = employee(7L, "ACTIVE");
+        Account requesterAccount = Account.builder()
+                .username("requester01").passwordHash("hash").role(AccountRole.EMPLOYEE)
+                .status(AccountStatus.ACTIVE).isActive(true).build();
+        requesterAccount.setId(4L);
+        requester.setAccount(requesterAccount);
+        SwapRequest swapRequest = swapRequest(
+                50L, assignment(100L, requester, "PUBLISHED"), me, "PENDING_TARGET");
+        when(accountRepository.findById(ACCOUNT_ID))
+                .thenReturn(Optional.of(account(principal, me)));
+        when(swapRequestRepository.findDetailByIdForUpdate(50L)).thenReturn(Optional.of(swapRequest));
+        when(swapRequestRepository.save(any(SwapRequest.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        SwapRequestResponse response = service.respondSwapRequest(
+                principal, 50L, new RespondSwapRequestRequest(true));
+
+        assertThat(response.status()).isEqualTo("PENDING_APPROVAL");
+        verify(notificationService).notify(
+                same(requesterAccount),
+                eq("SWAP_TARGET_ACCEPTED"),
+                eq("Yêu cầu đổi ca đang chờ quản lý duyệt"),
+                contains("chờ quản lý"));
+    }
+
+    @Test
+    void respondSwapRequestRejectNotifiesRequesterAccount() {
+        CurrentAccountPrincipal principal = employeePrincipal();
+        Employee me = employee(9L, "ACTIVE");
+        Employee requester = employee(7L, "ACTIVE");
+        Account requesterAccount = Account.builder()
+                .username("requester01").passwordHash("hash").role(AccountRole.EMPLOYEE)
+                .status(AccountStatus.ACTIVE).isActive(true).build();
+        requesterAccount.setId(4L);
+        requester.setAccount(requesterAccount);
+        SwapRequest swapRequest = swapRequest(
+                50L, assignment(100L, requester, "PUBLISHED"), me, "PENDING_TARGET");
+        when(accountRepository.findById(ACCOUNT_ID))
+                .thenReturn(Optional.of(account(principal, me)));
+        when(swapRequestRepository.findDetailByIdForUpdate(50L)).thenReturn(Optional.of(swapRequest));
+        when(swapRequestRepository.save(any(SwapRequest.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        SwapRequestResponse response = service.respondSwapRequest(
+                principal, 50L, new RespondSwapRequestRequest(false));
+
+        assertThat(response.status()).isEqualTo("REJECTED");
+        verify(notificationService).notify(
+                same(requesterAccount),
+                eq("SWAP_TARGET_REJECTED"),
+                eq("Yêu cầu đổi ca đã bị từ chối"),
+                contains("từ chối"));
     }
 
     private static SwapRequest swapRequest(

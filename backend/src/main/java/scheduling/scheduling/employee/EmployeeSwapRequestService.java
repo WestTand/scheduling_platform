@@ -13,6 +13,7 @@ import scheduling.scheduling.employee.dto.SwapRequestResponse;
 import scheduling.scheduling.entity.Employee;
 import scheduling.scheduling.entity.ShiftAssignment;
 import scheduling.scheduling.entity.SwapRequest;
+import scheduling.scheduling.notification.NotificationService;
 import scheduling.scheduling.repository.EmployeeRepository;
 import scheduling.scheduling.repository.ShiftAssignmentRepository;
 import scheduling.scheduling.repository.SwapRequestRepository;
@@ -31,16 +32,19 @@ public class EmployeeSwapRequestService {
     private final SwapRequestRepository swapRequestRepository;
     private final ShiftAssignmentRepository shiftAssignmentRepository;
     private final EmployeeRepository employeeRepository;
+    private final NotificationService notificationService;
 
     public EmployeeSwapRequestService(
             EmployeeAccess employeeAccess,
             SwapRequestRepository swapRequestRepository,
             ShiftAssignmentRepository shiftAssignmentRepository,
-            EmployeeRepository employeeRepository) {
+            EmployeeRepository employeeRepository,
+            NotificationService notificationService) {
         this.employeeAccess = employeeAccess;
         this.swapRequestRepository = swapRequestRepository;
         this.shiftAssignmentRepository = shiftAssignmentRepository;
         this.employeeRepository = employeeRepository;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -85,7 +89,13 @@ public class EmployeeSwapRequestService {
                 .reason(StringUtils.hasText(request.reason()) ? request.reason().trim() : null)
                 .status(PENDING_TARGET)
                 .build();
-        return SwapRequestResponse.from(swapRequestRepository.save(swapRequest));
+        SwapRequest saved = swapRequestRepository.save(swapRequest);
+        notificationService.notify(
+                target.getAccount(),
+                "SWAP_REQUESTED",
+                "Bạn có yêu cầu đổi ca mới",
+                "Bạn có yêu cầu đổi ca mới từ " + requester.getFullName() + ". Vui lòng xác nhận.");
+        return SwapRequestResponse.from(saved);
     }
 
     @Transactional(readOnly = true)
@@ -125,8 +135,23 @@ public class EmployeeSwapRequestService {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST, "Swap request is not pending target response");
         }
-        swapRequest.setStatus(Boolean.TRUE.equals(request.accept()) ? PENDING_APPROVAL : REJECTED);
-        return SwapRequestResponse.from(swapRequestRepository.save(swapRequest));
+        boolean accepted = Boolean.TRUE.equals(request.accept());
+        swapRequest.setStatus(accepted ? PENDING_APPROVAL : REJECTED);
+        SwapRequest saved = swapRequestRepository.save(swapRequest);
+        if (accepted) {
+            notificationService.notify(
+                    swapRequest.getRequesterAssignment().getEmployee().getAccount(),
+                    "SWAP_TARGET_ACCEPTED",
+                    "Yêu cầu đổi ca đang chờ quản lý duyệt",
+                    "Yêu cầu đổi ca của bạn đã được chấp nhận và đang chờ quản lý duyệt.");
+        } else {
+            notificationService.notify(
+                    swapRequest.getRequesterAssignment().getEmployee().getAccount(),
+                    "SWAP_TARGET_REJECTED",
+                    "Yêu cầu đổi ca đã bị từ chối",
+                    "Yêu cầu đổi ca của bạn đã bị đối phương từ chối.");
+        }
+        return SwapRequestResponse.from(saved);
     }
 
     private SwapRequest findVisibleToRequester(Long swapRequestId, Long employeeId) {
