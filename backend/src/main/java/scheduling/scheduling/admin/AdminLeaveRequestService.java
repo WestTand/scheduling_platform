@@ -5,6 +5,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,8 @@ import scheduling.scheduling.entity.Employee;
 import scheduling.scheduling.entity.LeaveRequest;
 import scheduling.scheduling.repository.AccountRepository;
 import scheduling.scheduling.repository.LeaveRequestRepository;
+import scheduling.scheduling.audit.ActivityLogService;
+import scheduling.scheduling.notification.NotificationService;
 
 @Service
 public class AdminLeaveRequestService {
@@ -32,16 +35,23 @@ public class AdminLeaveRequestService {
     private final LeaveRequestRepository leaveRequestRepository;
     private final AccountRepository accountRepository;
     private final Clock clock;
+    private final NotificationService notificationService;
+    private final ActivityLogService activityLogService;
 
     @Autowired
-    public AdminLeaveRequestService(LeaveRequestRepository leaveRequestRepository, AccountRepository accountRepository) {
-        this(leaveRequestRepository, accountRepository, Clock.systemDefaultZone());
+    public AdminLeaveRequestService(LeaveRequestRepository leaveRequestRepository, AccountRepository accountRepository,
+            NotificationService notificationService, ActivityLogService activityLogService) {
+        this(leaveRequestRepository, accountRepository, Clock.systemDefaultZone(), notificationService,
+                activityLogService);
     }
 
-    AdminLeaveRequestService(LeaveRequestRepository leaveRequestRepository, AccountRepository accountRepository, Clock clock) {
+    AdminLeaveRequestService(LeaveRequestRepository leaveRequestRepository, AccountRepository accountRepository,
+            Clock clock, NotificationService notificationService, ActivityLogService activityLogService) {
         this.leaveRequestRepository = leaveRequestRepository;
         this.accountRepository = accountRepository;
         this.clock = clock;
+        this.notificationService = notificationService;
+        this.activityLogService = activityLogService;
     }
 
     @Transactional(readOnly = true)
@@ -68,6 +78,8 @@ public class AdminLeaveRequestService {
             throw invalidRequest();
         }
         applyReview(leaveRequest, manager, APPROVED, request.reviewNote());
+        recordLeaveReview(manager, leaveRequest, "APPROVE");
+        notifyLeaveReview(leaveRequest, "LEAVE_APPROVED", "Đơn nghỉ của bạn đã được duyệt");
         return AdminLeaveRequestResponse.from(leaveRequestRepository.save(leaveRequest));
     }
 
@@ -78,6 +90,8 @@ public class AdminLeaveRequestService {
         LeaveRequest leaveRequest = findForUpdate(leaveRequestId);
         requirePending(leaveRequest);
         applyReview(leaveRequest, manager, REJECTED, request.reviewNote());
+        recordLeaveReview(manager, leaveRequest, "REJECT");
+        notifyLeaveReview(leaveRequest, "LEAVE_REJECTED", "Đơn nghỉ của bạn đã bị từ chối");
         return AdminLeaveRequestResponse.from(leaveRequestRepository.save(leaveRequest));
     }
 
@@ -113,6 +127,22 @@ public class AdminLeaveRequestService {
         leaveRequest.setReviewedBy(manager);
         leaveRequest.setReviewedAt(LocalDateTime.now(clock));
         leaveRequest.setReviewNote(StringUtils.hasText(reviewNote) ? reviewNote.trim() : null);
+    }
+
+    private void recordLeaveReview(Account manager, LeaveRequest leaveRequest, String action) {
+        activityLogService.record(manager, action, "leave_requests", leaveRequest.getId(), null, Map.of(
+                "id", leaveRequest.getId(),
+                "employeeId", leaveRequest.getEmployee().getId(),
+                "status", leaveRequest.getStatus(),
+                "startDate", leaveRequest.getStartDate(),
+                "endDate", leaveRequest.getEndDate()));
+    }
+
+    private void notifyLeaveReview(LeaveRequest leaveRequest, String type, String title) {
+        Account recipient = leaveRequest.getEmployee().getAccount();
+        notificationService.notify(recipient, type, title,
+                "Đơn nghỉ từ " + leaveRequest.getStartDate() + " đến " + leaveRequest.getEndDate()
+                        + ("APPROVED".equals(leaveRequest.getStatus()) ? " đã được duyệt." : " đã bị từ chối."));
     }
 
     private static void validateDateFilter(LocalDate from, LocalDate to) {

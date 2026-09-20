@@ -3,6 +3,9 @@ package scheduling.scheduling.admin;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.same;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -30,6 +33,8 @@ import scheduling.scheduling.entity.Employee;
 import scheduling.scheduling.entity.LeaveRequest;
 import scheduling.scheduling.repository.AccountRepository;
 import scheduling.scheduling.repository.LeaveRequestRepository;
+import scheduling.scheduling.audit.ActivityLogService;
+import scheduling.scheduling.notification.NotificationService;
 
 class AdminLeaveRequestServiceTest {
 
@@ -38,8 +43,10 @@ class AdminLeaveRequestServiceTest {
 
     private final LeaveRequestRepository leaveRequestRepository = mock(LeaveRequestRepository.class);
     private final AccountRepository accountRepository = mock(AccountRepository.class);
+    private final NotificationService notificationService = mock(NotificationService.class);
+    private final ActivityLogService activityLogService = mock(ActivityLogService.class);
     private final AdminLeaveRequestService service = new AdminLeaveRequestService(
-            leaveRequestRepository, accountRepository, FIXED_CLOCK);
+            leaveRequestRepository, accountRepository, FIXED_CLOCK, notificationService, activityLogService);
 
     @Test
     void listLeaveRequestsNormalizesFiltersAndMapsEmployeeSummary() {
@@ -258,6 +265,66 @@ class AdminLeaveRequestServiceTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
                 .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void approveLeaveRequestNotifiesEmployeeAndRecordsLog() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        Account manager = account(principal);
+        Account employeeAccount = account(new CurrentAccountPrincipal(2L, "employee01", AccountRole.EMPLOYEE));
+        Employee emp = employee(7L);
+        emp.setAccount(employeeAccount);
+        LeaveRequest leaveRequest = leaveRequest(10L, emp, "PENDING");
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
+        when(accountRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(employeeAccount));
+        when(leaveRequestRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(leaveRequest));
+        when(leaveRequestRepository.existsApprovedOverlapExcludingId(
+                7L, LocalDate.of(2026, 9, 14), LocalDate.of(2026, 9, 15), 10L))
+                .thenReturn(false);
+        when(leaveRequestRepository.save(leaveRequest)).thenReturn(leaveRequest);
+
+        service.approveLeaveRequest(principal, 10L, new ReviewLeaveRequestRequest(null));
+
+        verify(notificationService).notify(
+                same(employeeAccount),
+                eq("LEAVE_APPROVED"),
+                eq("Đơn nghỉ của bạn đã được duyệt"),
+                contains("Đơn nghỉ từ"));
+        verify(activityLogService).record(
+                same(manager),
+                eq("APPROVE"),
+                eq("leave_requests"),
+                eq(leaveRequest.getId()),
+                any(),
+                any());
+    }
+
+    @Test
+    void rejectLeaveRequestNotifiesEmployeeAndRecordsLog() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        Account manager = account(principal);
+        Account employeeAccount = account(new CurrentAccountPrincipal(2L, "employee01", AccountRole.EMPLOYEE));
+        Employee emp = employee(7L);
+        emp.setAccount(employeeAccount);
+        LeaveRequest leaveRequest = leaveRequest(10L, emp, "PENDING");
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
+        when(leaveRequestRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(leaveRequest));
+        when(leaveRequestRepository.save(leaveRequest)).thenReturn(leaveRequest);
+
+        service.rejectLeaveRequest(principal, 10L, new ReviewLeaveRequestRequest(null));
+
+        verify(notificationService).notify(
+                same(employeeAccount),
+                eq("LEAVE_REJECTED"),
+                eq("Đơn nghỉ của bạn đã bị từ chối"),
+                contains("Đơn nghỉ từ"));
+        verify(activityLogService).record(
+                same(manager),
+                eq("REJECT"),
+                eq("leave_requests"),
+                eq(leaveRequest.getId()),
+                any(),
+                any());
     }
 
     private static CurrentAccountPrincipal managerPrincipal() {
