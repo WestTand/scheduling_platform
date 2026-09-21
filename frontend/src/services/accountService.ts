@@ -1,4 +1,6 @@
+import { apiConfig } from '@/config/api'
 import { employeeService } from '@/services/employeeService'
+import { backendManagerAccountService } from '@/services/backendManagerAccountService'
 import type { UserAccount, AccountStatus, CreateEmployeeAccountInput } from '@/types/account'
 import type { User } from '@/types/auth'
 
@@ -81,16 +83,25 @@ let otpExpiryStore: Record<string, number> = {}
 
 export const accountService = {
   async getAccounts() {
+    if (!apiConfig.useMockApi) {
+      return backendManagerAccountService.getAccounts()
+    }
     await delay(150)
     return clone(mockAccounts)
   },
 
   async getAccountByEmployeeId(employeeId: string) {
+    if (!apiConfig.useMockApi) {
+      return backendManagerAccountService.getAccountByEmployeeId(employeeId)
+    }
     await delay(100)
     return mockAccounts.find((account) => account.employeeId === employeeId) ?? null
   },
 
   async getAccountById(accountId: string) {
+    if (!apiConfig.useMockApi) {
+      return backendManagerAccountService.getAccountById(accountId)
+    }
     await delay(100)
     return mockAccounts.find((account) => account.id === accountId) ?? null
   },
@@ -107,6 +118,9 @@ export const accountService = {
   },
 
   async createEmployeeAccount(input: CreateEmployeeAccountInput) {
+    if (!apiConfig.useMockApi) {
+      return backendManagerAccountService.createEmployeeAccount(input)
+    }
     await delay(400)
 
     const employee = await employeeService.getById(input.employeeId)
@@ -246,6 +260,11 @@ export const accountService = {
   },
 
   async resendActivationOtp(accountId: string) {
+    if (!apiConfig.useMockApi) {
+      await backendManagerAccountService.resendActivationOtp(accountId)
+      const account = await backendManagerAccountService.getAccountById(accountId)
+      return { account, maskedEmail: account?.email ?? '' }
+    }
     await delay(300)
 
     const account = mockAccounts.find((item) => item.id === accountId)
