@@ -3,8 +3,6 @@ package scheduling.scheduling.repository;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 import scheduling.scheduling.entity.ShiftType;
 
 public interface ShiftTypeRepository extends JpaRepository<ShiftType, Long> {
@@ -21,14 +19,26 @@ public interface ShiftTypeRepository extends JpaRepository<ShiftType, Long> {
 
     boolean existsByShiftCodeAndIdNot(String shiftCode, Long id);
 
-    @Query("""
-            select s
-            from ShiftType s
-            where (:query is null or lower(s.shiftName) like lower(concat('%', :query, '%')))
-              and (:status is null or s.status = :status)
-            order by s.shiftName asc
-            """)
-    List<ShiftType> search(@Param("query") String query, @Param("status") String status);
+    default List<ShiftType> search(String query, String status) {
+        if (query == null && status == null) {
+            return findAllByOrderByShiftNameAsc();
+        }
+        if (query == null) {
+            return findByStatusOrderByShiftNameAsc(status);
+        }
+        if (status == null) {
+            return findByShiftNameContainingIgnoreCaseOrderByShiftNameAsc(query);
+        }
+        return findByShiftNameContainingIgnoreCaseAndStatusOrderByShiftNameAsc(query, status);
+    }
+
+    List<ShiftType> findAllByOrderByShiftNameAsc();
+
+    List<ShiftType> findByStatusOrderByShiftNameAsc(String status);
+
+    List<ShiftType> findByShiftNameContainingIgnoreCaseOrderByShiftNameAsc(String shiftName);
+
+    List<ShiftType> findByShiftNameContainingIgnoreCaseAndStatusOrderByShiftNameAsc(String shiftName, String status);
 
     List<ShiftType> findByStatus(String status);
 }
