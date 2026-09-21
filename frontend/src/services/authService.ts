@@ -137,15 +137,20 @@ const storeUserInExistingStorage = (user: User) => {
 
 export const authService = {
   async login(credentials: LoginCredentials, rememberMe: boolean): Promise<User> {
-    if (apiConfig.useMockApi) {
-      const user = await mockLoginInternal(credentials)
-      setStoredAuth(user, rememberMe)
-      return user
-    }
+    try {
+      if (apiConfig.useMockApi) {
+        const user = await mockLoginInternal(credentials)
+        setStoredAuth(user, rememberMe)
+        return user
+      }
 
-    const result = await backendAuthService.login(credentials)
-    setStoredAuth(result.user, rememberMe, result.accessToken)
-    return result.user
+      const result = await backendAuthService.login(credentials)
+      setStoredAuth(result.user, rememberMe, result.accessToken)
+      return result.user
+    } catch (error) {
+      clearStoredAuth()
+      throw error
+    }
   },
 
   async getCurrentUser(): Promise<User | null> {
