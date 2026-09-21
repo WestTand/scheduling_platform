@@ -46,3 +46,22 @@ export const isBackendLoginStateResponse = (value: unknown): value is BackendLog
       typeof (value as { username?: unknown }).username === 'string',
   )
 }
+
+export interface BackendActivationStateResponse {
+  status: 'PASSWORD_CHANGE_REQUIRED'
+  accountId: number
+  username: string
+}
+
+export const isBackendActivationStateResponse = (value: unknown): value is BackendActivationStateResponse => {
+  return Boolean(
+    value &&
+      typeof value === 'object' &&
+      'status' in value &&
+      'accountId' in value &&
+      'username' in value &&
+      (value as { status?: unknown }).status === 'PASSWORD_CHANGE_REQUIRED' &&
+      typeof (value as { accountId?: unknown }).accountId === 'number' &&
+      typeof (value as { username?: unknown }).username === 'string',
+  )
+}
