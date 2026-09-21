@@ -46,36 +46,28 @@ class ManagerAccountServiceTest {
             "configured-default");
 
     @Test
-    void createEmployeeAccountUsesDefaultPasswordAndPendingActivationStatus() {
+    void createEmployeeAccountUsesExistingEmployeeDefaultPasswordAndPendingActivationStatus() {
         CreateEmployeeAccountRequest request = request();
-        Employee savedEmployee = employee();
-        savedEmployee.setId(10L);
+        Employee employee = employee();
+        employee.setId(10L);
         Account savedAccount = Account.builder()
                 .username("employee01")
                 .passwordHash("encoded-1111")
                 .role(AccountRole.EMPLOYEE)
                 .status(AccountStatus.PENDING_ACTIVATION)
                 .isActive(true)
-                .employee(savedEmployee)
+                .employee(employee)
                 .build();
         savedAccount.setId(20L);
-        Account manager = managerAccount();
-        CurrentAccountPrincipal principal = new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
-        when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(managerAccount()));
+        when(employeeRepository.findById(10L)).thenReturn(Optional.of(employee));
+        when(accountRepository.existsByUsername("employee01")).thenReturn(false);
         when(passwordEncoder.encode("configured-default")).thenReturn("encoded-1111");
-        when(employeeRepository.save(any(Employee.class))).thenReturn(savedEmployee);
         when(accountRepository.save(any(Account.class))).thenReturn(savedAccount);
 
-        AccountResponse response = service.createEmployeeAccount(principal, request);
+        AccountResponse response = service.createEmployeeAccount(managerPrincipal(), request);
 
-        ArgumentCaptor<Employee> employeeCaptor = ArgumentCaptor.forClass(Employee.class);
-        verify(employeeRepository).save(employeeCaptor.capture());
-        assertThat(employeeCaptor.getValue().getEmployeeCode()).isEqualTo("EMP001");
-        assertThat(employeeCaptor.getValue().getFullName()).isEqualTo("Nguyen Van A");
-        assertThat(employeeCaptor.getValue().getEmail()).isEqualTo("employee01@gmail.com");
-        assertThat(employeeCaptor.getValue().getPhone()).isEqualTo("0900000001");
-        assertThat(employeeCaptor.getValue().getStatus()).isEqualTo("ACTIVE");
-
+        verify(employeeRepository, never()).save(any(Employee.class));
         ArgumentCaptor<Account> accountCaptor = ArgumentCaptor.forClass(Account.class);
         verify(accountRepository).save(accountCaptor.capture());
         assertThat(accountCaptor.getValue().getUsername()).isEqualTo("employee01");
@@ -83,45 +75,43 @@ class ManagerAccountServiceTest {
         assertThat(accountCaptor.getValue().getRole()).isEqualTo(AccountRole.EMPLOYEE);
         assertThat(accountCaptor.getValue().getStatus()).isEqualTo(AccountStatus.PENDING_ACTIVATION);
         assertThat(accountCaptor.getValue().getIsActive()).isTrue();
-        assertThat(accountCaptor.getValue().getEmployee()).isSameAs(savedEmployee);
+        assertThat(accountCaptor.getValue().getEmployee()).isSameAs(employee);
         verify(otpService).createActivationOtp(savedAccount);
         assertThat(response).isEqualTo(new AccountResponse(20L, "employee01", AccountRole.EMPLOYEE));
     }
 
     @Test
-    void createEmployeeAccountRecordsEmployeeCreateActivityLog() {
-        CreateEmployeeAccountRequest request = request();
-        Employee savedEmployee = employee();
-        savedEmployee.setId(10L);
+    void createEmployeeAccountRecordsAccountCreateActivityLog() {
+        Employee employee = employee();
+        employee.setId(10L);
         Account savedAccount = Account.builder()
                 .username("employee01")
                 .passwordHash("encoded-1111")
                 .role(AccountRole.EMPLOYEE)
                 .status(AccountStatus.PENDING_ACTIVATION)
                 .isActive(true)
-                .employee(savedEmployee)
+                .employee(employee)
                 .build();
         savedAccount.setId(20L);
         Account manager = managerAccount();
-        CurrentAccountPrincipal principal = new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
         when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
+        when(employeeRepository.findById(10L)).thenReturn(Optional.of(employee));
         when(passwordEncoder.encode("configured-default")).thenReturn("encoded-1111");
-        when(employeeRepository.save(any(Employee.class))).thenReturn(savedEmployee);
         when(accountRepository.save(any(Account.class))).thenReturn(savedAccount);
 
-        service.createEmployeeAccount(principal, request);
+        service.createEmployeeAccount(managerPrincipal(), request());
 
         verify(activityLogService).record(
                 same(manager),
                 eq("CREATE"),
-                eq("employees"),
-                eq(10L),
+                eq("accounts"),
+                eq(20L),
                 isNull(),
                 argThat((Object snapshot) -> snapshot instanceof Map<?, ?> map
-                        && Long.valueOf(10L).equals(map.get("id"))
-                        && "EMP001".equals(map.get("employeeCode"))
-                        && "Nguyen Van A".equals(map.get("fullName"))
-                        && "ACTIVE".equals(map.get("status"))));
+                        && Long.valueOf(20L).equals(map.get("id"))
+                        && "employee01".equals(map.get("username"))
+                        && Long.valueOf(10L).equals(map.get("employeeId"))
+                        && "PENDING_ACTIVATION".equals(map.get("status"))));
     }
 
     @Test
@@ -138,16 +128,32 @@ class ManagerAccountServiceTest {
     }
 
     @Test
-    void createEmployeeAccountRejectsDuplicateEmployeeCode() {
+    void createEmployeeAccountRejectsMissingEmployee() {
         when(accountRepository.findById(1L)).thenReturn(Optional.of(managerAccount()));
-        when(employeeRepository.existsByEmployeeCode("EMP001")).thenReturn(true);
+        when(employeeRepository.findById(10L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.createEmployeeAccount(managerPrincipal(), request()))
-                .isInstanceOf(DuplicateResourceException.class)
-                .hasMessage("Employee code already exists");
+                .isInstanceOf(scheduling.scheduling.admin.EmployeeNotFoundException.class)
+                .hasMessage("Employee not found");
 
-        verify(employeeRepository, never()).save(any());
         verify(accountRepository, never()).save(any());
+        verifyNoInteractions(otpService);
+    }
+
+    @Test
+    void createEmployeeAccountRejectsEmployeeWithExistingAccount() {
+        Employee employee = employee();
+        employee.setId(10L);
+        employee.setAccount(account(21L, AccountStatus.ACTIVE, AccountRole.EMPLOYEE, true));
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(managerAccount()));
+        when(employeeRepository.findById(10L)).thenReturn(Optional.of(employee));
+
+        assertThatThrownBy(() -> service.createEmployeeAccount(managerPrincipal(), request()))
+                .isInstanceOf(InvalidAccountStateException.class)
+                .hasMessage("Invalid account state");
+
+        verify(accountRepository, never()).save(any());
+        verifyNoInteractions(otpService);
     }
 
     @Test
@@ -219,12 +225,7 @@ class ManagerAccountServiceTest {
     }
 
     private static CreateEmployeeAccountRequest request() {
-        return new CreateEmployeeAccountRequest(
-                "employee01",
-                "EMP001",
-                "Nguyen Van A",
-                "employee01@gmail.com",
-                "0900000001");
+        return new CreateEmployeeAccountRequest(10L, "employee01");
     }
 
     private static Employee employee() {

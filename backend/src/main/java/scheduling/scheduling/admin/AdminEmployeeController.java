@@ -2,6 +2,7 @@ package scheduling.scheduling.admin;
 
 import jakarta.validation.Valid;
 import java.util.List;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import scheduling.scheduling.admin.dto.AdminEmployeeResponse;
+import scheduling.scheduling.admin.dto.CreateEmployeeRequest;
 import scheduling.scheduling.admin.dto.UpdateEmployeeRequest;
 import scheduling.scheduling.auth.CurrentAccountPrincipal;
 
@@ -39,6 +41,15 @@ public class AdminEmployeeController {
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     ResponseEntity<AdminEmployeeResponse> getEmployee(@PathVariable Long employeeId) {
         return ResponseEntity.ok(adminEmployeeService.getEmployee(employeeId));
+    }
+
+    @PostMapping
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    ResponseEntity<AdminEmployeeResponse> createEmployee(
+            @AuthenticationPrincipal CurrentAccountPrincipal principal,
+            @Valid @RequestBody CreateEmployeeRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(adminEmployeeService.createEmployee(principal, request));
     }
 
     @PutMapping("/{employeeId}")

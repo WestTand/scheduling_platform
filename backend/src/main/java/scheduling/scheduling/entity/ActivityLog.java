@@ -3,6 +3,8 @@ package scheduling.scheduling.entity;
 import lombok.*;
 import jakarta.persistence.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.time.LocalDateTime;
 
 /**
@@ -43,10 +45,12 @@ public class ActivityLog extends BaseEntity {
     private Long entityId;
 
     /** Snapshot of the record BEFORE the change (null for CREATE). */
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "old_value_json", columnDefinition = "JSONB")
     private String oldValueJson;
 
     /** Snapshot of the record AFTER the change (null for DELETE). */
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "new_value_json", columnDefinition = "JSONB")
     private String newValueJson;
 

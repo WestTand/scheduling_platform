@@ -8,6 +8,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import scheduling.scheduling.admin.EmployeeNotFoundException;
 import scheduling.scheduling.audit.ActivityLogService;
 import scheduling.scheduling.auth.dto.AccountResponse;
 import scheduling.scheduling.auth.dto.CreateEmployeeAccountRequest;
@@ -49,38 +50,33 @@ public class ManagerAccountService {
     @Transactional
     public AccountResponse createEmployeeAccount(CurrentAccountPrincipal principal, CreateEmployeeAccountRequest request) {
         Account manager = requireManager(principal);
-        if (accountRepository.existsByUsername(request.username())) {
+        String username = request.username().trim();
+        if (accountRepository.existsByUsername(username)) {
             throw new DuplicateResourceException("Username already exists");
         }
-        if (employeeRepository.existsByEmployeeCode(request.employeeCode())) {
-            throw new DuplicateResourceException("Employee code already exists");
+
+        Employee employee = employeeRepository.findById(request.employeeId())
+                .orElseThrow(EmployeeNotFoundException::new);
+        if (employee.getAccount() != null) {
+            throw new InvalidAccountStateException();
         }
 
-        Employee employee = Employee.builder()
-                .employeeCode(request.employeeCode())
-                .fullName(request.fullName())
-                .email(request.email())
-                .phone(request.phone())
-                .status("ACTIVE")
-                .build();
-        Employee savedEmployee = employeeRepository.save(employee);
-
         Account account = Account.builder()
-                .username(request.username())
+                .username(username)
                 .passwordHash(passwordEncoder.encode(defaultEmployeePassword))
                 .role(AccountRole.EMPLOYEE)
                 .isActive(true)
                 .status(AccountStatus.PENDING_ACTIVATION)
-                .employee(savedEmployee)
+                .employee(employee)
                 .build();
 
         Account savedAccount = accountRepository.save(account);
         otpService.createActivationOtp(savedAccount);
-        activityLogService.record(manager, "CREATE", "employees", savedEmployee.getId(), null, Map.of(
-                "id", savedEmployee.getId(),
-                "employeeCode", savedEmployee.getEmployeeCode(),
-                "fullName", savedEmployee.getFullName(),
-                "status", savedEmployee.getStatus()));
+        activityLogService.record(manager, "CREATE", "accounts", savedAccount.getId(), null, Map.of(
+                "id", savedAccount.getId(),
+                "username", savedAccount.getUsername(),
+                "employeeId", employee.getId(),
+                "status", savedAccount.getStatus().name()));
 
         return AccountResponse.from(savedAccount);
     }

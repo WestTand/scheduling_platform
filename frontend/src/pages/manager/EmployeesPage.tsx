@@ -16,6 +16,7 @@ import { StatCard } from '@/components/common/StatCard'
 import { StatusBadge } from '@/components/common/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { apiConfig } from '@/config/api'
 import { useAuth } from '@/contexts/useAuth'
 import { accountService } from '@/services/accountService'
 import { employeeService } from '@/services/employeeService'
@@ -230,7 +231,7 @@ export function EmployeesPage() {
     }
   }
 
-  const handleCreateAccountSubmit = async (input: { employeeId: string; username: string; email: string; temporaryPassword: string }) => {
+  const handleCreateAccountSubmit = async (input: { employeeId: string; username: string }) => {
     setAccountSubmitting(true)
 
     try {
@@ -252,7 +253,11 @@ export function EmployeesPage() {
       await accountService.resendActivationOtp(resendTarget.id)
       setResendTarget(null)
       await fetchEmployees()
-      window.alert('Mã OTP mới đã được gửi tới email nhân viên. OTP mock đang sử dụng: 123456.')
+      window.alert(
+        apiConfig.useMockApi
+          ? 'Mã OTP mới đã được gửi tới email nhân viên. OTP mock đang sử dụng: 123456.'
+          : 'Mã OTP mới đã được gửi tới email nhân viên.',
+      )
     } catch (errorMessage) {
       window.alert(errorMessage instanceof Error ? errorMessage.message : 'Không thể gửi lại mã OTP.')
     }
@@ -433,8 +438,9 @@ export function EmployeesPage() {
 
       <ConfirmDialog
         open={Boolean(deleteTarget)}
-        title="Xóa nhân viên"
-        description={`Bạn có chắc chắn muốn xóa ${deleteTarget?.fullName} khỏi danh sách nhân viên?`}
+        title="Tạm ngưng nhân viên"
+        description={`Nhân viên ${deleteTarget?.fullName} sẽ bị tạm ngưng (vô hiệu hóa) chứ không bị xóa vĩnh viễn khỏi hệ thống. Bạn có chắc chắn muốn tiếp tục?`}
+        confirmLabel="Tạm ngưng"
         onCancel={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
       />

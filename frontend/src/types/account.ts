@@ -1,6 +1,8 @@
 export const AccountStatus = {
   PENDING_ACTIVATION: 'PENDING_ACTIVATION',
+  FORCE_PASSWORD_CHANGE: 'FORCE_PASSWORD_CHANGE',
   ACTIVE: 'ACTIVE',
+  INACTIVE: 'INACTIVE',
   LOCKED: 'LOCKED',
   DISABLED: 'DISABLED',
 } as const
@@ -22,8 +24,6 @@ export interface UserAccount {
 export interface CreateEmployeeAccountInput {
   employeeId: string
   username: string
-  email: string
-  temporaryPassword: string
 }
 
 export interface ActivationRequest {

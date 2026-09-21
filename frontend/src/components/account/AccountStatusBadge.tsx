@@ -12,14 +12,18 @@ export function AccountStatusBadge({ status }: AccountStatusBadgeProps) {
 
   const labelMap: Record<AccountStatus, string> = {
     PENDING_ACTIVATION: 'Chờ kích hoạt',
+    FORCE_PASSWORD_CHANGE: 'Đổi mật khẩu',
     ACTIVE: 'Đã kích hoạt',
+    INACTIVE: 'Tạm ngưng',
     LOCKED: 'Đã khóa',
     DISABLED: 'Đã vô hiệu hóa',
   }
 
   const variantMap: Record<AccountStatus, 'secondary' | 'default' | 'destructive' | 'outline'> = {
     PENDING_ACTIVATION: 'secondary',
+    FORCE_PASSWORD_CHANGE: 'secondary',
     ACTIVE: 'default',
+    INACTIVE: 'outline',
     LOCKED: 'destructive',
     DISABLED: 'outline',
   }

@@ -1,4 +1,6 @@
+import { apiConfig } from '@/config/api'
 import { employeeService } from '@/services/employeeService'
+import { backendManagerAccountService } from '@/services/backendManagerAccountService'
 import type { UserAccount, AccountStatus, CreateEmployeeAccountInput } from '@/types/account'
 import type { User } from '@/types/auth'
 
@@ -81,16 +83,25 @@ let otpExpiryStore: Record<string, number> = {}
 
 export const accountService = {
   async getAccounts() {
+    if (!apiConfig.useMockApi) {
+      return backendManagerAccountService.getAccounts()
+    }
     await delay(150)
     return clone(mockAccounts)
   },
 
   async getAccountByEmployeeId(employeeId: string) {
+    if (!apiConfig.useMockApi) {
+      return backendManagerAccountService.getAccountByEmployeeId(employeeId)
+    }
     await delay(100)
     return mockAccounts.find((account) => account.employeeId === employeeId) ?? null
   },
 
   async getAccountById(accountId: string) {
+    if (!apiConfig.useMockApi) {
+      return backendManagerAccountService.getAccountById(accountId)
+    }
     await delay(100)
     return mockAccounts.find((account) => account.id === accountId) ?? null
   },
@@ -107,6 +118,9 @@ export const accountService = {
   },
 
   async createEmployeeAccount(input: CreateEmployeeAccountInput) {
+    if (!apiConfig.useMockApi) {
+      return backendManagerAccountService.createEmployeeAccount(input)
+    }
     await delay(400)
 
     const employee = await employeeService.getById(input.employeeId)
@@ -132,20 +146,18 @@ export const accountService = {
       throw new Error('Tên tài khoản đã tồn tại. Vui lòng chọn tên tài khoản khác.')
     }
 
-    const duplicateEmail = mockAccounts.some((account) => normalize(account.email) === normalize(input.email))
+    const duplicateEmail = mockAccounts.some((account) => normalize(account.email) === normalize(employee.email))
     if (duplicateEmail) {
       throw new Error('Email đã được liên kết với tài khoản khác.')
     }
 
-    if (!hasPasswordRequirements(input.temporaryPassword)) {
-      throw new Error('Mật khẩu tạm thời tối thiểu 8 ký tự, có chữ hoa, chữ thường và số.')
-    }
+    const mockTemporaryPassword = 'Temp1234'
 
     const account: UserAccount = {
       id: `acct-${Date.now()}`,
       employeeId: input.employeeId,
       username: input.username.trim(),
-      email: input.email.trim(),
+      email: employee.email.trim(),
       role: 'EMPLOYEE',
       status: 'PENDING_ACTIVATION' as AccountStatus,
       createdAt: new Date().toISOString(),
@@ -154,7 +166,7 @@ export const accountService = {
     }
 
     mockAccounts = [account, ...mockAccounts]
-    accountSecrets[account.id] = { accountId: account.id, password: input.temporaryPassword }
+    accountSecrets[account.id] = { accountId: account.id, password: mockTemporaryPassword }
     otpStore[account.id] = MOCK_OTP
     otpExpiryStore[account.id] = Date.now() + 5 * 60 * 1000
 
@@ -246,6 +258,11 @@ export const accountService = {
   },
 
   async resendActivationOtp(accountId: string) {
+    if (!apiConfig.useMockApi) {
+      await backendManagerAccountService.resendActivationOtp(accountId)
+      const account = await backendManagerAccountService.getAccountById(accountId)
+      return { account, maskedEmail: account?.email ?? '' }
+    }
     await delay(300)
 
     const account = mockAccounts.find((item) => item.id === accountId)
