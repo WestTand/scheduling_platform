@@ -688,13 +688,13 @@ Frontend backend-contract alignment notes:
 - [ ] Bo trang register public cho nhan vien
   - Dung de UI khong mo self-registration.
   - Dong bo voi backend chi manager tao account.
-- [ ] Tao trang nhap OTP kich hoat tai khoan
+- [x] Tao trang nhap OTP kich hoat tai khoan
   - Dung de nhan vien kich hoat account sau khi nhan email.
   - La buoc sau login pending activation.
 - [ ] Tao trang resend OTP kich hoat
   - Dung khi OTP mat/het han.
   - Goi endpoint manager resend neu flow frontend cho phep theo role, hoac hien huong dan lien he quan ly.
-- [ ] Tao trang doi mat khau bat buoc lan dau
+- [x] Tao trang doi mat khau bat buoc lan dau
   - Dung de user doi password sau OTP/reset.
   - Chi sau khi doi thanh cong moi vao dashboard.
 - [ ] Tao trang thong bao quen mat khau: lien he quan ly de cap lai
