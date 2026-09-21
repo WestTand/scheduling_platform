@@ -1,20 +1,41 @@
 import { ArrowLeft, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck } from 'lucide-react'
-import { useEffect, useState, type FormEvent } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 
 import { OtpInput } from '@/components/account/OtpInput'
 import { PasswordRequirements } from '@/components/account/PasswordRequirements'
 import { Button } from '@/components/ui/button'
+import { apiConfig } from '@/config/api'
+import { useAuth } from '@/contexts/useAuth'
+import { authService } from '@/services/authService'
+import { BackendLoginStateError } from '@/services/backendAuthService'
 import { accountService, MOCK_OTP } from '@/services/accountService'
+import { Role } from '@/types/auth'
 
 const activationDelaySeconds = 60
 
+interface ActivationRouteState {
+  accountId?: string
+  username?: string
+  currentPassword?: string
+  status?: 'OTP_REQUIRED' | 'PASSWORD_CHANGE_REQUIRED'
+  rememberMe?: boolean
+}
+
+const dashboardPathForRole = (role: Role) => {
+  return role === Role.MANAGER ? '/manager/dashboard' : '/employee/dashboard'
+}
+
 export function AccountActivationPage() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const { login } = useAuth()
+  const routeState = (location.state ?? {}) as ActivationRouteState
+  const initialBackendStep = routeState.status === 'PASSWORD_CHANGE_REQUIRED' ? 3 : routeState.status === 'OTP_REQUIRED' ? 2 : 1
   const [searchParams] = useSearchParams()
-  const [step, setStep] = useState<1 | 2 | 3>(1)
-  const [username, setUsername] = useState(searchParams.get('username') ?? '')
-  const [temporaryPassword, setTemporaryPassword] = useState('')
+  const [step, setStep] = useState<1 | 2 | 3>(apiConfig.useMockApi ? 1 : initialBackendStep)
+  const [username, setUsername] = useState(routeState.username ?? searchParams.get('username') ?? '')
+  const [temporaryPassword, setTemporaryPassword] = useState(routeState.currentPassword ?? '')
   const [otp, setOtp] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -24,9 +45,34 @@ export function AccountActivationPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
-  const [accountId, setAccountId] = useState('')
+  const [accountId, setAccountId] = useState(routeState.accountId ?? '')
   const [maskedEmail, setMaskedEmail] = useState('')
   const [countdown, setCountdown] = useState(activationDelaySeconds)
+  const clearedSensitiveStateRef = useRef(false)
+
+  useEffect(() => {
+    if (clearedSensitiveStateRef.current) {
+      return
+    }
+
+    const pendingState = location.state as ActivationRouteState | null
+
+    if (!pendingState?.currentPassword) {
+      return
+    }
+
+    clearedSensitiveStateRef.current = true
+    navigate(location.pathname + location.search, {
+      replace: true,
+      state: {
+        accountId: pendingState.accountId,
+        username: pendingState.username,
+        status: pendingState.status,
+        rememberMe: pendingState.rememberMe,
+      } satisfies ActivationRouteState,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     if (step !== 2 || countdown <= 0) {
@@ -52,6 +98,33 @@ export function AccountActivationPage() {
 
     setLoading(true)
     try {
+      if (!apiConfig.useMockApi) {
+        try {
+          await login({ email: username, password: temporaryPassword }, Boolean(routeState.rememberMe))
+          navigate('/', { replace: true })
+          return
+        } catch (loginError) {
+          if (!(loginError instanceof BackendLoginStateError)) {
+            throw loginError
+          }
+
+          setAccountId(String(loginError.state.accountId))
+          setUsername(loginError.state.username)
+
+          if (loginError.state.status === 'PASSWORD_CHANGE_REQUIRED') {
+            setStep(3)
+            setSuccessMessage('Tài khoản cần đổi mật khẩu trước khi tiếp tục.')
+            return
+          }
+
+          setStep(2)
+          setOtp('')
+          setCountdown(activationDelaySeconds)
+          setSuccessMessage('Vui lòng nhập mã OTP đã được gửi tới email của bạn.')
+          return
+        }
+      }
+
       const result = await accountService.requestActivation(username, temporaryPassword)
       setAccountId(result.account.id)
       setMaskedEmail(result.maskedEmail)
@@ -82,7 +155,16 @@ export function AccountActivationPage() {
 
     setLoading(true)
     try {
-      await accountService.verifyActivationOtp(accountId, otp)
+      if (apiConfig.useMockApi) {
+        const result = await accountService.verifyActivationOtp(accountId, otp)
+        setAccountId(result.id)
+        setUsername(result.username)
+      } else {
+        const result = await authService.verifyActivationOtp(accountId, otp)
+        setAccountId(result.accountId)
+        setUsername(result.username)
+      }
+
       setStep(3)
       setSuccessMessage('Xác thực OTP thành công. Vui lòng đặt mật khẩu mới.')
     } catch (verifyError) {
@@ -100,6 +182,12 @@ export function AccountActivationPage() {
     setError('')
     setLoading(true)
     try {
+      if (!apiConfig.useMockApi) {
+        setSuccessMessage('Vui lòng liên hệ quản lý để gửi lại mã OTP.')
+        setCountdown(activationDelaySeconds)
+        return
+      }
+
       await accountService.resendActivationOtp(accountId)
       setCountdown(activationDelaySeconds)
       setOtp('')
@@ -144,16 +232,27 @@ export function AccountActivationPage() {
 
     setLoading(true)
     try {
-      await accountService.setNewPassword(accountId, newPassword)
-      setSuccessMessage('Kích hoạt tài khoản thành công. Bạn có thể đăng nhập bằng mật khẩu mới.')
-      setStep(1)
-      setUsername('')
-      setTemporaryPassword('')
-      setOtp('')
-      setNewPassword('')
-      setConfirmPassword('')
-      setAccountId('')
-      setMaskedEmail('')
+      if (apiConfig.useMockApi) {
+        await accountService.setNewPassword(accountId, newPassword)
+        setSuccessMessage('Kích hoạt tài khoản thành công. Bạn có thể đăng nhập bằng mật khẩu mới.')
+        setStep(1)
+        setUsername('')
+        setTemporaryPassword('')
+        setOtp('')
+        setNewPassword('')
+        setConfirmPassword('')
+        setAccountId('')
+        setMaskedEmail('')
+        return
+      }
+
+      const user = await authService.completeRequiredPasswordChange(
+        accountId,
+        temporaryPassword,
+        newPassword,
+        Boolean(routeState.rememberMe),
+      )
+      navigate(dashboardPathForRole(user.role), { replace: true })
     } catch (setPasswordError) {
       setError(setPasswordError instanceof Error ? setPasswordError.message : 'Không thể đặt mật khẩu mới.')
     } finally {
@@ -257,7 +356,11 @@ export function AccountActivationPage() {
               {canResendOtp ? 'Gửi lại mã' : `Gửi lại mã (${countdown}s)`}
             </Button>
 
-            <p className="text-xs text-slate-500">OTP mock đang được sử dụng trong môi trường dev: {MOCK_OTP}</p>
+            {apiConfig.useMockApi ? (
+              <p className="text-xs text-slate-500">OTP mock đang được sử dụng trong môi trường dev: {MOCK_OTP}</p>
+            ) : (
+              <p className="text-xs text-slate-500">Nếu chưa nhận được OTP, vui lòng liên hệ quản lý để gửi lại mã.</p>
+            )}
           </div>
         )}
 
