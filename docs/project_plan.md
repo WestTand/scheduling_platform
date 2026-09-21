@@ -628,11 +628,11 @@ Frontend backend-contract alignment notes:
 - UI terminology phai theo nghiep vu moi: `overtimeShiftsPerWeek` va `bathingShiftsPerWeek` la so ngay distinct moi tuan, khong phai so ca/shift rows.
 - Giao dien khong can redesign lon trong slice integration. Uu tien chinh form, label, table columns, loading/error/empty states va calendar/detail hien dung du lieu backend.
 
-- [ ] Tao frontend HTTP client va API mode config
+- [x] Tao frontend HTTP client va API mode config
   - Dung `VITE_API_BASE_URL` de goi backend that.
   - Dung `VITE_USE_MOCK_API` de chuyen giua mock va backend trong qua trinh migrate.
   - Chuan hoa parse loi backend thanh message hien thi duoc tren UI.
-- [ ] Tao backend DTO types va adapter functions trong frontend
+- [x] Tao backend DTO types va adapter functions trong frontend
   - Dinh nghia type raw theo backend DTO cho employee, shift type, scheduling rules, schedule period, work shift, assignment.
   - Adapter map raw DTO sang UI model hien tai de component it bi thay doi.
   - Khong de page/component map response raw truc tiep.
