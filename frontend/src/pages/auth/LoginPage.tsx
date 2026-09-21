@@ -5,6 +5,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAuth } from '@/contexts/useAuth'
+import { BackendLoginStateError } from '@/services/backendAuthService'
 import type { LoginCredentials } from '@/types/auth'
 
 const demoAccounts = [
@@ -39,6 +40,18 @@ export function LoginPage() {
     try {
       await login(credentials, rememberMe)
     } catch (loginError) {
+      if (loginError instanceof BackendLoginStateError) {
+        navigate('/activate-account', {
+          state: {
+            accountId: String(loginError.state.accountId),
+            username: loginError.state.username,
+            currentPassword: credentials.password,
+            status: loginError.state.status,
+            rememberMe,
+          },
+        })
+        return
+      }
       setError(loginError instanceof Error ? loginError.message : 'Đăng nhập thất bại.')
     }
   }
