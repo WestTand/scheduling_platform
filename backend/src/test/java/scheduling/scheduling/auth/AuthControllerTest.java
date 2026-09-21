@@ -203,6 +203,24 @@ class AuthControllerTest {
     }
 
     @Test
+    void resendActivationOtpIgnoresInvalidBearerToken() throws Exception {
+        when(jwtService.parseAccessToken("bad-token")).thenThrow(new InvalidTokenException("Invalid access token"));
+
+        mockMvc.perform(post("/api/auth/activation/resend")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer bad-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "employee01",
+                                  "temporaryPassword": "secret123"
+                                }
+                                """))
+                .andExpect(status().isNoContent())
+                .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
+        verify(authService).resendActivationOtp(any(ResendActivationOtpRequest.class));
+    }
+
+    @Test
     void verifyActivationOtpRejectsInvalidOtp() throws Exception {
         when(authService.verifyActivationOtp(any(VerifyActivationOtpRequest.class)))
                 .thenThrow(new InvalidActivationOtpException());
