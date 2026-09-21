@@ -29,7 +29,7 @@ const dashboardPathForRole = (role: Role) => {
 export function AccountActivationPage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { login } = useAuth()
+  const { completeRequiredPasswordChange, login } = useAuth()
   const routeState = (location.state ?? {}) as ActivationRouteState
   const initialBackendStep = routeState.status === 'PASSWORD_CHANGE_REQUIRED' ? 3 : routeState.status === 'OTP_REQUIRED' ? 2 : 1
   const [searchParams] = useSearchParams()
@@ -246,7 +246,7 @@ export function AccountActivationPage() {
         return
       }
 
-      const user = await authService.completeRequiredPasswordChange(
+      const user = await completeRequiredPasswordChange(
         accountId,
         temporaryPassword,
         newPassword,

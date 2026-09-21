@@ -27,5 +27,11 @@ export interface AuthState {
 
 export interface AuthContextValue extends AuthState {
   login: (credentials: LoginCredentials, rememberMe: boolean) => Promise<void>
+  completeRequiredPasswordChange: (
+    accountId: string | number,
+    currentPassword: string,
+    newPassword: string,
+    rememberMe: boolean,
+  ) => Promise<User>
   logout: () => Promise<void>
 }
