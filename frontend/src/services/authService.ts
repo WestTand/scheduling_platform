@@ -174,6 +174,17 @@ export const authService = {
     return { accountId: String(result.accountId), username: result.username }
   },
 
+  async resendActivationOtp(accountId: string | number, username: string, temporaryPassword: string): Promise<void> {
+    if (apiConfig.useMockApi) {
+      await accountService.resendActivationOtp(String(accountId))
+      return
+    }
+    if (!username.trim() || !temporaryPassword) {
+      throw new Error('Vui lòng nhập tên đăng nhập và mật khẩu tạm thời để gửi lại OTP.')
+    }
+    await backendAuthService.resendActivationOtp(username, temporaryPassword)
+  },
+
   async completeRequiredPasswordChange(accountId: string | number, currentPassword: string, newPassword: string, rememberMe: boolean): Promise<User> {
     try {
       if (apiConfig.useMockApi) {

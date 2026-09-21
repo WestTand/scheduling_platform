@@ -17,6 +17,7 @@ import scheduling.scheduling.auth.dto.AuthResponse;
 import scheduling.scheduling.auth.dto.ActivationStateResponse;
 import scheduling.scheduling.auth.dto.LoginRequest;
 import scheduling.scheduling.auth.dto.RequiredPasswordChangeRequest;
+import scheduling.scheduling.auth.dto.ResendActivationOtpRequest;
 import scheduling.scheduling.auth.dto.VerifyActivationOtpRequest;
 
 @RestController
@@ -63,6 +64,12 @@ public class AuthController {
     @PostMapping("/activation/verify-otp")
     ResponseEntity<ActivationStateResponse> verifyActivationOtp(@Valid @RequestBody VerifyActivationOtpRequest request) {
         return ResponseEntity.ok(authService.verifyActivationOtp(request));
+    }
+
+    @PostMapping("/activation/resend")
+    ResponseEntity<Void> resendActivationOtp(@Valid @RequestBody ResendActivationOtpRequest request) {
+        authService.resendActivationOtp(request);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/password/change-required")

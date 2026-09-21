@@ -31,7 +31,7 @@ export function LoginPage() {
     setTouched({ email: true, password: true })
 
     if (emailEmpty || passwordEmpty) {
-      setError('Vui lòng nhập email hoặc tên đăng nhập và mật khẩu để đăng nhập.')
+      setError('Vui lòng nhập tên đăng nhập và mật khẩu để đăng nhập.')
       return
     }
 
@@ -97,7 +97,7 @@ export function LoginPage() {
               <form className="space-y-5" onSubmit={handleSubmit} noValidate>
                 <div className="space-y-2">
                   <label htmlFor="email" className="text-sm font-medium text-slate-700">
-                    Email hoặc tên đăng nhập
+                    Tên đăng nhập
                   </label>
                   <div className={`flex items-center gap-2 rounded-xl border bg-slate-50 px-3 py-2 transition ${touched.email && !credentials.email.trim() ? 'border-red-300' : 'border-slate-200 focus-within:border-blue-500'}`}>
                     <Mail className="h-4 w-4 text-slate-400" />
@@ -110,13 +110,13 @@ export function LoginPage() {
                         if (error) setError('')
                       }}
                       onBlur={() => setTouched((current) => ({ ...current, email: true }))}
-                      placeholder="Email hoặc tên đăng nhập"
+                      placeholder="Tên đăng nhập"
                       className="w-full border-0 bg-transparent text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
                       autoComplete="username"
                     />
                   </div>
                   {touched.email && !credentials.email.trim() && (
-                    <p className="text-xs text-red-600">Vui lòng nhập email hoặc tên đăng nhập.</p>
+                    <p className="text-xs text-red-600">Vui lòng nhập tên đăng nhập.</p>
                   )}
                 </div>
 

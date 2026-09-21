@@ -5,6 +5,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -30,6 +31,7 @@ import scheduling.scheduling.auth.dto.LoginRequest;
 import scheduling.scheduling.auth.dto.LoginStateResponse;
 import scheduling.scheduling.auth.dto.MeResponse;
 import scheduling.scheduling.auth.dto.RequiredPasswordChangeRequest;
+import scheduling.scheduling.auth.dto.ResendActivationOtpRequest;
 import scheduling.scheduling.auth.dto.VerifyActivationOtpRequest;
 import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
@@ -40,7 +42,8 @@ import scheduling.scheduling.repository.AccountRepository;
 @Import({ SecurityConfig.class, JwtAuthenticationFilter.class, AuthExceptionHandler.class })
 @TestPropertySource(properties = {
         "app.auth.refresh-cookie-name=refresh_token",
-        "app.auth.refresh-cookie-secure=false"
+        "app.auth.refresh-cookie-secure=false",
+        "app.cors.allowed-origins=http://localhost:5173"
 })
 class AuthControllerTest {
 
@@ -55,6 +58,18 @@ class AuthControllerTest {
 
     @MockitoBean
     private AccountRepository accountRepository;
+
+    @Test
+    void corsPreflightAllowsFrontendOriginForLogin() throws Exception {
+        mockMvc.perform(options("/api/auth/login")
+                        .header(HttpHeaders.ORIGIN, "http://localhost:5173")
+                        .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "POST")
+                        .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, "content-type"))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "http://localhost:5173"))
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS, org.hamcrest.Matchers.containsString("POST")))
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, org.hamcrest.Matchers.containsString("content-type")));
+    }
 
     @Test
     void registerEndpointIsNotAvailable() throws Exception {
@@ -155,6 +170,54 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.accountId").value(42))
                 .andExpect(jsonPath("$.username").value("employee01"))
                 .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
+    }
+
+    @Test
+    void resendActivationOtpReturnsNoContentWithoutRefreshCookie() throws Exception {
+        mockMvc.perform(post("/api/auth/activation/resend")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "employee01",
+                                  "temporaryPassword": "secret123"
+                                }
+                                """))
+                .andExpect(status().isNoContent())
+                .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
+        verify(authService).resendActivationOtp(any(ResendActivationOtpRequest.class));
+    }
+
+    @Test
+    void resendActivationOtpRejectsInvalidRequest() throws Exception {
+        mockMvc.perform(post("/api/auth/activation/resend")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "",
+                                  "temporaryPassword": ""
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+        verifyNoInteractions(authService);
+    }
+
+    @Test
+    void resendActivationOtpIgnoresInvalidBearerToken() throws Exception {
+        when(jwtService.parseAccessToken("bad-token")).thenThrow(new InvalidTokenException("Invalid access token"));
+
+        mockMvc.perform(post("/api/auth/activation/resend")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer bad-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "employee01",
+                                  "temporaryPassword": "secret123"
+                                }
+                                """))
+                .andExpect(status().isNoContent())
+                .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
+        verify(authService).resendActivationOtp(any(ResendActivationOtpRequest.class));
     }
 
     @Test

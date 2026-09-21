@@ -73,6 +73,10 @@ export const backendAuthService = {
     return requireActivationState(response)
   },
 
+  async resendActivationOtp(username: string, temporaryPassword: string): Promise<void> {
+    await requestVoid('/api/auth/activation/resend', { method: 'POST', auth: false, body: { username: username.trim(), temporaryPassword } })
+  },
+
   async changeRequiredPassword(accountId: number, currentPassword: string, newPassword: string): Promise<BackendLoginResult> {
     const response = await requestJson<BackendAuthResponse>('/api/auth/password/change-required', {
       method: 'POST',
