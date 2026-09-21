@@ -182,16 +182,14 @@ export function AccountActivationPage() {
     setError('')
     setLoading(true)
     try {
-      if (!apiConfig.useMockApi) {
-        setSuccessMessage('Vui lòng liên hệ quản lý để gửi lại mã OTP.')
-        setCountdown(activationDelaySeconds)
-        return
-      }
-
-      await accountService.resendActivationOtp(accountId)
+      await authService.resendActivationOtp(accountId, username, temporaryPassword)
       setCountdown(activationDelaySeconds)
       setOtp('')
-      setSuccessMessage('Mã OTP mới đã được gửi lại. OTP mock hiện đang sử dụng: 123456.')
+      setSuccessMessage(
+        apiConfig.useMockApi
+          ? `Mã OTP mới đã được gửi lại. OTP mock hiện đang sử dụng: ${MOCK_OTP}.`
+          : 'Mã OTP mới đã được gửi lại. Vui lòng kiểm tra email của bạn.',
+      )
     } catch (resendError) {
       setError(resendError instanceof Error ? resendError.message : 'Không thể gửi lại mã OTP.')
     } finally {
