@@ -1,43 +1,76 @@
 import {
   createContext,
   useCallback,
+  useEffect,
   useMemo,
   useState,
   type PropsWithChildren,
 } from 'react'
 
-import { authService, restoreStoredUser } from '@/services/authService'
+import { authService } from '@/services/authService'
 import type { AuthContextValue, AuthState, LoginCredentials } from '@/types/auth'
 
 export const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
-const initializeAuthState = (): AuthState => {
-  const storedUser = restoreStoredUser()
-
-  return {
-    user: storedUser,
-    isAuthenticated: Boolean(storedUser),
-    isLoading: false,
-  }
+const initialAuthState: AuthState = {
+  user: null,
+  isAuthenticated: false,
+  isLoading: true,
 }
 
 export function AuthProvider({ children }: PropsWithChildren) {
-  const [authState, setAuthState] = useState<AuthState>(initializeAuthState)
+  const [authState, setAuthState] = useState<AuthState>(initialAuthState)
+
+  useEffect(() => {
+    let active = true
+
+    const bootstrapAuth = async () => {
+      const user = await authService.bootstrapAuth()
+
+      if (!active) {
+        return
+      }
+
+      setAuthState({
+        user,
+        isAuthenticated: Boolean(user),
+        isLoading: false,
+      })
+    }
+
+    bootstrapAuth()
+
+    return () => {
+      active = false
+    }
+  }, [])
 
   const login = useCallback(async (credentials: LoginCredentials, rememberMe: boolean) => {
     setAuthState((current) => ({ ...current, isLoading: true }))
 
-    const user = await authService.login(credentials, rememberMe)
+    try {
+      const user = await authService.login(credentials, rememberMe)
 
-    setAuthState({
-      user,
-      isAuthenticated: true,
-      isLoading: false,
-    })
+      setAuthState({
+        user,
+        isAuthenticated: true,
+        isLoading: false,
+      })
+    } catch (error) {
+      setAuthState({
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+      })
+      throw error
+    }
   }, [])
 
   const logout = useCallback(async () => {
+    setAuthState((current) => ({ ...current, isLoading: true }))
+
     await authService.logout()
+
     setAuthState({
       user: null,
       isAuthenticated: false,

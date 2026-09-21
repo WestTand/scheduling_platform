@@ -12,15 +12,15 @@ export { AUTH_STORAGE_KEYS, getStoredToken }
 const storageForRememberMe = (rememberMe: boolean) => (rememberMe ? localStorage : sessionStorage)
 
 const getStoredUserStorage = () => {
-  if (localStorage.getItem(AUTH_STORAGE_KEYS.USER)) {
-    return localStorage
-  }
-
-  if (sessionStorage.getItem(AUTH_STORAGE_KEYS.USER)) {
+  if (sessionStorage.getItem(AUTH_STORAGE_KEYS.TOKEN) || sessionStorage.getItem(AUTH_STORAGE_KEYS.USER)) {
     return sessionStorage
   }
 
-  return localStorage
+  if (localStorage.getItem(AUTH_STORAGE_KEYS.TOKEN) || localStorage.getItem(AUTH_STORAGE_KEYS.USER)) {
+    return localStorage
+  }
+
+  return sessionStorage
 }
 
 const getStoredTokenStorage = () => {
@@ -108,17 +108,27 @@ export const clearStoredAuth = () => {
 }
 
 export const restoreStoredUser = () => {
-  const storedUser = localStorage.getItem(AUTH_STORAGE_KEYS.USER) ?? sessionStorage.getItem(AUTH_STORAGE_KEYS.USER)
+  const localUser = localStorage.getItem(AUTH_STORAGE_KEYS.USER)
 
-  if (!storedUser) {
-    return null
+  if (localUser) {
+    try {
+      return JSON.parse(localUser) as User
+    } catch {
+      localStorage.removeItem(AUTH_STORAGE_KEYS.USER)
+    }
   }
 
-  try {
-    return JSON.parse(storedUser) as User
-  } catch {
-    return null
+  const sessionUser = sessionStorage.getItem(AUTH_STORAGE_KEYS.USER)
+
+  if (sessionUser) {
+    try {
+      return JSON.parse(sessionUser) as User
+    } catch {
+      sessionStorage.removeItem(AUTH_STORAGE_KEYS.USER)
+    }
   }
+
+  return null
 }
 
 const storeUserInExistingStorage = (user: User) => {
@@ -191,7 +201,25 @@ export const authService = {
       storeUserInExistingStorage(user)
       return user
     } catch {
-      return await this.refresh()
+      try {
+        const refreshed = await backendAuthService.refresh()
+
+        if (refreshed.accessToken) {
+          updateStoredAccessToken(refreshed.accessToken)
+        }
+
+        try {
+          const user = await backendAuthService.me()
+          storeUserInExistingStorage(user)
+          return user
+        } catch {
+          storeUserInExistingStorage(refreshed.user)
+          return refreshed.user
+        }
+      } catch {
+        clearStoredAuth()
+        return null
+      }
     }
   },
 
