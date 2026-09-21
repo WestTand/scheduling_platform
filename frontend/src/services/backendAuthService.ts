@@ -2,7 +2,9 @@ import { adaptBackendAccountToUser, adaptBackendMeToUser } from '@/adapters/auth
 import { requestJson, requestVoid } from '@/services/apiClient'
 import type { LoginCredentials, User } from '@/types/auth'
 import {
+  isBackendActivationStateResponse,
   isBackendLoginStateResponse,
+  type BackendActivationStateResponse,
   type BackendAuthResponse,
   type BackendLoginStateResponse,
   type BackendMeResponse,
@@ -34,6 +36,13 @@ export class BackendLoginStateError extends Error {
   }
 }
 
+const requireActivationState = (response: BackendActivationStateResponse) => {
+  if (!isBackendActivationStateResponse(response)) {
+    throw new Error('Trạng thái kích hoạt tài khoản không hợp lệ.')
+  }
+  return response
+}
+
 export const backendAuthService = {
   async login(credentials: LoginCredentials): Promise<BackendLoginResult> {
     const response = await requestJson<BackendAuthResponse | BackendLoginStateResponse>('/api/auth/login', {
@@ -53,6 +62,24 @@ export const backendAuthService = {
       accessToken: response.accessToken,
       user: adaptBackendAccountToUser(response.account),
     }
+  },
+
+  async verifyActivationOtp(accountId: number, otp: string): Promise<BackendActivationStateResponse> {
+    const response = await requestJson<BackendActivationStateResponse>('/api/auth/activation/verify-otp', {
+      method: 'POST',
+      auth: false,
+      body: { accountId, otp },
+    })
+    return requireActivationState(response)
+  },
+
+  async changeRequiredPassword(accountId: number, currentPassword: string, newPassword: string): Promise<BackendLoginResult> {
+    const response = await requestJson<BackendAuthResponse>('/api/auth/password/change-required', {
+      method: 'POST',
+      auth: false,
+      body: { accountId, currentPassword, newPassword },
+    })
+    return { accessToken: response.accessToken, user: adaptBackendAccountToUser(response.account) }
   },
 
   async me(): Promise<User> {

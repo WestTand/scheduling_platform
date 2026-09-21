@@ -66,6 +66,32 @@ export function AuthProvider({ children }: PropsWithChildren) {
     }
   }, [])
 
+  const completeRequiredPasswordChange = useCallback(
+    async (accountId: string | number, currentPassword: string, newPassword: string, rememberMe: boolean) => {
+      setAuthState((current) => ({ ...current, isLoading: true }))
+
+      try {
+        const user = await authService.completeRequiredPasswordChange(accountId, currentPassword, newPassword, rememberMe)
+
+        setAuthState({
+          user,
+          isAuthenticated: true,
+          isLoading: false,
+        })
+
+        return user
+      } catch (error) {
+        setAuthState({
+          user: null,
+          isAuthenticated: false,
+          isLoading: false,
+        })
+        throw error
+      }
+    },
+    [],
+  )
+
   const logout = useCallback(async () => {
     setAuthState((current) => ({ ...current, isLoading: true }))
 
@@ -82,9 +108,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
     () => ({
       ...authState,
       login,
+      completeRequiredPasswordChange,
       logout,
     }),
-    [authState, login, logout],
+    [authState, completeRequiredPasswordChange, login, logout],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
