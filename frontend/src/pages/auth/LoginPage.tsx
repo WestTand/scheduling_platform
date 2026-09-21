@@ -30,7 +30,7 @@ export function LoginPage() {
     setTouched({ email: true, password: true })
 
     if (emailEmpty || passwordEmpty) {
-      setError('Vui lòng nhập email và mật khẩu để đăng nhập.')
+      setError('Vui lòng nhập email hoặc tên đăng nhập và mật khẩu để đăng nhập.')
       return
     }
 
