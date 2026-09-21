@@ -24,12 +24,12 @@ const getStoredUserStorage = () => {
 }
 
 const getStoredTokenStorage = () => {
-  if (localStorage.getItem(AUTH_STORAGE_KEYS.TOKEN)) {
-    return localStorage
-  }
-
   if (sessionStorage.getItem(AUTH_STORAGE_KEYS.TOKEN)) {
     return sessionStorage
+  }
+
+  if (localStorage.getItem(AUTH_STORAGE_KEYS.TOKEN)) {
+    return localStorage
   }
 
   return sessionStorage

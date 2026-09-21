@@ -4,5 +4,5 @@ export const AUTH_STORAGE_KEYS = {
 }
 
 export const getStoredToken = () => {
-  return localStorage.getItem(AUTH_STORAGE_KEYS.TOKEN) ?? sessionStorage.getItem(AUTH_STORAGE_KEYS.TOKEN)
+  return sessionStorage.getItem(AUTH_STORAGE_KEYS.TOKEN) ?? localStorage.getItem(AUTH_STORAGE_KEYS.TOKEN)
 }
