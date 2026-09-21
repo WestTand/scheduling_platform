@@ -188,6 +188,10 @@ export const authService = {
         if (!preUser) {
           throw new Error('Không tìm thấy thông tin nhân viên cho tài khoản này.')
         }
+        const storedPassword = await accountService.getPasswordForAccount(existing.id)
+        if (!storedPassword || storedPassword !== currentPassword) {
+          throw new Error('Mật khẩu tạm thời không đúng. Vui lòng kiểm tra lại.')
+        }
         const account = await accountService.setNewPassword(existing.id, newPassword)
         const user = await accountService.getUserForAccount(account.id)
         if (!user) { throw new Error('Không tìm thấy thông tin nhân viên cho tài khoản này.') }
