@@ -30,7 +30,7 @@ export function LoginPage() {
     setTouched({ email: true, password: true })
 
     if (emailEmpty || passwordEmpty) {
-      setError('Vui lòng nhập email và mật khẩu để đăng nhập.')
+      setError('Vui lòng nhập email hoặc tên đăng nhập và mật khẩu để đăng nhập.')
       return
     }
 
@@ -90,16 +90,16 @@ export function LoginPage() {
                     <Mail className="h-4 w-4 text-slate-400" />
                     <input
                       id="email"
-                      type="email"
+                      type="text"
                       value={credentials.email}
                       onChange={(event) => {
                         setCredentials((current) => ({ ...current, email: event.target.value }))
                         if (error) setError('')
                       }}
                       onBlur={() => setTouched((current) => ({ ...current, email: true }))}
-                      placeholder="name@company.com"
+                      placeholder="Email hoặc tên đăng nhập"
                       className="w-full border-0 bg-transparent text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
-                      autoComplete="email"
+                      autoComplete="username"
                     />
                   </div>
                   {touched.email && !credentials.email.trim() && (

@@ -27,5 +27,5 @@ export interface AuthState {
 
 export interface AuthContextValue extends AuthState {
   login: (credentials: LoginCredentials, rememberMe: boolean) => Promise<void>
-  logout: () => void
+  logout: () => Promise<void>
 }
