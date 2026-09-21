@@ -5,6 +5,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -40,7 +41,8 @@ import scheduling.scheduling.repository.AccountRepository;
 @Import({ SecurityConfig.class, JwtAuthenticationFilter.class, AuthExceptionHandler.class })
 @TestPropertySource(properties = {
         "app.auth.refresh-cookie-name=refresh_token",
-        "app.auth.refresh-cookie-secure=false"
+        "app.auth.refresh-cookie-secure=false",
+        "app.cors.allowed-origins=http://localhost:5173"
 })
 class AuthControllerTest {
 
@@ -55,6 +57,18 @@ class AuthControllerTest {
 
     @MockitoBean
     private AccountRepository accountRepository;
+
+    @Test
+    void corsPreflightAllowsFrontendOriginForLogin() throws Exception {
+        mockMvc.perform(options("/api/auth/login")
+                        .header(HttpHeaders.ORIGIN, "http://localhost:5173")
+                        .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "POST")
+                        .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, "content-type"))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "http://localhost:5173"))
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS, org.hamcrest.Matchers.containsString("POST")))
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, org.hamcrest.Matchers.containsString("content-type")));
+    }
 
     @Test
     void registerEndpointIsNotAvailable() throws Exception {
