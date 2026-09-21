@@ -231,7 +231,7 @@ export function EmployeesPage() {
     }
   }
 
-  const handleCreateAccountSubmit = async (input: { employeeId: string; username: string; email: string; temporaryPassword: string }) => {
+  const handleCreateAccountSubmit = async (input: { employeeId: string; username: string }) => {
     setAccountSubmitting(true)
 
     try {

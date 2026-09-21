@@ -146,20 +146,18 @@ export const accountService = {
       throw new Error('Tên tài khoản đã tồn tại. Vui lòng chọn tên tài khoản khác.')
     }
 
-    const duplicateEmail = mockAccounts.some((account) => normalize(account.email) === normalize(input.email))
+    const duplicateEmail = mockAccounts.some((account) => normalize(account.email) === normalize(employee.email))
     if (duplicateEmail) {
       throw new Error('Email đã được liên kết với tài khoản khác.')
     }
 
-    if (!hasPasswordRequirements(input.temporaryPassword)) {
-      throw new Error('Mật khẩu tạm thời tối thiểu 8 ký tự, có chữ hoa, chữ thường và số.')
-    }
+    const mockTemporaryPassword = 'Temp1234'
 
     const account: UserAccount = {
       id: `acct-${Date.now()}`,
       employeeId: input.employeeId,
       username: input.username.trim(),
-      email: input.email.trim(),
+      email: employee.email.trim(),
       role: 'EMPLOYEE',
       status: 'PENDING_ACTIVATION' as AccountStatus,
       createdAt: new Date().toISOString(),
@@ -168,7 +166,7 @@ export const accountService = {
     }
 
     mockAccounts = [account, ...mockAccounts]
-    accountSecrets[account.id] = { accountId: account.id, password: input.temporaryPassword }
+    accountSecrets[account.id] = { accountId: account.id, password: mockTemporaryPassword }
     otpStore[account.id] = MOCK_OTP
     otpExpiryStore[account.id] = Date.now() + 5 * 60 * 1000
 

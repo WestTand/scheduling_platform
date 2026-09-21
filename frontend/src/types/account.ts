@@ -24,8 +24,6 @@ export interface UserAccount {
 export interface CreateEmployeeAccountInput {
   employeeId: string
   username: string
-  email: string
-  temporaryPassword: string
 }
 
 export interface ActivationRequest {

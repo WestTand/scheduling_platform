@@ -17,9 +17,6 @@ export function CreateAccountDialog({ employee, employees, open, isSubmitting, o
   const initialEmployee = employee ?? employees[0] ?? null
   const [form, setForm] = useState(() => ({
     username: '',
-    email: initialEmployee?.email ?? '',
-    temporaryPassword: '',
-    confirmPassword: '',
   }))
   const [error, setError] = useState('')
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(initialEmployee?.id ?? '')
@@ -37,9 +34,6 @@ export function CreateAccountDialog({ employee, employees, open, isSubmitting, o
     }
 
     const username = form.username.trim()
-    const email = form.email.trim()
-    const temporaryPassword = form.temporaryPassword
-    const confirmPassword = form.confirmPassword
 
     if (!username) {
       setError('Tên tài khoản là bắt buộc.')
@@ -51,27 +45,10 @@ export function CreateAccountDialog({ employee, employees, open, isSubmitting, o
       return
     }
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setError('Email không hợp lệ.')
-      return
-    }
-
-    if (temporaryPassword.length < 8 || !/[A-Z]/.test(temporaryPassword) || !/[a-z]/.test(temporaryPassword) || !/\d/.test(temporaryPassword)) {
-      setError('Mật khẩu tạm thời phải tối thiểu 8 ký tự, có chữ hoa, chữ thường và chữ số.')
-      return
-    }
-
-    if (temporaryPassword !== confirmPassword) {
-      setError('Xác nhận mật khẩu tạm thời không khớp.')
-      return
-    }
-
     setError('')
     await onSubmit({
       employeeId: selectedEmployee.id,
       username,
-      email,
-      temporaryPassword,
     })
   }
 
@@ -90,11 +67,7 @@ export function CreateAccountDialog({ employee, employees, open, isSubmitting, o
           <select
             value={selectedEmployeeId}
             onChange={(event) => {
-              const nextEmployee = employees.find((item) => item.id === event.target.value) ?? null
               setSelectedEmployeeId(event.target.value)
-              if (nextEmployee) {
-                setForm((current) => ({ ...current, email: nextEmployee.email ?? '', username: current.username }))
-              }
             }}
             className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none"
           >
@@ -112,14 +85,8 @@ export function CreateAccountDialog({ employee, employees, open, isSubmitting, o
           <input value={selectedEmployee.fullName} readOnly className="w-full rounded-xl border border-slate-200 bg-slate-100 px-3 py-2.5 text-sm text-slate-600" />
         </div>
         <div className="space-y-1 md:col-span-2">
-          <label className="text-sm font-medium text-slate-700">Email nhân viên</label>
-          <input
-            type="email"
-            value={form.email}
-            readOnly={Boolean(selectedEmployee.email)}
-            onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none"
-          />
+          <p className="text-sm font-medium text-slate-700">Email nhân viên</p>
+          <p className="rounded-xl border border-slate-200 bg-slate-100 px-3 py-2.5 text-sm text-slate-600">{selectedEmployee.email}</p>
           {!selectedEmployee.email && (
             <p className="text-xs text-amber-700">Nhân viên chưa có email, không thể tạo tài khoản cho đến khi hồ sơ được cập nhật.</p>
           )}
@@ -132,26 +99,6 @@ export function CreateAccountDialog({ employee, employees, open, isSubmitting, o
             className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none"
             autoComplete="username"
             placeholder="vd: hoangtam"
-          />
-        </div>
-        <div className="space-y-1">
-          <label className="text-sm font-medium text-slate-700">Mật khẩu tạm thời</label>
-          <input
-            type="password"
-            value={form.temporaryPassword}
-            onChange={(event) => setForm((current) => ({ ...current, temporaryPassword: event.target.value }))}
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none"
-            autoComplete="new-password"
-          />
-        </div>
-        <div className="space-y-1">
-          <label className="text-sm font-medium text-slate-700">Xác nhận mật khẩu tạm thời</label>
-          <input
-            type="password"
-            value={form.confirmPassword}
-            onChange={(event) => setForm((current) => ({ ...current, confirmPassword: event.target.value }))}
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none"
-            autoComplete="new-password"
           />
         </div>
       </div>
