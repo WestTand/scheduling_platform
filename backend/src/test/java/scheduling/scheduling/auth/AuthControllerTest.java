@@ -31,6 +31,7 @@ import scheduling.scheduling.auth.dto.LoginRequest;
 import scheduling.scheduling.auth.dto.LoginStateResponse;
 import scheduling.scheduling.auth.dto.MeResponse;
 import scheduling.scheduling.auth.dto.RequiredPasswordChangeRequest;
+import scheduling.scheduling.auth.dto.ResendActivationOtpRequest;
 import scheduling.scheduling.auth.dto.VerifyActivationOtpRequest;
 import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
@@ -169,6 +170,36 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.accountId").value(42))
                 .andExpect(jsonPath("$.username").value("employee01"))
                 .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
+    }
+
+    @Test
+    void resendActivationOtpReturnsNoContentWithoutRefreshCookie() throws Exception {
+        mockMvc.perform(post("/api/auth/activation/resend")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "employee01",
+                                  "temporaryPassword": "secret123"
+                                }
+                                """))
+                .andExpect(status().isNoContent())
+                .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
+        verify(authService).resendActivationOtp(any(ResendActivationOtpRequest.class));
+    }
+
+    @Test
+    void resendActivationOtpRejectsInvalidRequest() throws Exception {
+        mockMvc.perform(post("/api/auth/activation/resend")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "",
+                                  "temporaryPassword": ""
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+        verifyNoInteractions(authService);
     }
 
     @Test

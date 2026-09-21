@@ -15,6 +15,7 @@ import scheduling.scheduling.auth.dto.LoginStateResponse;
 import scheduling.scheduling.auth.dto.MeResponse;
 import scheduling.scheduling.auth.dto.RegisterRequest;
 import scheduling.scheduling.auth.dto.RequiredPasswordChangeRequest;
+import scheduling.scheduling.auth.dto.ResendActivationOtpRequest;
 import scheduling.scheduling.auth.dto.VerifyActivationOtpRequest;
 import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
@@ -112,6 +113,10 @@ public class AuthService {
     public ActivationStateResponse verifyActivationOtp(VerifyActivationOtpRequest request) {
         Account account = accountActivationOtpService.verifyActivationOtp(request.accountId(), request.otp());
         return new ActivationStateResponse("PASSWORD_CHANGE_REQUIRED", account.getId(), account.getUsername());
+    }
+
+    @Transactional
+    public void resendActivationOtp(ResendActivationOtpRequest request) {
     }
 
     @Transactional

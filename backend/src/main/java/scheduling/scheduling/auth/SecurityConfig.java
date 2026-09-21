@@ -53,6 +53,7 @@ public class SecurityConfig {
                                 "/api/health",
                                 "/api/auth/login",
                                 "/api/auth/activation/verify-otp",
+                                "/api/auth/activation/resend",
                                 "/api/auth/password/change-required",
                                 "/api/auth/refresh",
                                 "/api/auth/logout",
