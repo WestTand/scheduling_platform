@@ -61,11 +61,8 @@ class ManagerAccountControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "username": "employee01",
-                                  "employeeCode": "EMP001",
-                                  "fullName": "Nguyen Van A",
-                                  "email": "employee01@gmail.com",
-                                  "phone": "0900000001"
+                                  "employeeId": 10,
+                                  "username": "employee01"
                                 }
                                 """))
                 .andExpect(status().isCreated())
@@ -86,9 +83,8 @@ class ManagerAccountControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "username": "employee01",
-                                  "employeeCode": "EMP001",
-                                  "fullName": "Nguyen Van A"
+                                  "employeeId": 10,
+                                  "username": "employee01"
                                 }
                                 """))
                 .andExpect(status().isForbidden());
