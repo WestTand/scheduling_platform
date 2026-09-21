@@ -4,7 +4,7 @@ export interface BackendAdminEmployeeAccountResponse {
   id: number
   username: string
   role: 'MANAGER' | 'EMPLOYEE' | 'ADMIN'
-  status: AccountStatus | 'FORCE_PASSWORD_CHANGE' | 'INACTIVE'
+  status: AccountStatus
   active: boolean
 }
 
