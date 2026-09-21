@@ -1,3 +1,5 @@
+import { apiConfig } from '@/config/api'
+import { backendShiftTypeService } from '@/services/backendShiftTypeService'
 import { shiftTypeSeed } from '@/mocks/managementData'
 import { getWorkMinutes } from '@/configs/shiftDefinitions'
 import type { PaginatedResult, ShiftType, ShiftTypeFormValues } from '@/types/management'
@@ -9,6 +11,7 @@ let shiftTypes: ShiftType[] = clone(shiftTypeSeed)
 
 export const shiftTypeService = {
   async list({ page = 1, pageSize = 5, search = '', status = 'ALL' }: { page?: number; pageSize?: number; search?: string; status?: string }) {
+    if (!apiConfig.useMockApi) { return backendShiftTypeService.list({ page, pageSize, search, status }) }
     await delay(300)
 
     const filtered = shiftTypes.filter((shiftType) => {
@@ -32,11 +35,13 @@ export const shiftTypeService = {
   },
 
   async getById(id: string) {
+    if (!apiConfig.useMockApi) { return backendShiftTypeService.getById(id) }
     await delay(200)
     return shiftTypes.find((shiftType) => shiftType.id === id) ?? null
   },
 
   async add(data: ShiftTypeFormValues) {
+    if (!apiConfig.useMockApi) { return backendShiftTypeService.add(data) }
     await delay(350)
     const exists = shiftTypes.some((shiftType) => shiftType.code.toLowerCase() === data.code.trim().toLowerCase())
 
@@ -67,6 +72,7 @@ export const shiftTypeService = {
   },
 
   async update(id: string, data: ShiftTypeFormValues) {
+    if (!apiConfig.useMockApi) { return backendShiftTypeService.update(id, data) }
     await delay(300)
     const index = shiftTypes.findIndex((shiftType) => shiftType.id === id)
 
@@ -104,6 +110,7 @@ export const shiftTypeService = {
   },
 
   async toggleStatus(id: string) {
+    if (!apiConfig.useMockApi) { return backendShiftTypeService.toggleStatus(id) }
     await delay(250)
     const shiftType = shiftTypes.find((item) => item.id === id)
 
@@ -116,6 +123,7 @@ export const shiftTypeService = {
   },
 
   async remove(id: string) {
+    if (!apiConfig.useMockApi) { return backendShiftTypeService.remove(id) }
     await delay(250)
 
     const current = shiftTypes.find((item) => item.id === id)
