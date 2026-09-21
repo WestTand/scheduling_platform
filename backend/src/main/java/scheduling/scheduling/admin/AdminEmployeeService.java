@@ -62,17 +62,17 @@ public class AdminEmployeeService {
     @Transactional
     public AdminEmployeeResponse createEmployee(CurrentAccountPrincipal principal, CreateEmployeeRequest request) {
         Account manager = requireManager(principal);
-        String employeeCode = trimNullable(request.employeeCode());
+        String employeeCode = request.employeeCode();
         if (employeeRepository.existsByEmployeeCode(employeeCode)) {
             throw new DuplicateResourceException("Employee code already exists");
         }
 
         Employee employee = Employee.builder()
                 .employeeCode(employeeCode)
-                .fullName(trimNullable(request.fullName()))
-                .email(trimNullable(request.email()))
-                .phone(trimNullable(request.phone()))
-                .status(trimNullable(request.status()))
+                .fullName(request.fullName())
+                .email(optionalValue(request.email()))
+                .phone(optionalValue(request.phone()))
+                .status(request.status())
                 .build();
         Employee saved = employeeRepository.save(employee);
         activityLogService.record(manager, "CREATE", "employees", saved.getId(), null, employeeSnapshot(saved));
@@ -144,6 +144,10 @@ public class AdminEmployeeService {
 
     private static String trimNullable(String value) {
         return value == null ? null : value.trim();
+    }
+
+    private static String optionalValue(String value) {
+        return StringUtils.hasText(value) ? value : null;
     }
 
     private static Map<String, Object> employeeSnapshot(Employee employee) {

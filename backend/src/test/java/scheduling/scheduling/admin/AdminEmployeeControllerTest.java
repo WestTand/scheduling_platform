@@ -1,5 +1,6 @@
 package scheduling.scheduling.admin;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -14,6 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -111,6 +113,37 @@ class AdminEmployeeControllerTest {
                 .andExpect(jsonPath("$.employeeCode").value("EMP001"));
 
         verify(adminEmployeeService).createEmployee(any(CurrentAccountPrincipal.class), any(CreateEmployeeRequest.class));
+    }
+
+    @Test
+    void managerCreatesEmployeeWithWhitespacePaddedValues() throws Exception {
+        givenToken("manager-token", manager());
+        when(adminEmployeeService.createEmployee(any(CurrentAccountPrincipal.class), any(CreateEmployeeRequest.class)))
+                .thenReturn(employeeResponse());
+
+        mockMvc.perform(post("/api/admin/employees")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer manager-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "employeeCode": " EMP001 ",
+                                  "fullName": " Nguyen Van A ",
+                                  "email": " employee01@example.com ",
+                                  "phone": " 0900000001 ",
+                                  "status": " ACTIVE "
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(10));
+
+        ArgumentCaptor<CreateEmployeeRequest> requestCaptor = ArgumentCaptor.forClass(CreateEmployeeRequest.class);
+        verify(adminEmployeeService).createEmployee(any(CurrentAccountPrincipal.class), requestCaptor.capture());
+        CreateEmployeeRequest request = requestCaptor.getValue();
+        assertThat(request.employeeCode()).isEqualTo("EMP001");
+        assertThat(request.fullName()).isEqualTo("Nguyen Van A");
+        assertThat(request.email()).isEqualTo("employee01@example.com");
+        assertThat(request.phone()).isEqualTo("0900000001");
+        assertThat(request.status()).isEqualTo("ACTIVE");
     }
 
     @Test

@@ -128,6 +128,32 @@ class AdminEmployeeServiceTest {
     }
 
     @Test
+    void createEmployeePersistsBlankOptionalFieldsAsNull() {
+        givenManager();
+        CreateEmployeeRequest request = new CreateEmployeeRequest(
+                "EMP004",
+                "Pham Thi D",
+                " ",
+                "\t",
+                "ACTIVE");
+        when(employeeRepository.existsByEmployeeCode("EMP004")).thenReturn(false);
+        when(employeeRepository.save(argThat(employee ->
+                "EMP004".equals(employee.getEmployeeCode())
+                        && employee.getEmail() == null
+                        && employee.getPhone() == null)))
+                .thenAnswer(invocation -> {
+                    Employee saved = invocation.getArgument(0);
+                    saved.setId(13L);
+                    return saved;
+                });
+
+        AdminEmployeeResponse response = service.createEmployee(managerPrincipal(), request);
+
+        assertThat(response.id()).isEqualTo(13L);
+        verify(employeeRepository).save(argThat(employee -> employee.getEmail() == null && employee.getPhone() == null));
+    }
+
+    @Test
     void createEmployeeRejectsDuplicateEmployeeCode() {
         givenManager();
         CreateEmployeeRequest request = new CreateEmployeeRequest(
