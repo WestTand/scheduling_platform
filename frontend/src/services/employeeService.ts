@@ -1,4 +1,6 @@
+import { apiConfig } from '@/config/api'
 import { employeeSeed } from '@/mocks/managementData'
+import { backendEmployeeService } from '@/services/backendEmployeeService'
 import type { Employee, EmployeeFormValues, PaginatedResult } from '@/types/management'
 
 const delay = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms))
@@ -9,6 +11,9 @@ let employees: Employee[] = clone(employeeSeed)
 
 export const employeeService = {
   async list({ page = 1, pageSize = 5, search = '', status = 'ALL' }: { page?: number; pageSize?: number; search?: string; status?: string }) {
+    if (!apiConfig.useMockApi) {
+      return backendEmployeeService.list({ page, pageSize, search, status })
+    }
     await delay(350)
 
     const filtered = employees.filter((employee) => {
@@ -34,11 +39,17 @@ export const employeeService = {
   },
 
   async getById(id: string) {
+    if (!apiConfig.useMockApi) {
+      return backendEmployeeService.getById(id)
+    }
     await delay(200)
     return employees.find((employee) => employee.id === id) ?? null
   },
 
   async add(data: EmployeeFormValues) {
+    if (!apiConfig.useMockApi) {
+      return backendEmployeeService.add(data)
+    }
     await delay(350)
     const exists = employees.some((employee) => employee.employeeCode.toLowerCase() === data.employeeCode.trim().toLowerCase())
 
@@ -63,6 +74,9 @@ export const employeeService = {
   },
 
   async update(id: string, data: EmployeeFormValues) {
+    if (!apiConfig.useMockApi) {
+      return backendEmployeeService.update(id, data)
+    }
     await delay(300)
     const index = employees.findIndex((employee) => employee.id === id)
 
@@ -94,6 +108,16 @@ export const employeeService = {
   },
 
   async toggleStatus(id: string, currentUserId?: string) {
+    if (!apiConfig.useMockApi) {
+      const employee = await backendEmployeeService.getById(id)
+      if (!employee) throw new Error('Nhân viên không tồn tại.')
+      if (employee.status === 'ACTIVE') {
+        await backendEmployeeService.lock(id)
+      } else {
+        await backendEmployeeService.unlock(id)
+      }
+      return backendEmployeeService.getById(id)
+    }
     await delay(250)
 
     if (currentUserId && currentUserId === id) {
@@ -115,6 +139,12 @@ export const employeeService = {
   },
 
   async remove(id: string, currentUserId?: string) {
+    if (!apiConfig.useMockApi) {
+      const employee = await backendEmployeeService.getById(id)
+      if (!employee) throw new Error('Nhân viên không tồn tại.')
+      await backendEmployeeService.lock(id)
+      return { ...employee, status: 'INACTIVE' }
+    }
     await delay(250)
 
     if (currentUserId && currentUserId === id) {
