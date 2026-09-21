@@ -194,7 +194,7 @@ export function ShiftTypesPage() {
       setPage(1)
       await fetchData()
     } catch (deleteError) {
-      window.alert(deleteError instanceof Error ? deleteError.message : 'Không thể xóa loại ca.')
+      window.alert(deleteError instanceof Error ? deleteError.message : 'Không thể tạm ngưng loại ca.')
     }
   }
 
@@ -258,7 +258,7 @@ export function ShiftTypesPage() {
                       <Button variant="ghost" size="icon" onClick={() => toggleStatus(item)} aria-label="Thay đổi trạng thái ca">
                         <Search className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(item)} aria-label="Xóa ca">
+                      <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(item)} aria-label="Tạm ngưng ca">
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
@@ -352,8 +352,8 @@ export function ShiftTypesPage() {
 
       <ConfirmDialog
         open={Boolean(deleteTarget)}
-        title="Xóa loại ca trực"
-        description={`Loại ca ${deleteTarget?.name} đang được dùng trong mock schedule. Bạn nên tạm ngưng thay vì xóa ngay.`}
+        title="Tạm ngưng loại ca trực"
+        description={`Loại ca ${deleteTarget?.name} sẽ được chuyển sang trạng thái tạm ngưng. Lịch sử ca đã sử dụng vẫn được giữ nguyên.`}
         onCancel={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
       />
