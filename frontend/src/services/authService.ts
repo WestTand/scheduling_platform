@@ -135,6 +135,17 @@ const storeUserInExistingStorage = (user: User) => {
   getStoredUserStorage().setItem(AUTH_STORAGE_KEYS.USER, JSON.stringify(user))
 }
 
+const parseBackendAccountId = (accountId: string | number): number => {
+  if (typeof accountId === 'string' && accountId.trim() === '') {
+    throw new Error('Thông tin tài khoản không hợp lệ.')
+  }
+  const parsed = Number(accountId)
+  if (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed <= 0) {
+    throw new Error('Thông tin tài khoản không hợp lệ.')
+  }
+  return parsed
+}
+
 export const authService = {
   async login(credentials: LoginCredentials, rememberMe: boolean): Promise<User> {
     try {
@@ -158,21 +169,39 @@ export const authService = {
       const result = await accountService.verifyActivationOtp(String(accountId), otp)
       return { accountId: result.id, username: result.username }
     }
-    const result = await backendAuthService.verifyActivationOtp(Number(accountId), otp)
+    const backendAccountId = parseBackendAccountId(accountId)
+    const result = await backendAuthService.verifyActivationOtp(backendAccountId, otp)
     return { accountId: String(result.accountId), username: result.username }
   },
 
   async completeRequiredPasswordChange(accountId: string | number, currentPassword: string, newPassword: string, rememberMe: boolean): Promise<User> {
-    if (apiConfig.useMockApi) {
-      const account = await accountService.setNewPassword(String(accountId), newPassword)
-      const user = await accountService.getUserForAccount(account.id)
-      if (!user) { throw new Error('Không tìm thấy thông tin nhân viên cho tài khoản này.') }
-      setStoredAuth(user, rememberMe)
-      return user
+    try {
+      if (apiConfig.useMockApi) {
+        if (!currentPassword || !currentPassword.trim()) {
+          throw new Error('Vui lòng nhập mật khẩu tạm thời.')
+        }
+        const existing = await accountService.getAccountById(String(accountId))
+        if (!existing) {
+          throw new Error('Tài khoản không tồn tại.')
+        }
+        const preUser = await accountService.getUserForAccount(existing.id)
+        if (!preUser) {
+          throw new Error('Không tìm thấy thông tin nhân viên cho tài khoản này.')
+        }
+        const account = await accountService.setNewPassword(existing.id, newPassword)
+        const user = await accountService.getUserForAccount(account.id)
+        if (!user) { throw new Error('Không tìm thấy thông tin nhân viên cho tài khoản này.') }
+        setStoredAuth(user, rememberMe)
+        return user
+      }
+      const backendAccountId = parseBackendAccountId(accountId)
+      const result = await backendAuthService.changeRequiredPassword(backendAccountId, currentPassword, newPassword)
+      setStoredAuth(result.user, rememberMe, result.accessToken)
+      return result.user
+    } catch (error) {
+      clearStoredAuth()
+      throw error
     }
-    const result = await backendAuthService.changeRequiredPassword(Number(accountId), currentPassword, newPassword)
-    setStoredAuth(result.user, rememberMe, result.accessToken)
-    return result.user
   },
 
   async getCurrentUser(): Promise<User | null> {
