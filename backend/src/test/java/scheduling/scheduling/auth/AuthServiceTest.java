@@ -22,6 +22,7 @@ import scheduling.scheduling.auth.dto.LoginRequest;
 import scheduling.scheduling.auth.dto.MeResponse;
 import scheduling.scheduling.auth.dto.RegisterRequest;
 import scheduling.scheduling.auth.dto.RequiredPasswordChangeRequest;
+import scheduling.scheduling.auth.dto.ResendActivationOtpRequest;
 import scheduling.scheduling.auth.dto.VerifyActivationOtpRequest;
 import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
@@ -373,6 +374,56 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> service.changeRequiredPassword(new RequiredPasswordChangeRequest(42L, "old-password", "new-password")))
                 .isInstanceOf(InvalidPasswordChangeStateException.class);
+    }
+
+    @Test
+    void resendActivationOtpCreatesOtpForPendingAccount() {
+        Account account = account(1L, "employee01", "hash", true, null);
+        account.setStatus(AccountStatus.PENDING_ACTIVATION);
+        when(accountRepository.findByUsername("employee01")).thenReturn(Optional.of(account));
+        when(passwordEncoder.matches("temp-password", "hash")).thenReturn(true);
+
+        service.resendActivationOtp(new ResendActivationOtpRequest("employee01", "temp-password"));
+
+        verify(accountActivationOtpService).createActivationOtp(account);
+    }
+
+    @Test
+    void resendActivationOtpRejectsWrongPassword() {
+        Account account = account(1L, "employee01", "hash", true, null);
+        account.setStatus(AccountStatus.PENDING_ACTIVATION);
+        when(accountRepository.findByUsername("employee01")).thenReturn(Optional.of(account));
+        when(passwordEncoder.matches("wrong-password", "hash")).thenReturn(false);
+
+        assertThatThrownBy(() -> service.resendActivationOtp(new ResendActivationOtpRequest("employee01", "wrong-password")))
+                .isInstanceOf(AuthenticationFailedException.class)
+                .hasMessage("Invalid username or password");
+
+        verify(accountActivationOtpService, never()).createActivationOtp(any());
+    }
+
+    @Test
+    void resendActivationOtpRejectsNonPendingAccount() {
+        Account account = account(1L, "employee01", "hash", true, null);
+        account.setStatus(AccountStatus.ACTIVE);
+        when(accountRepository.findByUsername("employee01")).thenReturn(Optional.of(account));
+
+        assertThatThrownBy(() -> service.resendActivationOtp(new ResendActivationOtpRequest("employee01", "temp-password")))
+                .isInstanceOf(InvalidAccountStateException.class)
+                .hasMessage("Invalid account state");
+
+        verify(accountActivationOtpService, never()).createActivationOtp(any());
+    }
+
+    @Test
+    void resendActivationOtpRejectsUnknownUsername() {
+        when(accountRepository.findByUsername("missing")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.resendActivationOtp(new ResendActivationOtpRequest("missing", "temp-password")))
+                .isInstanceOf(AuthenticationFailedException.class)
+                .hasMessage("Invalid username or password");
+
+        verify(accountActivationOtpService, never()).createActivationOtp(any());
     }
 
     private static RegisterRequest registerRequest() {

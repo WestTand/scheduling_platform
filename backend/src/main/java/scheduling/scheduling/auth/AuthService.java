@@ -117,6 +117,15 @@ public class AuthService {
 
     @Transactional
     public void resendActivationOtp(ResendActivationOtpRequest request) {
+        Account account = accountRepository.findByUsername(request.username())
+                .orElseThrow(AuthenticationFailedException::new);
+        if (!Boolean.TRUE.equals(account.getIsActive()) || account.getStatus() != AccountStatus.PENDING_ACTIVATION) {
+            throw new InvalidAccountStateException();
+        }
+        if (!passwordEncoder.matches(request.temporaryPassword(), account.getPasswordHash())) {
+            throw new AuthenticationFailedException();
+        }
+        accountActivationOtpService.createActivationOtp(account);
     }
 
     @Transactional
