@@ -16,9 +16,11 @@ import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import scheduling.scheduling.admin.dto.AdminEmployeeResponse;
+import scheduling.scheduling.admin.dto.CreateEmployeeRequest;
 import scheduling.scheduling.admin.dto.UpdateEmployeeRequest;
 import scheduling.scheduling.audit.ActivityLogService;
 import scheduling.scheduling.auth.CurrentAccountPrincipal;
+import scheduling.scheduling.auth.DuplicateResourceException;
 import scheduling.scheduling.auth.RefreshTokenService;
 import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
@@ -84,6 +86,64 @@ class AdminEmployeeServiceTest {
         assertThatThrownBy(() -> service.getEmployee(10L))
                 .isInstanceOf(EmployeeNotFoundException.class)
                 .hasMessage("Employee not found");
+    }
+
+    @Test
+    void createEmployeeSavesEmployeeAndRecordsActivityLog() {
+        Account manager = givenManager();
+        CreateEmployeeRequest request = new CreateEmployeeRequest(
+                " EMP003 ",
+                " Le Van C ",
+                " employee03@example.com ",
+                " 0900000003 ",
+                " ACTIVE ");
+        when(employeeRepository.existsByEmployeeCode("EMP003")).thenReturn(false);
+        when(employeeRepository.save(argThat(employee ->
+                "EMP003".equals(employee.getEmployeeCode())
+                        && "Le Van C".equals(employee.getFullName())
+                        && "employee03@example.com".equals(employee.getEmail())
+                        && "0900000003".equals(employee.getPhone())
+                        && "ACTIVE".equals(employee.getStatus()))))
+                .thenAnswer(invocation -> {
+                    Employee saved = invocation.getArgument(0);
+                    saved.setId(12L);
+                    return saved;
+                });
+
+        AdminEmployeeResponse response = service.createEmployee(managerPrincipal(), request);
+
+        assertThat(response.id()).isEqualTo(12L);
+        assertThat(response.employeeCode()).isEqualTo("EMP003");
+        verify(activityLogService).record(
+                same(manager),
+                eq("CREATE"),
+                eq("employees"),
+                eq(12L),
+                isNull(),
+                argThat((Object snapshot) -> snapshot instanceof Map<?, ?> map
+                        && Long.valueOf(12L).equals(map.get("id"))
+                        && "EMP003".equals(map.get("employeeCode"))
+                        && "Le Van C".equals(map.get("fullName"))
+                        && "ACTIVE".equals(map.get("status"))));
+    }
+
+    @Test
+    void createEmployeeRejectsDuplicateEmployeeCode() {
+        givenManager();
+        CreateEmployeeRequest request = new CreateEmployeeRequest(
+                " EMP003 ",
+                " Le Van C ",
+                " employee03@example.com ",
+                " 0900000003 ",
+                " ACTIVE ");
+        when(employeeRepository.existsByEmployeeCode("EMP003")).thenReturn(true);
+
+        assertThatThrownBy(() -> service.createEmployee(managerPrincipal(), request))
+                .isInstanceOf(DuplicateResourceException.class)
+                .hasMessage("Employee code already exists");
+
+        verify(employeeRepository).existsByEmployeeCode("EMP003");
+        verifyNoInteractions(activityLogService);
     }
 
     @Test

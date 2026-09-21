@@ -8,9 +8,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
 import scheduling.scheduling.admin.dto.AdminEmployeeResponse;
+import scheduling.scheduling.admin.dto.CreateEmployeeRequest;
 import scheduling.scheduling.admin.dto.UpdateEmployeeRequest;
 import scheduling.scheduling.audit.ActivityLogService;
 import scheduling.scheduling.auth.CurrentAccountPrincipal;
+import scheduling.scheduling.auth.DuplicateResourceException;
 import scheduling.scheduling.auth.RefreshTokenService;
 import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
@@ -55,6 +57,26 @@ public class AdminEmployeeService {
     @Transactional(readOnly = true)
     public AdminEmployeeResponse getEmployee(Long employeeId) {
         return AdminEmployeeResponse.from(findEmployee(employeeId));
+    }
+
+    @Transactional
+    public AdminEmployeeResponse createEmployee(CurrentAccountPrincipal principal, CreateEmployeeRequest request) {
+        Account manager = requireManager(principal);
+        String employeeCode = trimNullable(request.employeeCode());
+        if (employeeRepository.existsByEmployeeCode(employeeCode)) {
+            throw new DuplicateResourceException("Employee code already exists");
+        }
+
+        Employee employee = Employee.builder()
+                .employeeCode(employeeCode)
+                .fullName(trimNullable(request.fullName()))
+                .email(trimNullable(request.email()))
+                .phone(trimNullable(request.phone()))
+                .status(trimNullable(request.status()))
+                .build();
+        Employee saved = employeeRepository.save(employee);
+        activityLogService.record(manager, "CREATE", "employees", saved.getId(), null, employeeSnapshot(saved));
+        return AdminEmployeeResponse.from(saved);
     }
 
     @Transactional
@@ -118,6 +140,10 @@ public class AdminEmployeeService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Manager access required");
         }
         return account;
+    }
+
+    private static String trimNullable(String value) {
+        return value == null ? null : value.trim();
     }
 
     private static Map<String, Object> employeeSnapshot(Employee employee) {
