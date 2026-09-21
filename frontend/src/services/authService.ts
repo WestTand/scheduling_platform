@@ -153,6 +153,28 @@ export const authService = {
     }
   },
 
+  async verifyActivationOtp(accountId: string | number, otp: string): Promise<{ accountId: string; username: string }> {
+    if (apiConfig.useMockApi) {
+      const result = await accountService.verifyActivationOtp(String(accountId), otp)
+      return { accountId: result.id, username: result.username }
+    }
+    const result = await backendAuthService.verifyActivationOtp(Number(accountId), otp)
+    return { accountId: String(result.accountId), username: result.username }
+  },
+
+  async completeRequiredPasswordChange(accountId: string | number, currentPassword: string, newPassword: string, rememberMe: boolean): Promise<User> {
+    if (apiConfig.useMockApi) {
+      const account = await accountService.setNewPassword(String(accountId), newPassword)
+      const user = await accountService.getUserForAccount(account.id)
+      if (!user) { throw new Error('Không tìm thấy thông tin nhân viên cho tài khoản này.') }
+      setStoredAuth(user, rememberMe)
+      return user
+    }
+    const result = await backendAuthService.changeRequiredPassword(Number(accountId), currentPassword, newPassword)
+    setStoredAuth(result.user, rememberMe, result.accessToken)
+    return result.user
+  },
+
   async getCurrentUser(): Promise<User | null> {
     if (apiConfig.useMockApi) {
       return restoreStoredUser()
@@ -245,4 +267,6 @@ export const mockLogin = (credentials: LoginCredentials): Promise<User> => authS
 export const getCurrentUser = (): Promise<User | null> => authService.getCurrentUser()
 export const refreshAuth = (): Promise<User | null> => authService.refresh()
 export const bootstrapAuth = (): Promise<User | null> => authService.bootstrapAuth()
+export const verifyActivationOtp = (accountId: string | number, otp: string): Promise<{ accountId: string; username: string }> => authService.verifyActivationOtp(accountId, otp)
+export const completeRequiredPasswordChange = (accountId: string | number, currentPassword: string, newPassword: string, rememberMe: boolean): Promise<User> => authService.completeRequiredPasswordChange(accountId, currentPassword, newPassword, rememberMe)
 export const logout = (): Promise<void> => authService.logout()
