@@ -632,7 +632,10 @@ Frontend backend-contract alignment notes:
   - Dung `VITE_API_BASE_URL` de goi backend that.
   - Dung `VITE_USE_MOCK_API` de chuyen giua mock va backend trong qua trinh migrate.
   - Chuan hoa parse loi backend thanh message hien thi duoc tren UI.
-- [x] Tao backend DTO types va adapter functions trong frontend
+- [x] Tao backend auth DTO types va adapter functions trong frontend
+  - Dinh nghia type raw theo backend auth DTO cho login, `/me`, refresh va pending login states.
+  - Adapter map backend account/employee auth response sang UI `User` hien tai.
+- [ ] Tao backend DTO types va adapter functions cho cac trang nghiep vu trong frontend
   - Dinh nghia type raw theo backend DTO cho employee, shift type, scheduling rules, schedule period, work shift, assignment.
   - Adapter map raw DTO sang UI model hien tai de component it bi thay doi.
   - Khong de page/component map response raw truc tiep.
