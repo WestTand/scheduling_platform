@@ -59,6 +59,29 @@ public interface PreferenceRepository extends JpaRepository<Preference, Long> {
             select p from Preference p
             join fetch p.employee e
             left join fetch p.shiftType st
+            where (:status is null or p.status = :status)
+            and (:from is null or p.preferenceDate >= :from)
+            and (:to is null or p.preferenceDate <= :to)
+            order by p.preferenceDate asc, p.id desc
+            """)
+    List<Preference> searchForAdmin(
+            @Param("status") String status,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select p from Preference p
+            join fetch p.employee e
+            left join fetch p.shiftType st
+            where p.id = :id
+            """)
+    Optional<Preference> findByIdForAdminReview(@Param("id") Long id);
+
+    @Query("""
+            select p from Preference p
+            join fetch p.employee e
+            left join fetch p.shiftType st
             where p.preferenceDate between :periodStart and :periodEnd
               and p.status in ('PENDING', 'APPROVED')
             order by p.preferenceDate asc, p.id asc
