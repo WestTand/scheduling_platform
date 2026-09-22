@@ -8,6 +8,7 @@ describe('swapRequestAdapter', () => {
     const response: BackendSwapRequestResponse = {
       id: 15,
       requesterAssignmentId: 100,
+      requesterWorkDate: '2026-09-24',
       requesterEmployee: { id: 7, employeeCode: 'EMP007', fullName: 'Nguyen Van A' },
       targetAssignmentId: null,
       targetEmployee: { id: 9, employeeCode: 'EMP009', fullName: 'Tran Van B' },
@@ -26,6 +27,8 @@ describe('swapRequestAdapter', () => {
       targetAssignmentId: undefined,
       employeeName: 'Nguyen Van A',
       partnerName: 'Tran Van B',
+      requestedDate: '2026-09-24',
+      submittedAt: '2026-09-24',
       status: 'PENDING_TARGET',
       reason: 'Can doi ca',
     })

@@ -32,6 +32,7 @@ describe('backendSwapRequestService', () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({
       id: 1,
       requesterAssignmentId: 100,
+      requesterWorkDate: '2026-09-24',
       requesterEmployee: { id: 7, employeeCode: 'EMP007', fullName: 'A' },
       targetAssignmentId: null,
       targetEmployee: { id: 9, employeeCode: 'EMP009', fullName: 'B' },
@@ -55,6 +56,7 @@ describe('backendSwapRequestService', () => {
     fetchMock.mockImplementation(() => Promise.resolve(jsonResponse({
       id: 1,
       requesterAssignmentId: 100,
+      requesterWorkDate: '2026-09-24',
       requesterEmployee: { id: 7, employeeCode: 'EMP007', fullName: 'A' },
       targetAssignmentId: null,
       targetEmployee: { id: 9, employeeCode: 'EMP009', fullName: 'B' },

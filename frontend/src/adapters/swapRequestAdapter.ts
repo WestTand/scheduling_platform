@@ -1,8 +1,6 @@
 import type { BackendCoworkerResponse, BackendEmployeeScheduleItemResponse, BackendSwapRequestResponse } from '@/types/backendSwapRequest'
 import type { CoworkerOption, SwapAssignmentOption, SwapRequest } from '@/types/management'
 
-const fallbackDate = (request: BackendSwapRequestResponse) => request.reviewedAt?.slice(0, 10) ?? new Date().toISOString().slice(0, 10)
-
 export const adaptBackendSwapRequest = (request: BackendSwapRequestResponse): SwapRequest => ({
   id: String(request.id),
   requesterEmployeeId: String(request.requesterEmployee.id),
@@ -14,11 +12,11 @@ export const adaptBackendSwapRequest = (request: BackendSwapRequestResponse): Sw
   currentShiftName: `Assignment #${request.requesterAssignmentId}`,
   requestedShiftName: request.targetAssignmentId == null ? 'Nhờ nhận ca' : `Assignment #${request.targetAssignmentId}`,
   partnerName: request.targetEmployee.fullName,
-  requestedDate: fallbackDate(request),
+  requestedDate: request.requesterWorkDate,
   reason: request.reason ?? '',
   note: request.status === 'PENDING_TARGET' ? 'Chờ nhân viên được đề nghị phản hồi.' : request.status === 'PENDING_APPROVAL' ? 'Chờ quản lý duyệt.' : undefined,
   status: request.status,
-  submittedAt: fallbackDate(request),
+  submittedAt: request.requesterWorkDate,
   reviewedBy: request.reviewedByUsername ?? undefined,
   reviewedAt: request.reviewedAt ?? undefined,
 })

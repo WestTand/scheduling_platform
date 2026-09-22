@@ -12,6 +12,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
+import java.time.LocalDate;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -79,6 +80,7 @@ class EmployeeSwapRequestServiceTest {
         period.setStatus(periodStatus);
         WorkShift workShift = new WorkShift();
         workShift.setSchedulePeriod(period);
+        workShift.setWorkDate(LocalDate.of(2026, 9, 24));
         ShiftAssignment assignment = new ShiftAssignment();
         assignment.setId(id);
         assignment.setEmployee(employee);
@@ -110,6 +112,7 @@ class EmployeeSwapRequestServiceTest {
         assertThat(response.requesterAssignmentId()).isEqualTo(100L);
         assertThat(response.targetAssignmentId()).isNull();
         assertThat(response.requesterEmployee().employeeCode()).isEqualTo("NV7");
+        assertThat(response.requesterWorkDate()).isEqualTo(LocalDate.of(2026, 9, 24));
         assertThat(response.targetEmployee().employeeCode()).isEqualTo("NV9");
         assertThat(response.reason()).isEqualTo("Cover me");
         assertThat(response.status()).isEqualTo("PENDING_TARGET");

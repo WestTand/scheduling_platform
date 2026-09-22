@@ -9,6 +9,7 @@ export interface BackendEmployeeSummary {
 export interface BackendSwapRequestResponse {
   id: number
   requesterAssignmentId: number
+  requesterWorkDate: string
   requesterEmployee: BackendEmployeeSummary
   targetAssignmentId: number | null
   targetEmployee: BackendEmployeeSummary

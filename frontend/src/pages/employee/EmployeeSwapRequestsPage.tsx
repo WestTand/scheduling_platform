@@ -19,6 +19,14 @@ import { backendAuthService } from '@/services/backendAuthService'
 import { swapRequestService } from '@/services/swapRequestService'
 import type { CoworkerOption, PaginatedResult, SwapAssignmentOption, SwapRequest } from '@/types/management'
 
+const statusBadgeLabels: Record<string, string> = {
+  PENDING_TARGET: 'chờ nhân viên phản hồi',
+  PENDING_APPROVAL: 'chờ quản lý duyệt',
+  APPROVED: 'đã duyệt',
+  REJECTED: 'đã từ chối',
+  CANCELLED: 'đã hủy',
+}
+
 export function EmployeeSwapRequestsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [showForm, setShowForm] = useState(() => searchParams.get('action') === 'create')
@@ -114,14 +122,6 @@ export function EmployeeSwapRequestsPage() {
       mounted = false
     }
   }, [statusFilter])
-
-  const statusBadgeLabels: Record<string, string> = {
-    PENDING_TARGET: 'chờ nhân viên phản hồi',
-    PENDING_APPROVAL: 'chờ quản lý duyệt',
-    APPROVED: 'đã duyệt',
-    REJECTED: 'đã từ chối',
-    CANCELLED: 'đã hủy',
-  }
 
   const filteredRequests = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase()
