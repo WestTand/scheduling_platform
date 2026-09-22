@@ -50,6 +50,9 @@ const getBadgeCount = (label: string, role: Role) => {
     return leaveRequestSeed.filter((item) => item.status === 'PENDING').length
   }
   if (label === 'Nguyện vọng') {
+    if (!apiConfig.useMockApi) {
+      return 0
+    }
     return preferenceSeed.filter((item) => item.status === 'PENDING').length
   }
   if (label === 'Yêu cầu đổi ca') {
@@ -59,9 +62,15 @@ const getBadgeCount = (label: string, role: Role) => {
     return swapRequestSeed.filter((item) => item.status === 'PENDING_TARGET' || item.status === 'PENDING_APPROVAL').length
   }
   if (label === 'Thông báo') {
+    if (!apiConfig.useMockApi) {
+      return 0
+    }
     return notificationSeed.filter((item) => !item.isRead).length
   }
   if (role === Role.MANAGER && label === 'Quản lý lịch') {
+    if (!apiConfig.useMockApi) {
+      return 0
+    }
     return scheduleSeed.filter((item) => item.status === 'PENDING_APPROVAL').length
   }
   return 0
