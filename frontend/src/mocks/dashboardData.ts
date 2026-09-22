@@ -46,6 +46,7 @@ export const navItems = {
     { label: 'Tổng quan', href: '/manager/dashboard', icon: 'LayoutDashboard' },
     { label: 'Nhân viên', href: '/manager/employees', icon: 'Users' },
     { label: 'Loại ca trực', href: '/manager/shift-types', icon: 'CalendarRange' },
+    { label: 'Quy định xếp lịch', href: '/manager/scheduling-rules', icon: 'ClipboardList' },
     { label: 'Ngày nghỉ', href: '/manager/leave-requests', icon: 'CalendarX2' },
     { label: 'Nguyện vọng', href: '/manager/preferences', icon: 'ClipboardList' },
     { label: 'Tạo lịch tự động', href: '/manager/schedule-generation', icon: 'Sparkles' },

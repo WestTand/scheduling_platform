@@ -21,6 +21,7 @@ const breadcrumbLabels: Record<string, string> = {
   dashboard: 'Tổng quan',
   employees: 'Nhân viên',
   'shift-types': 'Loại ca trực',
+  'scheduling-rules': 'Quy định xếp lịch',
   'leave-requests': 'Yêu cầu ngày nghỉ',
   leaves: 'Đăng ký ngày nghỉ',
   preferences: 'Nguyện vọng làm việc',
