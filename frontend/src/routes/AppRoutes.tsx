@@ -22,6 +22,7 @@ import { ScheduleDetailPage } from '@/pages/manager/ScheduleDetailPage'
 import { ScheduleEditPage } from '@/pages/manager/ScheduleEditPage'
 import { ScheduleGenerationPage } from '@/pages/manager/ScheduleGenerationPage'
 import { SchedulesPage } from '@/pages/manager/SchedulesPage'
+import { SchedulingRulesPage } from '@/pages/manager/SchedulingRulesPage'
 import { ShiftTypesPage } from '@/pages/manager/ShiftTypesPage'
 import { SwapRequestsPage } from '@/pages/manager/SwapRequestsPage'
 import { WorkPreferencesPage } from '@/pages/manager/WorkPreferencesPage'
@@ -93,6 +94,15 @@ function AppShell() {
           element={
             <ProtectedRoute requiredRole={Role.MANAGER}>
               <ShiftTypesPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/manager/scheduling-rules"
+          element={
+            <ProtectedRoute requiredRole={Role.MANAGER}>
+              <SchedulingRulesPage />
             </ProtectedRoute>
           }
         />
