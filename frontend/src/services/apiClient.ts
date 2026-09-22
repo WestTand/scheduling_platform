@@ -1,5 +1,5 @@
 import { apiConfig } from '@/config/api'
-import { getStoredToken } from '@/services/authStorage'
+import { getStoredToken, updateStoredToken } from '@/services/authStorage'
 
 const DEFAULT_ERROR_MESSAGE = 'Không thể kết nối máy chủ. Vui lòng thử lại.'
 
@@ -18,6 +18,10 @@ export class ApiError extends Error {
 interface RequestOptions extends Omit<RequestInit, 'body'> {
   body?: unknown
   auth?: boolean
+}
+
+interface RefreshResponse {
+  accessToken?: unknown
 }
 
 const buildUrl = (path: string) => {
@@ -66,7 +70,21 @@ const errorCode = (body: unknown) => {
   return undefined
 }
 
-export async function requestJson<T>(path: string, options: RequestOptions = {}): Promise<T> {
+const refreshAccessToken = async () => {
+  const response = await fetch(buildUrl('/api/auth/refresh'), {
+    method: 'POST',
+    credentials: 'include',
+  })
+
+  if (!response.ok) {
+    return null
+  }
+
+  const body = await parseResponseBody(response) as RefreshResponse
+  return typeof body?.accessToken === 'string' && body.accessToken.trim() ? body.accessToken : null
+}
+
+const sendRequest = async (path: string, options: RequestOptions, accessToken: string | null) => {
   const headers = new Headers(options.headers)
   const hasBody = options.body !== undefined
 
@@ -74,21 +92,32 @@ export async function requestJson<T>(path: string, options: RequestOptions = {})
     headers.set('Content-Type', 'application/json')
   }
 
-  if (options.auth !== false) {
-    const token = getStoredToken()
-    if (token) {
-      headers.set('Authorization', `Bearer ${token}`)
-    }
+  if (options.auth !== false && accessToken) {
+    headers.set('Authorization', `Bearer ${accessToken}`)
   }
 
-  const response = await fetch(buildUrl(path), {
+  return fetch(buildUrl(path), {
     ...options,
     headers,
     credentials: options.credentials ?? 'include',
     body: hasBody ? JSON.stringify(options.body) : undefined,
   })
+}
 
-  const body = await parseResponseBody(response)
+export async function requestJson<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  let response = await sendRequest(path, options, options.auth === false ? null : getStoredToken())
+
+  let body = await parseResponseBody(response)
+
+  if (!response.ok && response.status === 401 && options.auth !== false) {
+    const refreshedToken = await refreshAccessToken()
+
+    if (refreshedToken) {
+      updateStoredToken(refreshedToken)
+      response = await sendRequest(path, options, refreshedToken)
+      body = await parseResponseBody(response)
+    }
+  }
 
   if (!response.ok) {
     throw new ApiError(errorMessage(body), response.status, errorCode(body))

@@ -16,6 +16,7 @@ export function StatusBadge({ status, variant }: StatusBadgeProps) {
     APPROVED: 'Đã duyệt',
     REJECTED: 'Đã từ chối',
     REVIEWED: 'Đã xem',
+    CANCELLED: 'Đã hủy',
   }[normalized] ?? status
 
   const badgeVariant = normalized === 'ACTIVE' || normalized === 'APPROVED' ? 'default' : normalized === 'PENDING' || normalized === 'REVIEWED' ? 'secondary' : normalized === 'REJECTED' || normalized === 'INACTIVE' ? 'destructive' : 'outline'
