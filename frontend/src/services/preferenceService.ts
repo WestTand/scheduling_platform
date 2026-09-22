@@ -99,8 +99,7 @@ export const preferenceService = {
     return preference
   },
 
-  async updateStatus(id: string, decision: WorkPreferenceDecision) {
-    if (!apiConfig.useMockApi) {
+  async updateStatus(id: string, decision: WorkPreferenceDecision) {    if (!apiConfig.useMockApi) {
       return decision.status === 'APPROVED' ? backendPreferenceService.approveForManager(id) : backendPreferenceService.rejectForManager(id)
     }
     await delay(300)
@@ -115,6 +114,73 @@ export const preferenceService = {
     preference.adminNote = decision.adminNote
 
     return preference
+  },
+
+  async listMine({ page = 1, pageSize = 50, search = '', month = 'ALL', status = 'ALL' }: { page?: number; pageSize?: number; search?: string; month?: string; status?: string } = {}) {
+    if (!apiConfig.useMockApi) {
+      const response = await backendPreferenceService.listForEmployee({ status })
+      return paginate(filterPreferences(response, search, month, 'ALL', 'ALL'), page, pageSize)
+    }
+    return this.list({ page, pageSize, search, month, status })
+  },
+
+  async createMine(input: { preferenceDate: string; type: PreferenceType; shiftTypeId?: number | null; priority: number; note: string }) {
+    if (!apiConfig.useMockApi) {
+      return backendPreferenceService.createForEmployee({
+        preferenceDate: input.preferenceDate,
+        preferenceType: input.type,
+        shiftTypeId: input.shiftTypeId ?? null,
+        priority: input.priority,
+        note: input.note,
+      })
+    }
+    await delay(300)
+    const created: WorkPreference = {
+      id: `PREF-${Date.now()}`,
+      employeeName: 'Bạn',
+      month: input.preferenceDate.slice(0, 7),
+      type: input.type,
+      note: input.note,
+      priority: input.priority,
+      submittedAt: new Date().toISOString(),
+      status: 'PENDING',
+    }
+    preferences = [created, ...preferences]
+    return created
+  },
+
+  async updateMine(id: string, input: { preferenceDate: string; type: PreferenceType; shiftTypeId?: number | null; priority: number; note: string }) {
+    if (!apiConfig.useMockApi) {
+      return backendPreferenceService.updateForEmployee(id, {
+        preferenceDate: input.preferenceDate,
+        preferenceType: input.type,
+        shiftTypeId: input.shiftTypeId ?? null,
+        priority: input.priority,
+        note: input.note,
+      })
+    }
+    await delay(300)
+    const preference = preferences.find((item) => item.id === id)
+
+    if (!preference) {
+      throw new Error('Nguyện vọng không tồn tại.')
+    }
+
+    preference.month = input.preferenceDate.slice(0, 7)
+    preference.type = input.type
+    preference.note = input.note
+    preference.priority = input.priority
+
+    return preference
+  },
+
+  async cancelMine(id: string) {
+    if (!apiConfig.useMockApi) {
+      await backendPreferenceService.cancelForEmployee(id)
+      return
+    }
+    await delay(200)
+    preferences = preferences.filter((item) => item.id !== id)
   },
 
   reset() {
