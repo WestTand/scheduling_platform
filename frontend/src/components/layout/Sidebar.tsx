@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import {
   AlertCircle,
   Bell,
@@ -17,10 +18,9 @@ import type { LucideIcon } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
-import { apiConfig } from '@/config/api'
-import { leaveRequestSeed, notificationSeed, preferenceSeed, swapRequestSeed } from '@/mocks/managementData'
-import { scheduleSeed } from '@/mocks/schedules'
+import { navigationSummaryService } from '@/services/navigationSummaryService'
 import { Role, type User } from '@/types/auth'
+import type { NavigationSummary } from '@/types/navigationSummary'
 
 const iconMap: Record<string, LucideIcon> = {
   LayoutDashboard,
@@ -42,37 +42,20 @@ interface SidebarItem {
   icon: string
 }
 
-const getBadgeCount = (label: string, role: Role) => {
-  if (label === 'Ngày nghỉ') {
-    if (!apiConfig.useMockApi) {
-      return 0
-    }
-    return leaveRequestSeed.filter((item) => item.status === 'PENDING').length
-  }
-  if (label === 'Nguyện vọng') {
-    if (!apiConfig.useMockApi) {
-      return 0
-    }
-    return preferenceSeed.filter((item) => item.status === 'PENDING').length
-  }
-  if (label === 'Yêu cầu đổi ca') {
-    if (!apiConfig.useMockApi) {
-      return 0
-    }
-    return swapRequestSeed.filter((item) => item.status === 'PENDING_TARGET' || item.status === 'PENDING_APPROVAL').length
-  }
-  if (label === 'Thông báo') {
-    if (!apiConfig.useMockApi) {
-      return 0
-    }
-    return notificationSeed.filter((item) => !item.isRead).length
-  }
-  if (role === Role.MANAGER && label === 'Quản lý lịch') {
-    if (!apiConfig.useMockApi) {
-      return 0
-    }
-    return scheduleSeed.filter((item) => item.status === 'PENDING_APPROVAL').length
-  }
+const emptySummary: NavigationSummary = {
+  pendingLeaveRequests: 0,
+  pendingPreferences: 0,
+  pendingSwapRequests: 0,
+  unreadNotifications: 0,
+  pendingSchedules: 0,
+}
+
+const getBadgeCount = (label: string, role: Role, summary: NavigationSummary) => {
+  if (label === 'Ngày nghỉ') return summary.pendingLeaveRequests
+  if (label === 'Nguyện vọng') return summary.pendingPreferences
+  if (label === 'Yêu cầu đổi ca') return summary.pendingSwapRequests
+  if (label === 'Thông báo') return summary.unreadNotifications
+  if (role === Role.MANAGER && label === 'Quản lý lịch') return summary.pendingSchedules
   return 0
 }
 
@@ -85,6 +68,22 @@ interface SidebarProps {
 }
 
 export function Sidebar({ items, user, isMobileOpen, onMobileToggle, onLogout }: SidebarProps) {
+  const [summary, setSummary] = useState<NavigationSummary>(emptySummary)
+
+  useEffect(() => {
+    let mounted = true
+    navigationSummaryService.get()
+      .then((result) => {
+        if (mounted) setSummary(result)
+      })
+      .catch(() => {
+        if (mounted) setSummary(emptySummary)
+      })
+    return () => {
+      mounted = false
+    }
+  }, [user.role])
+
   const navContent = (
     <aside className="flex h-full flex-col border-r border-slate-200 bg-slate-50/80 backdrop-blur-sm">
       <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
@@ -111,6 +110,7 @@ export function Sidebar({ items, user, isMobileOpen, onMobileToggle, onLogout }:
       <nav className="flex-1 space-y-1 px-3 py-4">
         {items.map((item) => {
           const Icon = iconMap[item.icon] ?? LayoutDashboard
+          const badgeCount = getBadgeCount(item.label, user.role, summary)
 
           return (
             <NavLink
@@ -127,7 +127,7 @@ export function Sidebar({ items, user, isMobileOpen, onMobileToggle, onLogout }:
             >
               <Icon className="h-4 w-4" />
               <span className="min-w-0 flex-1 truncate">{item.label}</span>
-              {getBadgeCount(item.label, user.role) > 0 && <span className="min-w-5 rounded-full bg-amber-100 px-1.5 py-0.5 text-center text-[11px] font-semibold text-amber-700">{getBadgeCount(item.label, user.role)}</span>}
+              {badgeCount > 0 && <span className="min-w-5 rounded-full bg-amber-100 px-1.5 py-0.5 text-center text-[11px] font-semibold text-amber-700">{badgeCount}</span>}
             </NavLink>
           )
         })}
