@@ -4,17 +4,17 @@ import { useSearchParams } from 'react-router-dom'
 
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { DataTable } from '@/components/common/DataTable'
+import { EmptyState } from '@/components/common/EmptyState'
+import { ErrorState } from '@/components/common/ErrorState'
+import { LoadingState } from '@/components/common/LoadingState'
 import { PageHeader } from '@/components/common/PageHeader'
 import { SearchInput } from '@/components/common/SearchInput'
 import { StatusBadge } from '@/components/common/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { getShiftDefinition, shiftDefinitions } from '@/configs/shiftDefinitions'
-
-const seedPreferences = [
-  { id: 'PREF-001', month: '2026-09', type: 'PREFERRED', relatedShiftCode: 'THONG_TAM', priority: 1, note: 'Ưu tiên làm ca thông tầm trong tuần đầu', status: 'PENDING' },
-  { id: 'PREF-002', month: '2026-10', type: 'AVOID_SHIFT', relatedShiftCode: 'TRUC_DEM', priority: 2, note: 'Không muốn làm trực đêm nếu có thể', status: 'APPROVED' },
-]
+import { preferenceService } from '@/services/preferenceService'
+import type { PreferenceType, WorkPreference } from '@/types/management'
 
 const preferenceLabels: Record<string, string> = {
   PREFERRED: 'Muốn làm',
@@ -23,15 +23,46 @@ const preferenceLabels: Record<string, string> = {
   AVOID_SHIFT: 'Tránh ca',
 }
 
+// NOTE: frontend shiftDefinitions carry no numeric id, and the only backend
+// shift-type list (GET /api/admin/shift-types) requires MANAGER/ADMIN, so it is
+// not usable from this EMPLOYEE page (would 403). Resolve therefore stays null
+// and relatedShiftCode is kept locally for display; backend creates send
+// shiftTypeId only (null) without silent loss of the local code.
+const resolveShiftTypeId = (code: string): number | null => {
+  const found = shiftDefinitions.find((shift) => shift.code === code) as unknown as { id?: unknown } | undefined
+  if (!found || found.id === undefined || found.id === null || found.id === '') {
+    return null
+  }
+  const numeric = Number(found.id)
+  return Number.isNaN(numeric) ? null : numeric
+}
+
 export function EmployeePreferencesPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [showForm, setShowForm] = useState(() => searchParams.get('action') === 'create')
-  const [selected, setSelected] = useState<(typeof seedPreferences)[number] | null>(null)
+  const [selected, setSelected] = useState<WorkPreference | null>(null)
   const [search, setSearch] = useState('')
   const [monthFilter, setMonthFilter] = useState('ALL')
   const [statusFilter, setStatusFilter] = useState(() => searchParams.get('status') ?? 'ALL')
-  const [preferences, setPreferences] = useState(seedPreferences)
+  const [preferences, setPreferences] = useState<WorkPreference[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [editing, setEditing] = useState<WorkPreference | null>(null)
   const [form, setForm] = useState({ month: '2026-10', type: 'PREFERRED', relatedShiftCode: 'THONG_TAM', priority: '1', note: '', })
+
+  const loadData = async () => {
+    setLoading(true)
+    setError('')
+
+    try {
+      const result = await preferenceService.listMine({ page: 1, pageSize: 50, status: statusFilter })
+      setPreferences(result.data)
+    } catch (loadErr) {
+      setError(loadErr instanceof Error ? loadErr.message : 'Không thể tải nguyện vọng.')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
     if (searchParams.get('action') !== 'create') {
@@ -43,42 +74,107 @@ export function EmployeePreferencesPage() {
     setSearchParams(nextSearchParams, { replace: true })
   }, [searchParams, setSearchParams])
 
+  useEffect(() => {
+    let mounted = true
+
+    const fetchPreferences = async () => {
+      setLoading(true)
+      setError('')
+
+      try {
+        const result = await preferenceService.listMine({ page: 1, pageSize: 50, status: statusFilter })
+        if (mounted) {
+          setPreferences(result.data)
+        }
+      } catch (loadErr) {
+        if (mounted) {
+          setError(loadErr instanceof Error ? loadErr.message : 'Không thể tải nguyện vọng.')
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false)
+        }
+      }
+    }
+
+    void fetchPreferences()
+
+    return () => {
+      mounted = false
+    }
+  }, [statusFilter])
+
   const filtered = useMemo(() => preferences.filter((item) => {
-    const matchesSearch = !search || item.note.toLowerCase().includes(search.toLowerCase()) || item.relatedShiftCode.toLowerCase().includes(search.toLowerCase())
+    const normalizedSearch = search.trim().toLowerCase()
+    const matchesSearch =
+      !normalizedSearch ||
+      [item.note ?? '', item.relatedShiftCode ?? '', item.targetLabel ?? '', item.employeeName ?? ''].some((value) =>
+        value.toLowerCase().includes(normalizedSearch),
+      )
     const matchesMonth = monthFilter === 'ALL' || item.month === monthFilter
     const matchesStatus = statusFilter === 'ALL' || item.status === statusFilter
     return matchesSearch && matchesMonth && matchesStatus
   }), [preferences, search, monthFilter, statusFilter])
 
-  const handleSubmit = () => {
+  const handleEdit = (item: WorkPreference) => {
+    setEditing(item)
+    setForm({
+      month: item.month,
+      type: item.type,
+      relatedShiftCode: item.relatedShiftCode ?? 'THONG_TAM',
+      priority: String(item.priority),
+      note: item.note ?? '',
+    })
+    setShowForm(true)
+  }
+
+  const handleSubmit = async () => {
     if (!form.note.trim()) {
       window.alert('Nội dung ghi chú không được bỏ trống.')
       return
     }
 
-    setPreferences((current) => [{
-      id: `PREF-${Date.now()}`,
-      month: form.month,
-      type: form.type,
-      relatedShiftCode: form.relatedShiftCode,
-      priority: Number(form.priority),
-      note: form.note,
-      status: 'PENDING',
-    }, ...current])
+    const preferenceDate = form.month.length === 7 ? `${form.month}-01` : form.month
 
-    setShowForm(false)
-    setForm({ month: '2026-10', type: 'PREFERRED', relatedShiftCode: 'THONG_TAM', priority: '1', note: '' })
-    window.alert('Nguyện vọng đã được gửi và đang chờ xem xét.')
+    try {
+      const input = {
+        preferenceDate,
+        type: form.type as PreferenceType,
+        shiftTypeId: resolveShiftTypeId(form.relatedShiftCode),
+        // Kept for mock-mode display (relatedShiftCode/targetLabel); backend branch forwards it as shiftCode.
+        relatedShiftCode: form.relatedShiftCode,
+        priority: Number(form.priority),
+        note: form.note.trim(),
+      }
+
+      if (editing) {
+        await preferenceService.updateMine(editing.id, input)
+      } else {
+        await preferenceService.createMine(input)
+      }
+
+      setShowForm(false)
+      setEditing(null)
+      setForm({ month: '2026-10', type: 'PREFERRED', relatedShiftCode: 'THONG_TAM', priority: '1', note: '' })
+      await loadData()
+      window.alert('Nguyện vọng đã được gửi và đang chờ xem xét.')
+    } catch (submitError) {
+      window.alert(submitError instanceof Error ? submitError.message : 'Không thể gửi nguyện vọng.')
+    }
   }
 
-  const handleDelete = (id: string) => {
-    setPreferences((current) => current.filter((item) => item.id !== id))
-    window.alert('Nguyện vọng đã được hủy trong mock state.')
+  const handleDelete = async (id: string) => {
+    try {
+      await preferenceService.cancelMine(id)
+      await loadData()
+    } catch (deleteError) {
+      window.alert(deleteError instanceof Error ? deleteError.message : 'Không thể hủy nguyện vọng.')
+    }
   }
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Đăng ký nguyện vọng" description="Gửi và quản lý nguyện vọng làm việc theo tháng." action={<Button onClick={() => setShowForm(true)}><CalendarRange className="mr-2 h-4 w-4" />Đăng ký nguyện vọng</Button>} />
+      <PageHeader title="Đăng ký nguyện vọng" description="Gửi và quản lý nguyện vọng làm việc theo tháng." action={<Button onClick={() => { setEditing(null); setShowForm(true) }}><CalendarRange className="mr-2 h-4 w-4" />Đăng ký nguyện vọng</Button>} />
 
       <Card className="border-slate-200 bg-white shadow-sm">
         <CardContent className="space-y-4 p-4">
@@ -97,23 +193,37 @@ export function EmployeePreferencesPage() {
             </select>
           </div>
 
-          <DataTable
-            data={filtered}
-            columns={[
-              { key: 'month', label: 'Tháng', render: (item: (typeof seedPreferences)[number]) => <span>{item.month}</span> },
-              { key: 'type', label: 'Loại nguyện vọng', render: (item: (typeof seedPreferences)[number]) => <span>{preferenceLabels[item.type]}</span> },
-              { key: 'relatedShiftCode', label: 'Ca liên quan', render: (item: (typeof seedPreferences)[number]) => <span>{getShiftDefinition(item.relatedShiftCode)?.name} ({item.relatedShiftCode})</span> },
-              { key: 'priority', label: 'Mức ưu tiên' },
-              { key: 'status', label: 'Trạng thái', render: (item: (typeof seedPreferences)[number]) => <StatusBadge status={item.status} /> },
-              { key: 'actions', label: 'Thao tác', render: (item: (typeof seedPreferences)[number]) => (
-                <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="icon" onClick={() => setSelected(item)}><Eye className="h-4 w-4" /></Button>
-                  {item.status === 'PENDING' && <Button variant="ghost" size="icon" onClick={() => setShowForm(true)}><PencilLine className="h-4 w-4" /></Button>}
-                  {item.status === 'PENDING' && <Button variant="ghost" size="icon" onClick={() => handleDelete(item.id)}><Trash2 className="h-4 w-4" /></Button>}
-                </div>
-              ) },
-            ]}
-          />
+          {loading ? (
+            <LoadingState label="Đang tải nguyện vọng..." />
+          ) : error ? (
+            <ErrorState message={error} onRetry={loadData} />
+          ) : filtered.length === 0 ? (
+            <EmptyState title="Không có nguyện vọng" description="Bạn chưa có nguyện vọng nào phù hợp với bộ lọc." />
+          ) : (
+            <DataTable
+              data={filtered}
+              columns={[
+                { key: 'month', label: 'Tháng', render: (item: WorkPreference) => <span>{item.month}</span> },
+                { key: 'type', label: 'Loại nguyện vọng', render: (item: WorkPreference) => <span>{preferenceLabels[item.type] ?? item.type}</span> },
+                { key: 'relatedShiftCode', label: 'Ca liên quan', render: (item: WorkPreference) => {
+                  const definition = item.relatedShiftCode ? getShiftDefinition(item.relatedShiftCode) : undefined
+                  if (definition) {
+                    return <span>{definition.name} ({item.relatedShiftCode})</span>
+                  }
+                  return <span>{item.targetLabel ?? '—'}</span>
+                } },
+                { key: 'priority', label: 'Mức ưu tiên' },
+                { key: 'status', label: 'Trạng thái', render: (item: WorkPreference) => <StatusBadge status={item.status} /> },
+                { key: 'actions', label: 'Thao tác', render: (item: WorkPreference) => (
+                  <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="icon" onClick={() => setSelected(item)}><Eye className="h-4 w-4" /></Button>
+                    {item.status === 'PENDING' && <Button variant="ghost" size="icon" onClick={() => handleEdit(item)}><PencilLine className="h-4 w-4" /></Button>}
+                    {item.status === 'PENDING' && <Button variant="ghost" size="icon" onClick={() => handleDelete(item.id)}><Trash2 className="h-4 w-4" /></Button>}
+                  </div>
+                ) },
+              ]}
+            />
+          )}
         </CardContent>
       </Card>
 
@@ -121,7 +231,7 @@ export function EmployeePreferencesPage() {
         open={showForm}
         title="Đăng ký nguyện vọng"
         description="Nguyện vọng sẽ được hệ thống xem xét khi tạo lịch nhưng không bảo đảm được đáp ứng hoàn toàn."
-        onCancel={() => setShowForm(false)}
+        onCancel={() => { setShowForm(false); setEditing(null) }}
         onConfirm={handleSubmit}
         confirmLabel="Gửi nguyện vọng"
       >
@@ -167,8 +277,8 @@ export function EmployeePreferencesPage() {
         {selected && (
           <div className="mt-4 space-y-3 text-sm text-slate-600">
             <div className="flex justify-between"><span>Tháng</span><strong>{selected.month}</strong></div>
-            <div className="flex justify-between"><span>Loại</span><strong>{preferenceLabels[selected.type]}</strong></div>
-            <div className="flex justify-between"><span>Ca liên quan</span><strong>{getShiftDefinition(selected.relatedShiftCode)?.name} ({selected.relatedShiftCode})</strong></div>
+            <div className="flex justify-between"><span>Loại</span><strong>{preferenceLabels[selected.type] ?? selected.type}</strong></div>
+            <div className="flex justify-between"><span>Ca liên quan</span><strong>{selected.relatedShiftCode ? `${getShiftDefinition(selected.relatedShiftCode)?.name ?? selected.relatedShiftCode} (${selected.relatedShiftCode})` : (selected.targetLabel ?? '—')}</strong></div>
             <div className="flex justify-between"><span>Mức ưu tiên</span><strong>{selected.priority}</strong></div>
             <div className="flex justify-between"><span>Trạng thái</span><StatusBadge status={selected.status} /></div>
             <div className="flex justify-between"><span>Ghi chú</span><strong>{selected.note}</strong></div>

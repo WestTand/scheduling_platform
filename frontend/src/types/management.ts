@@ -65,6 +65,7 @@ export const PreferenceStatus = {
   REVIEWED: 'REVIEWED',
   APPROVED: 'APPROVED',
   REJECTED: 'REJECTED',
+  CANCELLED: 'CANCELLED',
 } as const
 
 export type PreferenceStatus = (typeof PreferenceStatus)[keyof typeof PreferenceStatus]

@@ -11,3 +11,10 @@ export const updateStoredToken = (accessToken: string) => {
   const storage = sessionStorage.getItem(AUTH_STORAGE_KEYS.TOKEN) ? sessionStorage : localStorage
   storage.setItem(AUTH_STORAGE_KEYS.TOKEN, accessToken)
 }
+
+export const clearStoredAuth = () => {
+  localStorage.removeItem(AUTH_STORAGE_KEYS.TOKEN)
+  localStorage.removeItem(AUTH_STORAGE_KEYS.USER)
+  sessionStorage.removeItem(AUTH_STORAGE_KEYS.TOKEN)
+  sessionStorage.removeItem(AUTH_STORAGE_KEYS.USER)
+}

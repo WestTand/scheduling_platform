@@ -1,5 +1,5 @@
 import { apiConfig } from '@/config/api'
-import { getStoredToken, updateStoredToken } from '@/services/authStorage'
+import { clearStoredAuth, getStoredToken, updateStoredToken } from '@/services/authStorage'
 
 const DEFAULT_ERROR_MESSAGE = 'Không thể kết nối máy chủ. Vui lòng thử lại.'
 
@@ -116,6 +116,8 @@ export async function requestJson<T>(path: string, options: RequestOptions = {})
       updateStoredToken(refreshedToken)
       response = await sendRequest(path, options, refreshedToken)
       body = await parseResponseBody(response)
+    } else {
+      clearStoredAuth()
     }
   }
 

@@ -56,7 +56,7 @@ public class EmployeePreferenceService {
     public EmployeePreferenceResponse createPreference(CurrentAccountPrincipal principal, CreatePreferenceRequest request) {
         Employee employee = employeeAccess.requireActiveEmployeeForUpdate(principal);
         String preferenceType = normalizePreferenceType(request.preferenceType());
-        ShiftType shiftType = resolveShiftType(request.shiftTypeId());
+        ShiftType shiftType = resolveShiftType(request.shiftTypeId(), request.shiftCode());
         Long shiftTypeId = shiftType == null ? null : shiftType.getId();
         if (preferenceRepository.existsActiveDuplicate(employee.getId(), request.preferenceDate(), shiftTypeId, preferenceType, null)) {
             throw invalidRequest();
@@ -82,7 +82,7 @@ public class EmployeePreferenceService {
             throw invalidRequest();
         }
         String preferenceType = normalizePreferenceType(request.preferenceType());
-        ShiftType shiftType = resolveShiftType(request.shiftTypeId());
+        ShiftType shiftType = resolveShiftType(request.shiftTypeId(), request.shiftCode());
         Long shiftTypeId = shiftType == null ? null : shiftType.getId();
         if (preferenceRepository.existsActiveDuplicate(employee.getId(), request.preferenceDate(), shiftTypeId, preferenceType, preferenceId)) {
             throw invalidRequest();
@@ -107,11 +107,19 @@ public class EmployeePreferenceService {
         preferenceRepository.save(preference);
     }
 
-    private ShiftType resolveShiftType(Long shiftTypeId) {
-        if (shiftTypeId == null) {
+    private ShiftType resolveShiftType(Long shiftTypeId, String shiftCode) {
+        if (shiftTypeId != null) {
+            ShiftType shiftType = shiftTypeRepository.findById(shiftTypeId)
+                    .orElseThrow(EmployeePreferenceService::invalidRequest);
+            if (!ACTIVE.equals(shiftType.getStatus())) {
+                throw invalidRequest();
+            }
+            return shiftType;
+        }
+        if (!StringUtils.hasText(shiftCode)) {
             return null;
         }
-        ShiftType shiftType = shiftTypeRepository.findById(shiftTypeId)
+        ShiftType shiftType = shiftTypeRepository.findByShiftCode(shiftCode.trim())
                 .orElseThrow(EmployeePreferenceService::invalidRequest);
         if (!ACTIVE.equals(shiftType.getStatus())) {
             throw invalidRequest();

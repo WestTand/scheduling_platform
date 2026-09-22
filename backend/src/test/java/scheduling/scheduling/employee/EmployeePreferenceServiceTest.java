@@ -104,6 +104,8 @@ class EmployeePreferenceServiceTest {
         assertThat(response.preferenceType()).isEqualTo(preferenceType);
         assertThat(response.shiftTypeId()).isEqualTo(10L);
         assertThat(response.shiftName()).isEqualTo("Morning");
+        assertThat(response.shiftCode()).isEqualTo("THONG_TAM");
+        assertThat(response.employeeName()).isEqualTo("Employee One");
         assertThat(response.status()).isEqualTo("PENDING");
         verify(accountRepository).findByIdForUpdate(2L);
     }
@@ -112,7 +114,7 @@ class EmployeePreferenceServiceTest {
     void createPreferenceSupportsNullShiftTypeAndBlankNote() {
         CurrentAccountPrincipal principal = employeePrincipal();
         Employee employee = employee(7L, "ACTIVE");
-        CreatePreferenceRequest request = new CreatePreferenceRequest(LocalDate.of(2026, 9, 14), "WANT", null, 1, "   ");
+        CreatePreferenceRequest request = new CreatePreferenceRequest(LocalDate.of(2026, 9, 14), "WANT", null, null, 1, "   ");
         when(accountRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(account(principal, employee)));
         when(preferenceRepository.existsActiveDuplicate(7L, request.preferenceDate(), null, "WANT", null)).thenReturn(false);
         when(preferenceRepository.save(any(Preference.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -120,6 +122,7 @@ class EmployeePreferenceServiceTest {
         EmployeePreferenceResponse response = service.createPreference(principal, request);
 
         assertThat(response.shiftTypeId()).isNull();
+        assertThat(response.shiftCode()).isNull();
         assertThat(response.note()).isNull();
     }
 
@@ -162,6 +165,65 @@ class EmployeePreferenceServiceTest {
     }
 
     @Test
+    void createPreferenceResolvesShiftCode() {
+        CurrentAccountPrincipal principal = employeePrincipal();
+        Employee employee = employee(7L, "ACTIVE");
+        ShiftType shiftType = shiftType(10L, "ACTIVE");
+        CreatePreferenceRequest request = new CreatePreferenceRequest(
+                LocalDate.of(2026, 9, 14), "WANT", null, "THONG_TAM", 1, "note");
+        when(accountRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(account(principal, employee)));
+        when(shiftTypeRepository.findByShiftCode("THONG_TAM")).thenReturn(Optional.of(shiftType));
+        when(preferenceRepository.existsActiveDuplicate(7L, request.preferenceDate(), 10L, "WANT", null)).thenReturn(false);
+        when(preferenceRepository.save(any(Preference.class))).thenAnswer(invocation -> {
+            Preference saved = invocation.getArgument(0);
+            saved.setId(20L);
+            return saved;
+        });
+
+        EmployeePreferenceResponse response = service.createPreference(principal, request);
+
+        assertThat(response.shiftTypeId()).isEqualTo(10L);
+        assertThat(response.shiftCode()).isEqualTo("THONG_TAM");
+        org.mockito.ArgumentCaptor<Preference> preferenceCaptor = org.mockito.ArgumentCaptor.forClass(Preference.class);
+        verify(preferenceRepository).save(preferenceCaptor.capture());
+        assertThat(preferenceCaptor.getValue().getShiftType()).isEqualTo(shiftType);
+    }
+
+    @Test
+    void createPreferenceRejectsUnknownShiftCode() {
+        CurrentAccountPrincipal principal = employeePrincipal();
+        Employee employee = employee(7L, "ACTIVE");
+        CreatePreferenceRequest request = new CreatePreferenceRequest(
+                LocalDate.of(2026, 9, 14), "WANT", null, "UNKNOWN_CODE", 1, "note");
+        when(accountRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(account(principal, employee)));
+        when(shiftTypeRepository.findByShiftCode("UNKNOWN_CODE")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.createPreference(principal, request))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(preferenceRepository, never()).save(any());
+    }
+
+    @Test
+    void createPreferenceRejectsInactiveShiftCode() {
+        CurrentAccountPrincipal principal = employeePrincipal();
+        Employee employee = employee(7L, "ACTIVE");
+        CreatePreferenceRequest request = new CreatePreferenceRequest(
+                LocalDate.of(2026, 9, 14), "WANT", null, "THONG_TAM", 1, "note");
+        when(accountRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(account(principal, employee)));
+        when(shiftTypeRepository.findByShiftCode("THONG_TAM")).thenReturn(Optional.of(shiftType(10L, "INACTIVE")));
+
+        assertThatThrownBy(() -> service.createPreference(principal, request))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(preferenceRepository, never()).save(any());
+    }
+
+    @Test
     void createPreferenceRejectsDuplicateActivePreference() {
         CurrentAccountPrincipal principal = employeePrincipal();
         Employee employee = employee(7L, "ACTIVE");
@@ -182,7 +244,7 @@ class EmployeePreferenceServiceTest {
         CurrentAccountPrincipal principal = employeePrincipal();
         Employee employee = employee(7L, "ACTIVE");
         Preference preference = preference(20L, employee, null, "WANT", "PENDING");
-        UpdatePreferenceRequest request = new UpdatePreferenceRequest(LocalDate.of(2026, 9, 16), "AVOID", null, 2, "Avoid that day");
+        UpdatePreferenceRequest request = new UpdatePreferenceRequest(LocalDate.of(2026, 9, 16), "AVOID", null, null, 2, "Avoid that day");
         when(accountRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(account(principal, employee)));
         when(preferenceRepository.findByIdAndEmployeeIdForUpdate(20L, 7L)).thenReturn(Optional.of(preference));
         when(preferenceRepository.existsActiveDuplicate(7L, request.preferenceDate(), null, "AVOID", 20L)).thenReturn(false);
@@ -201,7 +263,7 @@ class EmployeePreferenceServiceTest {
         CurrentAccountPrincipal principal = employeePrincipal();
         Employee employee = employee(7L, "ACTIVE");
         Preference preference = preference(20L, employee, null, "WANT", "PENDING");
-        UpdatePreferenceRequest request = new UpdatePreferenceRequest(LocalDate.of(2026, 9, 16), "AVOID", null, 2, "Avoid that day");
+        UpdatePreferenceRequest request = new UpdatePreferenceRequest(LocalDate.of(2026, 9, 16), "AVOID", null, null, 2, "Avoid that day");
         when(accountRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(account(principal, employee)));
         when(preferenceRepository.findByIdAndEmployeeIdForUpdate(20L, 7L)).thenReturn(Optional.of(preference));
         when(preferenceRepository.existsActiveDuplicate(7L, request.preferenceDate(), null, "AVOID", 20L)).thenReturn(true);
@@ -258,11 +320,11 @@ class EmployeePreferenceServiceTest {
     }
 
     private static CreatePreferenceRequest createRequest(String preferenceType, Long shiftTypeId) {
-        return new CreatePreferenceRequest(LocalDate.of(2026, 9, 14), preferenceType, shiftTypeId, 1, "note");
+        return new CreatePreferenceRequest(LocalDate.of(2026, 9, 14), preferenceType, shiftTypeId, null, 1, "note");
     }
 
     private static UpdatePreferenceRequest updateRequest() {
-        return new UpdatePreferenceRequest(LocalDate.of(2026, 9, 16), "AVOID", null, 2, "Avoid that day");
+        return new UpdatePreferenceRequest(LocalDate.of(2026, 9, 16), "AVOID", null, null, 2, "Avoid that day");
     }
 
     private static CurrentAccountPrincipal employeePrincipal() {
@@ -291,6 +353,7 @@ class EmployeePreferenceServiceTest {
     private static ShiftType shiftType(Long id, String status) {
         ShiftType shiftType = ShiftType.builder()
                 .shiftName("Morning")
+                .shiftCode("THONG_TAM")
                 .startTime(LocalTime.of(8, 0))
                 .endTime(LocalTime.of(12, 0))
                 .durationHours(BigDecimal.valueOf(4.0))
