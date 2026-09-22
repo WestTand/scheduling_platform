@@ -72,4 +72,14 @@ public interface SwapRequestRepository extends JpaRepository<SwapRequest, Long> 
             order by sr.id desc
             """)
     List<SwapRequest> findAllDetail(@Param("status") String status);
+
+    long countByStatus(String status);
+
+    @Query("""
+            select count(s)
+            from SwapRequest s
+            where (s.requesterAssignment.employee.id = :employeeId or s.targetEmployee.id = :employeeId)
+              and s.status in ('PENDING_TARGET', 'PENDING_APPROVAL')
+            """)
+    long countPendingForEmployee(@Param("employeeId") Long employeeId);
 }

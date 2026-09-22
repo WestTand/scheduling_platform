@@ -97,4 +97,8 @@ public interface LeaveRequestRepository extends JpaRepository<LeaveRequest, Long
             """)
     List<LeaveRequest> findApprovedOverlapping(
             @Param("periodStart") LocalDate periodStart, @Param("periodEnd") LocalDate periodEnd);
+
+    long countByStatus(String status);
+
+    long countByEmployeeIdAndStatus(Long employeeId, String status);
 }

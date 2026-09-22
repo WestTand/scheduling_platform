@@ -88,4 +88,8 @@ public interface PreferenceRepository extends JpaRepository<Preference, Long> {
             """)
     List<Preference> findActiveInRange(
             @Param("periodStart") LocalDate periodStart, @Param("periodEnd") LocalDate periodEnd);
+
+    long countByStatus(String status);
+
+    long countByEmployeeIdAndStatus(Long employeeId, String status);
 }
