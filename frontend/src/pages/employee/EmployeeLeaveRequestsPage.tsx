@@ -1,30 +1,47 @@
 import { CalendarPlus, Eye, X } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { DataTable } from '@/components/common/DataTable'
+import { EmptyState } from '@/components/common/EmptyState'
+import { ErrorState } from '@/components/common/ErrorState'
+import { LoadingState } from '@/components/common/LoadingState'
 import { PageHeader } from '@/components/common/PageHeader'
+import { Pagination } from '@/components/common/Pagination'
 import { SearchInput } from '@/components/common/SearchInput'
 import { StatusBadge } from '@/components/common/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-
-const seedRequests = [
-  { id: 'LEAVE-001', startDate: '2026-09-18', endDate: '2026-09-18', type: 'Nghỉ phép', status: 'PENDING', reason: 'Đi khám sức khỏe định kỳ', note: 'Chờ quản lý duyệt' },
-  { id: 'LEAVE-002', startDate: '2026-09-20', endDate: '2026-09-22', type: 'Nghỉ phép', status: 'APPROVED', reason: 'Đi du lịch gia đình', note: 'Đã duyệt theo quy định' },
-  { id: 'LEAVE-003', startDate: '2026-09-25', endDate: '2026-09-25', type: 'Nghỉ không lương', status: 'REJECTED', reason: 'Có việc cá nhân', note: 'Không đủ nhân sự' },
-]
+import { leaveRequestService } from '@/services/leaveRequestService'
+import type { LeaveRequest, PaginatedResult } from '@/types/management'
 
 export function EmployeeLeaveRequestsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [showForm, setShowForm] = useState(() => searchParams.get('action') === 'create')
-  const [selected, setSelected] = useState<(typeof seedRequests)[number] | null>(null)
+  const [selected, setSelected] = useState<LeaveRequest | null>(null)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState(() => searchParams.get('status') ?? 'ALL')
-  const [requests, setRequests] = useState(seedRequests)
   const [form, setForm] = useState({ startDate: '2026-09-27', endDate: '2026-09-28', type: 'Nghỉ phép', reason: '', note: '' })
   const [error, setError] = useState('')
+  const [page, setPage] = useState(1)
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
+  const [data, setData] = useState<PaginatedResult<LeaveRequest>>({ data: [], page: 1, pageSize: 5, total: 0, totalPages: 1 })
+
+  const fetchData = async () => {
+    setLoading(true)
+    setLoadError('')
+
+    try {
+      const result = await leaveRequestService.listMine({ page, pageSize: 5, search, status: statusFilter })
+      setData(result)
+    } catch (loadErr) {
+      setLoadError(loadErr instanceof Error ? loadErr.message : 'Không thể tải yêu cầu nghỉ.')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
     if (searchParams.get('action') !== 'create') {
@@ -36,13 +53,37 @@ export function EmployeeLeaveRequestsPage() {
     setSearchParams(nextSearchParams, { replace: true })
   }, [searchParams, setSearchParams])
 
-  const filtered = useMemo(() => requests.filter((item) => {
-    const matchesSearch = !search || item.reason.toLowerCase().includes(search.toLowerCase())
-    const matchesStatus = statusFilter === 'ALL' || item.status === statusFilter
-    return matchesSearch && matchesStatus
-  }), [requests, search, statusFilter])
+  useEffect(() => {
+    let mounted = true
 
-  const handleSubmit = () => {
+    const loadRequests = async () => {
+      setLoading(true)
+      setLoadError('')
+
+      try {
+        const result = await leaveRequestService.listMine({ page, pageSize: 5, search, status: statusFilter })
+        if (mounted) {
+          setData(result)
+        }
+      } catch (loadErr) {
+        if (mounted) {
+          setLoadError(loadErr instanceof Error ? loadErr.message : 'Không thể tải yêu cầu nghỉ.')
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false)
+        }
+      }
+    }
+
+    void loadRequests()
+
+    return () => {
+      mounted = false
+    }
+  }, [page, search, statusFilter])
+
+  const handleSubmit = async () => {
     if (!form.startDate || !form.endDate || !form.reason.trim()) {
       setError('Ngày bắt đầu/kết thúc và lý do không được bỏ trống.')
       return
@@ -53,25 +94,27 @@ export function EmployeeLeaveRequestsPage() {
       return
     }
 
-    setRequests((current) => [{
-      id: `LEAVE-${Date.now()}`,
-      startDate: form.startDate,
-      endDate: form.endDate,
-      type: form.type,
-      status: 'PENDING',
-      reason: form.reason,
-      note: form.note || 'Yêu cầu đang chờ quản lý duyệt',
-    }, ...current])
+    try {
+      await leaveRequestService.createMine({ startDate: form.startDate, endDate: form.endDate, reason: form.reason, note: form.note, type: form.type })
 
-    setForm({ startDate: '2026-09-27', endDate: '2026-09-28', type: 'Nghỉ phép', reason: '', note: '' })
-    setShowForm(false)
-    setError('')
-    window.alert('Đã tạo yêu cầu nghỉ thành công. Yêu cầu đang chờ quản lý duyệt.')
+      setForm({ startDate: '2026-09-27', endDate: '2026-09-28', type: 'Nghỉ phép', reason: '', note: '' })
+      setShowForm(false)
+      setError('')
+      setPage(1)
+      await fetchData()
+      window.alert('Đã tạo yêu cầu nghỉ thành công. Yêu cầu đang chờ quản lý duyệt.')
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : 'Không thể tạo yêu cầu nghỉ.')
+    }
   }
 
-  const handleCancel = (id: string) => {
-    setRequests((current) => current.map((item) => item.id === id ? { ...item, status: 'REJECTED', note: 'Nhân viên hủy yêu cầu' } : item))
-    window.alert('Yêu cầu đã được hủy trong mock state.')
+  const handleCancel = async (id: string) => {
+    try {
+      await leaveRequestService.cancelMine(id)
+      await fetchData()
+    } catch (cancelError) {
+      window.alert(cancelError instanceof Error ? cancelError.message : 'Không thể hủy yêu cầu.')
+    }
   }
 
   return (
@@ -81,8 +124,8 @@ export function EmployeeLeaveRequestsPage() {
       <Card className="border-slate-200 bg-white shadow-sm">
         <CardContent className="space-y-4 p-4">
           <div className="grid gap-3 md:grid-cols-[1.2fr_0.8fr]">
-            <SearchInput value={search} placeholder="Tìm kiếm theo lý do" onChange={setSearch} />
-            <select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); const params = new URLSearchParams(searchParams); params.set('status', event.target.value); setSearchParams(params) }} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm">
+            <SearchInput value={search} placeholder="Tìm kiếm theo lý do" onChange={(value) => { setSearch(value); setPage(1) }} />
+            <select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1); const params = new URLSearchParams(searchParams); params.set('status', event.target.value); setSearchParams(params) }} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm">
               <option value="ALL">Tất cả trạng thái</option>
               <option value="PENDING">Chờ duyệt</option>
               <option value="APPROVED">Đã duyệt</option>
@@ -90,22 +133,33 @@ export function EmployeeLeaveRequestsPage() {
             </select>
           </div>
 
-          <DataTable
-            data={filtered}
-            columns={[
-              { key: 'id', label: 'Mã yêu cầu' },
-              { key: 'startDate', label: 'Từ ngày', render: (item: (typeof seedRequests)[number]) => <span>{new Date(item.startDate).toLocaleDateString('vi-VN')}</span> },
-              { key: 'endDate', label: 'Đến ngày', render: (item: (typeof seedRequests)[number]) => <span>{new Date(item.endDate).toLocaleDateString('vi-VN')}</span> },
-              { key: 'type', label: 'Loại nghỉ' },
-              { key: 'status', label: 'Trạng thái', render: (item: (typeof seedRequests)[number]) => <StatusBadge status={item.status} /> },
-              { key: 'actions', label: 'Thao tác', render: (item: (typeof seedRequests)[number]) => (
-                <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="icon" onClick={() => setSelected(item)}><Eye className="h-4 w-4" /></Button>
-                  {item.status === 'PENDING' && <Button variant="ghost" size="icon" onClick={() => handleCancel(item.id)}><X className="h-4 w-4" /></Button>}
-                </div>
-              ) },
-            ]}
-          />
+          {loading ? (
+            <LoadingState label="Đang tải yêu cầu nghỉ..." />
+          ) : loadError ? (
+            <ErrorState message={loadError} onRetry={fetchData} />
+          ) : data.data.length === 0 ? (
+            <EmptyState title="Không có yêu cầu nghỉ" description="Bạn chưa có yêu cầu nào phù hợp với bộ lọc." />
+          ) : (
+            <>
+              <DataTable
+                data={data.data}
+                columns={[
+                  { key: 'id', label: 'Mã yêu cầu' },
+                  { key: 'startDate', label: 'Từ ngày', render: (item: LeaveRequest) => <span>{new Date(item.startDate).toLocaleDateString('vi-VN')}</span> },
+                  { key: 'endDate', label: 'Đến ngày', render: (item: LeaveRequest) => <span>{new Date(item.endDate).toLocaleDateString('vi-VN')}</span> },
+                  { key: 'type', label: 'Loại nghỉ', render: (item: LeaveRequest) => <span>{(item as LeaveRequest & { type?: string }).type ?? 'Nghỉ phép'}</span> },
+                  { key: 'status', label: 'Trạng thái', render: (item: LeaveRequest) => <StatusBadge status={item.status} /> },
+                  { key: 'actions', label: 'Thao tác', render: (item: LeaveRequest) => (
+                    <div className="flex items-center gap-2">
+                      <Button variant="ghost" size="icon" onClick={() => setSelected(item)}><Eye className="h-4 w-4" /></Button>
+                      {item.status === 'PENDING' && <Button variant="ghost" size="icon" onClick={() => handleCancel(item.id)}><X className="h-4 w-4" /></Button>}
+                    </div>
+                  ) },
+                ]}
+              />
+              <Pagination page={data.page} totalPages={data.totalPages} onPageChange={setPage} />
+            </>
+          )}
         </CardContent>
       </Card>
 
@@ -161,10 +215,10 @@ export function EmployeeLeaveRequestsPage() {
             <div className="flex justify-between"><span>Mã yêu cầu</span><strong>{selected.id}</strong></div>
             <div className="flex justify-between"><span>Ngày bắt đầu</span><strong>{new Date(selected.startDate).toLocaleDateString('vi-VN')}</strong></div>
             <div className="flex justify-between"><span>Ngày kết thúc</span><strong>{new Date(selected.endDate).toLocaleDateString('vi-VN')}</strong></div>
-            <div className="flex justify-between"><span>Loại nghỉ</span><strong>{selected.type}</strong></div>
+            <div className="flex justify-between"><span>Loại nghỉ</span><strong>{(selected as LeaveRequest & { type?: string }).type ?? 'Nghỉ phép'}</strong></div>
             <div className="flex justify-between"><span>Lý do</span><strong>{selected.reason}</strong></div>
             <div className="flex justify-between"><span>Trạng thái</span><StatusBadge status={selected.status} /></div>
-            <div className="flex justify-between"><span>Ghi chú</span><strong>{selected.note}</strong></div>
+            <div className="flex justify-between"><span>Ghi chú</span><strong>{selected.managerNote ?? '—'}</strong></div>
           </div>
         )}
       </ConfirmDialog>
