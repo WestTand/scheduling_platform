@@ -40,6 +40,19 @@ class ActivityLogServiceTest {
     }
 
     @Test
+    void recordsActivityLogSnapshotWithLocalDate() {
+        Account manager = account(1L, AccountRole.MANAGER);
+
+        service.record(manager, "APPROVE", "leave_requests", 10L, null, Map.of(
+                "startDate", LocalDate.of(2026, 9, 22),
+                "endDate", LocalDate.of(2026, 9, 23)));
+
+        verify(activityLogRepository).save(org.mockito.ArgumentMatchers.argThat(log ->
+                log.getNewValueJson().contains("2026-09-22")
+                        && log.getNewValueJson().contains("2026-09-23")));
+    }
+
+    @Test
     void managerListsActivityLogsWithFilters() {
         Account manager = account(1L, AccountRole.MANAGER);
         ActivityLog log = ActivityLog.builder()

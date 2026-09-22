@@ -6,3 +6,8 @@ export const AUTH_STORAGE_KEYS = {
 export const getStoredToken = () => {
   return sessionStorage.getItem(AUTH_STORAGE_KEYS.TOKEN) ?? localStorage.getItem(AUTH_STORAGE_KEYS.TOKEN)
 }
+
+export const updateStoredToken = (accessToken: string) => {
+  const storage = sessionStorage.getItem(AUTH_STORAGE_KEYS.TOKEN) ? sessionStorage : localStorage
+  storage.setItem(AUTH_STORAGE_KEYS.TOKEN, accessToken)
+}

@@ -2,6 +2,7 @@ package scheduling.scheduling.audit;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -27,7 +28,9 @@ public class ActivityLogService {
     public ActivityLogService(ActivityLogRepository activityLogRepository, AccountRepository accountRepository, ObjectMapper objectMapper) {
         this.activityLogRepository = activityLogRepository;
         this.accountRepository = accountRepository;
-        this.objectMapper = objectMapper;
+        this.objectMapper = objectMapper.copy()
+                .findAndRegisterModules()
+                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     }
 
     @Transactional
