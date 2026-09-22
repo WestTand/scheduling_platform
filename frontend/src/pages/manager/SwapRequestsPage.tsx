@@ -20,7 +20,8 @@ import type { PaginatedResult, SwapRequest, SwapRequestStatus } from '@/types/ma
 
 const statusOptions = [
   { value: 'ALL', label: 'Tất cả' },
-  { value: 'PENDING', label: 'Chờ xử lý' },
+  { value: 'PENDING_TARGET', label: 'Chờ nhân viên phản hồi' },
+  { value: 'PENDING_APPROVAL', label: 'Chờ quản lý duyệt' },
   { value: 'APPROVED', label: 'Đã duyệt' },
   { value: 'REJECTED', label: 'Đã từ chối' },
   { value: 'CANCELLED', label: 'Đã hủy' },
@@ -167,7 +168,7 @@ export function SwapRequestsPage() {
       <ConfirmDialog
         open={Boolean(decisionDialog)}
         title={decisionDialog?.type === 'APPROVED' ? 'Duyệt yêu cầu đổi ca' : 'Từ chối yêu cầu đổi ca'}
-        description={decisionDialog?.type === 'APPROVED' ? 'Bạn xác nhận duyệt và cập nhật trạng thái bằng mock state.' : 'Vui lòng nhập lý do từ chối trước khi xác nhận.'}
+        description={decisionDialog?.type === 'APPROVED' ? 'Bạn xác nhận duyệt yêu cầu đổi ca này.' : 'Bạn xác nhận từ chối yêu cầu đổi ca này.'}
         onCancel={() => setDecisionDialog(null)}
         onConfirm={handleDecision}
       >
@@ -188,8 +189,8 @@ export function SwapRequestsPage() {
           <div className="mt-4 space-y-3 text-sm text-slate-600">
             <div className="flex justify-between"><span>Mã yêu cầu</span><strong>{selected.id}</strong></div>
             <div className="flex justify-between"><span>Nhân viên</span><strong>{selected.employeeName}</strong></div>
-            <div className="flex justify-between"><span>Ca hiện tại</span><strong>{selected.currentShiftCode ? getShiftDefinition(selected.currentShiftCode)?.name : selected.currentShiftName}</strong></div>
-            <div className="flex justify-between"><span>Ca muốn đổi</span><strong>{selected.requestedShiftCode ? getShiftDefinition(selected.requestedShiftCode)?.name : selected.requestedShiftName}</strong></div>
+            <div className="flex justify-between"><span>Ca hiện tại</span><strong>{selected.currentShiftCode ? getShiftDefinition(selected.currentShiftCode)?.name ?? selected.currentShiftName ?? 'Assignment chưa rõ' : selected.currentShiftName ?? 'Assignment chưa rõ'}</strong></div>
+            <div className="flex justify-between"><span>Ca muốn đổi</span><strong>{selected.requestedShiftCode ? getShiftDefinition(selected.requestedShiftCode)?.name ?? selected.requestedShiftName ?? 'Nhờ nhận ca' : selected.requestedShiftName ?? 'Nhờ nhận ca'}</strong></div>
             <div className="flex justify-between"><span>Ngày gửi</span><strong>{new Date(selected.requestedDate).toLocaleDateString('vi-VN')}</strong></div>
             <div className="flex justify-between"><span>Nhân viên đổi cùng</span><strong>{selected.partnerName ?? 'Không có'}</strong></div>
             <div className="flex justify-between"><span>Lý do</span><strong>{selected.reason}</strong></div>
