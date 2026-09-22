@@ -10,10 +10,14 @@ vi.mock('@/services/apiClient', () => ({
 
 const mockResponse: BackendPreferenceResponse = {
   id: 12,
+  employeeId: 100,
+  employeeCode: 'NV001',
+  employeeName: 'Nhan vien 1',
   preferenceDate: '2026-09-14',
   preferenceType: 'WANT',
   shiftTypeId: 10,
   shiftName: 'Ca sang',
+  shiftCode: 'THONG_TAM',
   priority: 1,
   note: 'note',
   status: 'PENDING',
@@ -27,9 +31,10 @@ describe('backendPreferenceService', () => {
   test('lists manager preferences with status query', async () => {
     vi.mocked(requestJson).mockResolvedValueOnce([mockResponse])
 
-    await backendPreferenceService.listForManager({ status: 'PENDING' })
+    const result = await backendPreferenceService.listForManager({ status: 'PENDING' })
 
     expect(requestJson).toHaveBeenCalledWith('/api/admin/preferences?status=PENDING')
+    expect(result[0]).toMatchObject({ employeeName: 'Nhan vien 1', relatedShiftCode: 'THONG_TAM' })
   })
 
   test('approves a manager preference', async () => {

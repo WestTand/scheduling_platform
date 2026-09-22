@@ -212,10 +212,14 @@ class EmployeePreferenceControllerTest {
     private static EmployeePreferenceResponse response() {
         return new EmployeePreferenceResponse(
                 20L,
+                100L,
+                "NV001",
+                "Nhan vien 1",
                 LocalDate.of(2026, 9, 14),
                 "WANT",
                 10L,
                 "Morning",
+                "THONG_TAM",
                 1,
                 "Prefer morning shift",
                 "PENDING");

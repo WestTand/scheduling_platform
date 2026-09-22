@@ -61,6 +61,8 @@ class AdminPreferenceServiceTest {
         List<EmployeePreferenceResponse> response = service.listPreferences(principal, "PENDING", from, to);
 
         assertThat(response).extracting(EmployeePreferenceResponse::id).containsExactly(50L);
+        assertThat(response.get(0).employeeName()).isEqualTo("Employee One");
+        assertThat(response.get(0).employeeId()).isEqualTo(7L);
         verify(preferenceRepository).searchForAdmin("PENDING", from, to);
     }
 
@@ -84,6 +86,7 @@ class AdminPreferenceServiceTest {
         EmployeePreferenceResponse response = service.approvePreference(principal, 50L);
 
         assertThat(response.status()).isEqualTo("APPROVED");
+        assertThat(response.employeeName()).isEqualTo("Employee One");
         assertThat(preference.getStatus()).isEqualTo("APPROVED");
         verify(preferenceRepository).save(preference);
     }

@@ -7,10 +7,14 @@ describe('preferenceAdapter', () => {
   test('maps WANT response to PREFERRED work preference', () => {
     const response: BackendPreferenceResponse = {
       id: 12,
+      employeeId: 100,
+      employeeCode: 'NV001',
+      employeeName: 'Nhan vien 1',
       preferenceDate: '2026-09-14',
       preferenceType: 'WANT',
       shiftTypeId: 10,
       shiftName: 'Ca sang',
+      shiftCode: 'THONG_TAM',
       priority: 1,
       note: 'Muon lam ca sang',
       status: 'PENDING',
@@ -18,6 +22,8 @@ describe('preferenceAdapter', () => {
 
     expect(adaptBackendPreference(response)).toMatchObject({
       id: '12',
+      employeeName: 'Nhan vien 1',
+      relatedShiftCode: 'THONG_TAM',
       month: '2026-09',
       type: 'PREFERRED',
       targetLabel: 'Ca sang',
@@ -31,10 +37,14 @@ describe('preferenceAdapter', () => {
   test('maps AVOID response to AVOID work preference', () => {
     const response: BackendPreferenceResponse = {
       id: 13,
+      employeeId: null,
+      employeeCode: null,
+      employeeName: null,
       preferenceDate: '2026-09-16',
       preferenceType: 'AVOID',
       shiftTypeId: null,
       shiftName: null,
+      shiftCode: null,
       priority: 2,
       note: null,
       status: 'APPROVED',
@@ -43,6 +53,8 @@ describe('preferenceAdapter', () => {
     const adapted = adaptBackendPreference(response)
 
     expect(adapted.type).toBe('AVOID')
+    expect(adapted.employeeName).toBe('')
+    expect(adapted.relatedShiftCode).toBeUndefined()
     expect(adapted.month).toBe('2026-09')
     expect(adapted.submittedAt).toBe('2026-09-16')
     expect(adapted.targetLabel).toBe('Không có ca cụ thể')

@@ -104,6 +104,8 @@ class EmployeePreferenceServiceTest {
         assertThat(response.preferenceType()).isEqualTo(preferenceType);
         assertThat(response.shiftTypeId()).isEqualTo(10L);
         assertThat(response.shiftName()).isEqualTo("Morning");
+        assertThat(response.shiftCode()).isEqualTo("THONG_TAM");
+        assertThat(response.employeeName()).isEqualTo("Employee One");
         assertThat(response.status()).isEqualTo("PENDING");
         verify(accountRepository).findByIdForUpdate(2L);
     }
@@ -120,6 +122,7 @@ class EmployeePreferenceServiceTest {
         EmployeePreferenceResponse response = service.createPreference(principal, request);
 
         assertThat(response.shiftTypeId()).isNull();
+        assertThat(response.shiftCode()).isNull();
         assertThat(response.note()).isNull();
     }
 
@@ -291,6 +294,7 @@ class EmployeePreferenceServiceTest {
     private static ShiftType shiftType(Long id, String status) {
         ShiftType shiftType = ShiftType.builder()
                 .shiftName("Morning")
+                .shiftCode("THONG_TAM")
                 .startTime(LocalTime.of(8, 0))
                 .endTime(LocalTime.of(12, 0))
                 .durationHours(BigDecimal.valueOf(4.0))

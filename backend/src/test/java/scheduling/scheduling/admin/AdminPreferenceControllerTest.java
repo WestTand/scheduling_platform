@@ -69,7 +69,9 @@ class AdminPreferenceControllerTest {
                         .header(HttpHeaders.AUTHORIZATION, "Bearer manager-token"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(50))
-                .andExpect(jsonPath("$[0].status").value("PENDING"));
+                .andExpect(jsonPath("$[0].status").value("PENDING"))
+                .andExpect(jsonPath("$[0].employeeName").value("Nhan vien 1"))
+                .andExpect(jsonPath("$[0].shiftCode").value("THONG_TAM"));
     }
 
     @Test
@@ -139,10 +141,14 @@ class AdminPreferenceControllerTest {
     private static EmployeePreferenceResponse response(String status) {
         return new EmployeePreferenceResponse(
                 50L,
+                100L,
+                "NV001",
+                "Nhan vien 1",
                 LocalDate.of(2026, 9, 14),
                 "WANT",
                 10L,
                 "Morning",
+                "THONG_TAM",
                 1,
                 "Prefer morning shift",
                 status);

@@ -4,10 +4,14 @@ export type BackendPreferenceStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CAN
 
 export interface BackendPreferenceResponse {
   id: number
+  employeeId: number | null
+  employeeCode: string | null
+  employeeName: string | null
   preferenceDate: string
   preferenceType: BackendPreferenceType
   shiftTypeId: number | null
   shiftName: string | null
+  shiftCode: string | null
   priority: number
   note: string | null
   status: BackendPreferenceStatus
