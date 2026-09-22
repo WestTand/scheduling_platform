@@ -206,7 +206,15 @@ export function WorkPreferencesPage() {
       <ConfirmDialog
         open={Boolean(decisionDialog)}
         title={decisionDialog?.type === 'APPROVED' ? 'Duyệt nguyện vọng' : 'Từ chối nguyện vọng'}
-        description={decisionDialog?.type === 'APPROVED' ? 'Bạn xác nhận muốn duyệt nguyện vọng này?' : 'Bạn xác nhận muốn từ chối nguyện vọng này?'}
+        description={
+          decisionDialog?.type === 'APPROVED'
+            ? apiConfig.useMockApi
+              ? 'Bạn xác nhận muốn duyệt nguyện vọng này?'
+              : 'Bạn xác nhận muốn duyệt nguyện vọng này? Ghi chú chỉ hiển thị cục bộ vì backend hiện không nhận lý do.'
+            : apiConfig.useMockApi
+              ? 'Bạn xác nhận muốn từ chối nguyện vọng này?'
+              : 'Bạn xác nhận muốn từ chối nguyện vọng này? Ghi chú chỉ hiển thị cục bộ vì backend hiện không nhận lý do.'
+        }
         onCancel={() => setDecisionDialog(null)}
         onConfirm={handleDecision}
       >

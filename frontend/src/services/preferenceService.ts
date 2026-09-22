@@ -43,7 +43,10 @@ export const preferenceService = {
   async list({ page = 1, pageSize = 5, search = '', month = 'ALL', type = 'ALL', status = 'ALL' }: { page?: number; pageSize?: number; search?: string; month?: string; type?: string; status?: string }) {
     if (!apiConfig.useMockApi) {
       const response = await backendPreferenceService.listForManager({ status })
-      return paginate(filterPreferences(response, search, month, type, 'ALL'), page, pageSize)
+      // Backend adapter leaves employeeName empty, has no relatedShiftCode, and collapses
+      // type to PREFERRED|AVOID, so skip degraded local month/type filters here and only
+      // search present fields (note/targetLabel/employeeName) before paginating.
+      return paginate(filterPreferences(response, search, 'ALL', 'ALL', 'ALL'), page, pageSize)
     }
     await delay(350)
 
@@ -71,11 +74,18 @@ export const preferenceService = {
   },
 
   async getById(id: string) {
+    if (!apiConfig.useMockApi) {
+      const response = await backendPreferenceService.listForManager({})
+      return response.find((preference) => preference.id === id) ?? null
+    }
     await delay(200)
     return preferences.find((preference) => preference.id === id) ?? null
   },
 
   async review(id: string, status: PreferenceStatus, managerNote: string) {
+    if (!apiConfig.useMockApi) {
+      return status === 'APPROVED' ? backendPreferenceService.approveForManager(id) : backendPreferenceService.rejectForManager(id)
+    }
     await delay(300)
     const preference = preferences.find((item) => item.id === id)
 
