@@ -32,6 +32,18 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
 
     @Query("""
             select e from Employee e
+            join fetch e.account a
+            where e.status = 'ACTIVE'
+              and a.role = scheduling.scheduling.entity.AccountRole.EMPLOYEE
+              and a.status = scheduling.scheduling.entity.AccountStatus.ACTIVE
+              and a.isActive = true
+              and e.id <> :currentEmployeeId
+            order by e.employeeCode asc, e.fullName asc
+            """)
+    List<Employee> findActiveCoworkers(Long currentEmployeeId);
+
+    @Query("""
+            select e from Employee e
             where e.status = 'ACTIVE'
             order by e.employeeCode asc, e.fullName asc
             """)

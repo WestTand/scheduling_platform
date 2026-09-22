@@ -18,7 +18,7 @@ export function ManagerDashboardPage() {
     { label: 'Tạo lịch tự động', icon: Sparkles, path: '/manager/schedule-generation' },
     { label: 'Xem lịch làm việc', icon: CalendarCheck2, path: '/manager/schedules' },
     { label: 'Xử lý yêu cầu nghỉ', icon: CheckCircle2, path: '/manager/leave-requests?status=PENDING' },
-    { label: 'Xử lý đổi ca', icon: Clock3, path: '/manager/swap-requests?status=PENDING' },
+    { label: 'Xử lý đổi ca', icon: Clock3, path: '/manager/swap-requests?status=PENDING_APPROVAL' },
     { label: 'Xuất dữ liệu', icon: FileWarning, path: '/manager/exports' },
   ]
 
@@ -26,13 +26,13 @@ export function ManagerDashboardPage() {
 
   const pendingSchedule = scheduleSeed.find((schedule) => schedule.status === 'DRAFT')
   const pendingLeave = leaveRequestSeed.find((request) => request.status === 'PENDING')
-  const pendingSwap = swapRequestSeed.find((request) => request.status === 'PENDING')
+  const pendingSwap = swapRequestSeed.find((request) => request.status === 'PENDING_TARGET' || request.status === 'PENDING_APPROVAL')
   const pendingPreference = preferenceSeed.find((preference) => preference.status === 'PENDING')
   const criticalWarning = scheduleDetailSeed.warnings.find((warning) => warning.severity === 'HIGH')
   const actionItems = [
     { title: 'Lịch chờ duyệt', related: pendingSchedule?.name ?? 'Không có lịch chờ duyệt', detail: pendingSchedule ? `Tạo ngày ${pendingSchedule.createdAt.slice(0, 10)}.` : '', priority: 'Cao', status: 'Chờ duyệt', icon: CalendarCheck2, path: '/manager/schedules?status=PENDING_APPROVAL' },
     { title: 'Ngày nghỉ chờ duyệt', related: pendingLeave?.employeeName ?? 'Không có yêu cầu', detail: pendingLeave ? `Yêu cầu từ ${pendingLeave.startDate} đến ${pendingLeave.endDate}.` : '', priority: 'Cao', status: 'Chờ duyệt', icon: Clock3, path: '/manager/leave-requests?status=PENDING' },
-    { title: 'Đổi ca chờ xử lý', related: pendingSwap?.employeeName ?? 'Không có yêu cầu', detail: pendingSwap?.reason ?? '', priority: 'Trung bình', status: 'Chờ xử lý', icon: ArrowRight, path: '/manager/swap-requests?status=PENDING' },
+    { title: 'Đổi ca chờ xử lý', related: pendingSwap?.employeeName ?? 'Không có yêu cầu', detail: pendingSwap?.reason ?? '', priority: 'Trung bình', status: 'Chờ xử lý', icon: ArrowRight, path: '/manager/swap-requests?status=PENDING_APPROVAL' },
     { title: 'Nguyện vọng chưa xem', related: pendingPreference?.employeeName ?? 'Không có nguyện vọng', detail: pendingPreference?.note ?? '', priority: 'Trung bình', status: 'Chưa xem', icon: Users, path: '/manager/preferences?status=PENDING' },
     { title: 'Cảnh báo lịch nghiêm trọng', related: criticalWarning?.employeeName ?? 'Không có cảnh báo', detail: criticalWarning?.content ?? '', priority: 'Cao', status: 'Cần xem', icon: AlertTriangle, path: '/manager/schedules/schedule-demo-01?tab=warnings' },
   ]
@@ -140,7 +140,7 @@ export function ManagerDashboardPage() {
                   </div>
                   <p className="text-sm text-slate-500">{request.shiftCode ? getShiftDefinition(request.shiftCode)?.name : 'Cả ngày'} • {request.date}</p>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => navigate(request.type === 'Nghỉ phép' ? '/manager/leave-requests?status=PENDING' : '/manager/swap-requests?status=PENDING')}>Xem chi tiết</Button>
+                <Button variant="outline" size="sm" onClick={() => navigate(request.type === 'Nghỉ phép' ? '/manager/leave-requests?status=PENDING' : '/manager/swap-requests?status=PENDING_APPROVAL')}>Xem chi tiết</Button>
               </div>
             ))}
           </CardContent>

@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -135,7 +136,7 @@ class AdminSwapRequestControllerTest {
 
     private static SwapRequestResponse response(String status) {
         return new SwapRequestResponse(
-                50L, 100L,
+                50L, 100L, LocalDate.of(2026, 9, 24),
                 new SwapRequestResponse.EmployeeSummary(7L, "NV7", "Nhan vien 7"),
                 null,
                 new SwapRequestResponse.EmployeeSummary(9L, "NV9", "Nhan vien 9"),

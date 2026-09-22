@@ -126,7 +126,7 @@ export const swapRequestSeed: SwapRequest[] = [
     requestedDate: '2026-09-17',
     reason: 'Có lịch học bổ sung xuất hiện vào buổi sáng.',
     note: 'Cần đổi để đảm bảo đi học đúng giờ.',
-    status: SwapRequestStatus.PENDING,
+    status: SwapRequestStatus.PENDING_APPROVAL,
     submittedAt: '2026-09-15T08:00:00',
   },
   {

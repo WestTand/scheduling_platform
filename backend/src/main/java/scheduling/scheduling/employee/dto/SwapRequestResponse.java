@@ -1,6 +1,7 @@
 package scheduling.scheduling.employee.dto;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.Employee;
 import scheduling.scheduling.entity.ShiftAssignment;
@@ -9,6 +10,7 @@ import scheduling.scheduling.entity.SwapRequest;
 public record SwapRequestResponse(
         Long id,
         Long requesterAssignmentId,
+        LocalDate requesterWorkDate,
         EmployeeSummary requesterEmployee,
         Long targetAssignmentId,
         EmployeeSummary targetEmployee,
@@ -29,6 +31,7 @@ public record SwapRequestResponse(
         return new SwapRequestResponse(
                 swapRequest.getId(),
                 requesterAssignment.getId(),
+                requesterAssignment.getWorkShift().getWorkDate(),
                 new EmployeeSummary(requester.getId(), requester.getEmployeeCode(), requester.getFullName()),
                 swapRequest.getTargetAssignment() == null ? null : swapRequest.getTargetAssignment().getId(),
                 new EmployeeSummary(target.getId(), target.getEmployeeCode(), target.getFullName()),
