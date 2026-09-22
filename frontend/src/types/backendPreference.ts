@@ -1,0 +1,30 @@
+export type BackendPreferenceType = 'WANT' | 'AVOID'
+
+export type BackendPreferenceStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED'
+
+export interface BackendPreferenceResponse {
+  id: number
+  preferenceDate: string
+  preferenceType: BackendPreferenceType
+  shiftTypeId: number | null
+  shiftName: string | null
+  priority: number
+  note: string | null
+  status: BackendPreferenceStatus
+}
+
+export interface BackendCreatePreferenceRequest {
+  preferenceDate: string
+  preferenceType: BackendPreferenceType
+  shiftTypeId?: number | null
+  priority: number
+  note?: string
+}
+
+export interface BackendUpdatePreferenceRequest {
+  preferenceDate: string
+  preferenceType: BackendPreferenceType
+  shiftTypeId?: number | null
+  priority: number
+  note?: string
+}
