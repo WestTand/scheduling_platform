@@ -2,7 +2,7 @@ import { apiConfig } from '@/config/api'
 import { mockUsers } from '@/mocks/users'
 import { accountService } from '@/services/accountService'
 import { backendAuthService } from '@/services/backendAuthService'
-import { AUTH_STORAGE_KEYS, getStoredToken } from '@/services/authStorage'
+import { AUTH_STORAGE_KEYS, clearStoredAuth, getStoredToken } from '@/services/authStorage'
 import type { LoginCredentials, User } from '@/types/auth'
 
 const AUTH_DELAY_MS = 700
@@ -98,13 +98,6 @@ export const setStoredAuth = (user: User, rememberMe: boolean, accessToken?: str
 
 export const updateStoredAccessToken = (accessToken: string) => {
   getStoredTokenStorage().setItem(AUTH_STORAGE_KEYS.TOKEN, accessToken)
-}
-
-export const clearStoredAuth = () => {
-  localStorage.removeItem(AUTH_STORAGE_KEYS.TOKEN)
-  localStorage.removeItem(AUTH_STORAGE_KEYS.USER)
-  sessionStorage.removeItem(AUTH_STORAGE_KEYS.TOKEN)
-  sessionStorage.removeItem(AUTH_STORAGE_KEYS.USER)
 }
 
 export const restoreStoredUser = () => {

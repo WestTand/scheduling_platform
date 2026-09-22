@@ -67,4 +67,23 @@ describe('requestJson', () => {
     expect((retryRequest?.headers as Headers).get('Authorization')).toBe('Bearer fresh-token')
     expect(sessionStorage.getItem(AUTH_STORAGE_KEYS.TOKEN)).toBe('fresh-token')
   })
+
+  test('clears stored auth when token refresh fails after an authenticated 401', async () => {
+    sessionStorage.setItem(AUTH_STORAGE_KEYS.TOKEN, 'expired-token')
+    sessionStorage.setItem(AUTH_STORAGE_KEYS.USER, JSON.stringify({ id: '1' }))
+    localStorage.setItem(AUTH_STORAGE_KEYS.TOKEN, 'stale-token')
+    localStorage.setItem(AUTH_STORAGE_KEYS.USER, JSON.stringify({ id: '2' }))
+    const fetchMock = vi.mocked(fetch)
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ message: 'Unauthorized' }, { status: 401 }))
+      .mockResolvedValueOnce(jsonResponse({ message: 'Invalid refresh token' }, { status: 401 }))
+
+    await expect(requestJson('/api/employee/leave-requests')).rejects.toMatchObject({ status: 401 })
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(sessionStorage.getItem(AUTH_STORAGE_KEYS.TOKEN)).toBeNull()
+    expect(sessionStorage.getItem(AUTH_STORAGE_KEYS.USER)).toBeNull()
+    expect(localStorage.getItem(AUTH_STORAGE_KEYS.TOKEN)).toBeNull()
+    expect(localStorage.getItem(AUTH_STORAGE_KEYS.USER)).toBeNull()
+  })
 })
