@@ -15,6 +15,7 @@ import { StatCard } from '@/components/common/StatCard'
 import { StatusBadge } from '@/components/common/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { apiConfig } from '@/config/api'
 import { getShiftDefinition } from '@/configs/shiftDefinitions'
 import { preferenceService } from '@/services/preferenceService'
 import type { PaginatedResult, WorkPreference, WorkPreferenceDecision } from '@/types/management'
@@ -103,7 +104,7 @@ export function WorkPreferencesPage() {
       return
     }
 
-    if (decisionDialog.type === 'REJECTED' && !decisionState.adminNote.trim()) {
+    if (decisionDialog.type === 'REJECTED' && apiConfig.useMockApi && !decisionState.adminNote.trim()) {
       window.alert('Vui lòng nhập lý do từ chối.')
       return
     }
