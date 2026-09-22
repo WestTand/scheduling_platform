@@ -21,6 +21,7 @@ export interface BackendCreatePreferenceRequest {
   preferenceDate: string
   preferenceType: BackendPreferenceType
   shiftTypeId?: number | null
+  shiftCode?: string
   priority: number
   note?: string
 }
@@ -29,6 +30,7 @@ export interface BackendUpdatePreferenceRequest {
   preferenceDate: string
   preferenceType: BackendPreferenceType
   shiftTypeId?: number | null
+  shiftCode?: string
   priority: number
   note?: string
 }

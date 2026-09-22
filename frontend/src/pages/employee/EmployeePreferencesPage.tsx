@@ -141,7 +141,7 @@ export function EmployeePreferencesPage() {
         preferenceDate,
         type: form.type as PreferenceType,
         shiftTypeId: resolveShiftTypeId(form.relatedShiftCode),
-        // Kept for mock-mode display (relatedShiftCode/targetLabel); backend branch ignores it.
+        // Kept for mock-mode display (relatedShiftCode/targetLabel); backend branch forwards it as shiftCode.
         relatedShiftCode: form.relatedShiftCode,
         priority: Number(form.priority),
         note: form.note.trim(),

@@ -18,6 +18,7 @@ export interface CreateEmployeePreferenceInput {
   preferenceDate: string
   preferenceType: PreferenceType | BackendPreferenceType
   shiftTypeId?: number | null
+  shiftCode?: string | null
   priority: number
   note?: string
 }
@@ -26,6 +27,7 @@ export interface UpdateEmployeePreferenceInput {
   preferenceDate: string
   preferenceType: PreferenceType | BackendPreferenceType
   shiftTypeId?: number | null
+  shiftCode?: string | null
   priority: number
   note?: string
 }
@@ -50,6 +52,7 @@ const toBackendInput = (input: CreateEmployeePreferenceInput): BackendCreatePref
   preferenceDate: input.preferenceDate,
   preferenceType: resolveBackendType(input.preferenceType),
   shiftTypeId: input.shiftTypeId ?? undefined,
+  shiftCode: input.shiftCode ?? undefined,
   priority: input.priority,
   note: input.note?.trim() ? input.note.trim() : undefined,
 })

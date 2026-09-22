@@ -131,6 +131,7 @@ export const preferenceService = {
         preferenceDate: input.preferenceDate,
         preferenceType: input.type,
         shiftTypeId: input.shiftTypeId ?? null,
+        shiftCode: input.relatedShiftCode ?? undefined,
         priority: input.priority,
         note: input.note,
       })
@@ -158,6 +159,7 @@ export const preferenceService = {
         preferenceDate: input.preferenceDate,
         preferenceType: input.type,
         shiftTypeId: input.shiftTypeId ?? null,
+        shiftCode: input.relatedShiftCode ?? undefined,
         priority: input.priority,
         note: input.note,
       })

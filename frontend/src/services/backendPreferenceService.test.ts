@@ -52,6 +52,7 @@ describe('backendPreferenceService', () => {
       preferenceDate: '2026-09-14',
       preferenceType: 'PREFERRED',
       shiftTypeId: 10,
+      shiftCode: 'THONG_TAM',
       priority: 1,
       note: 'note',
     })
@@ -62,6 +63,7 @@ describe('backendPreferenceService', () => {
         preferenceDate: '2026-09-14',
         preferenceType: 'WANT',
         shiftTypeId: 10,
+        shiftCode: 'THONG_TAM',
         priority: 1,
         note: 'note',
       },
