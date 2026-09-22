@@ -1,29 +1,53 @@
-import { CalendarClock, Eye, X } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { CalendarClock, Check, Eye, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { DataTable } from '@/components/common/DataTable'
+import { EmptyState } from '@/components/common/EmptyState'
+import { ErrorState } from '@/components/common/ErrorState'
+import { LoadingState } from '@/components/common/LoadingState'
 import { PageHeader } from '@/components/common/PageHeader'
+import { Pagination } from '@/components/common/Pagination'
 import { SearchInput } from '@/components/common/SearchInput'
 import { StatusBadge } from '@/components/common/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { formatShiftRangeLabel, getShiftDefinition, shiftDefinitions } from '@/configs/shiftDefinitions'
-
-const seedRequests = [
-  { id: 'SWAP-001', currentShiftCode: 'THONG_TAM', requestedShiftCode: 'NGOAI_GIO_1', requestedDate: '2026-09-17', partner: 'Lê Thị Hòa', reason: 'Có lịch học vào buổi sáng', note: 'Chờ quản lý duyệt', status: 'PENDING' },
-  { id: 'SWAP-002', currentShiftCode: 'NGOAI_GIO_1', requestedShiftCode: 'NGOAI_GIO_2', requestedDate: '2026-09-18', partner: 'Trần Văn Nam', reason: 'Muốn đổi để bù thời gian gia đình', note: 'Đã duyệt', status: 'APPROVED' },
-]
+import { useAuth } from '@/contexts/useAuth'
+import { swapRequestService } from '@/services/swapRequestService'
+import type { CoworkerOption, PaginatedResult, SwapAssignmentOption, SwapRequest } from '@/types/management'
 
 export function EmployeeSwapRequestsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [showForm, setShowForm] = useState(() => searchParams.get('action') === 'create')
-  const [selected, setSelected] = useState<(typeof seedRequests)[number] | null>(null)
+  const [selected, setSelected] = useState<SwapRequest | null>(null)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState(() => searchParams.get('status') ?? 'ALL')
-  const [requests, setRequests] = useState(seedRequests)
-  const [form, setForm] = useState({ currentShiftCode: 'THONG_TAM', requestedShiftCode: 'NGOAI_GIO_1', partner: 'Lê Thị Hòa', reason: '', note: '' })
+  const [data, setData] = useState<PaginatedResult<SwapRequest>>({ data: [], page: 1, pageSize: 50, total: 0, totalPages: 1 })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [assignments, setAssignments] = useState<SwapAssignmentOption[]>([])
+  const [coworkers, setCoworkers] = useState<CoworkerOption[]>([])
+  const [optionsLoading, setOptionsLoading] = useState(false)
+  const [optionsError, setOptionsError] = useState('')
+  const [form, setForm] = useState({ requesterAssignmentId: '', targetEmployeeId: '', reason: '' })
+
+  const { user } = useAuth()
+  const currentEmployeeId = user?.id
+
+  const loadData = async () => {
+    setLoading(true)
+    setError('')
+
+    try {
+      const result = await swapRequestService.listMine({ page: 1, pageSize: 50, search, status: statusFilter })
+      setData(result)
+    } catch (loadErr) {
+      setError(loadErr instanceof Error ? loadErr.message : 'Không thể tải yêu cầu đổi ca.')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
     if (searchParams.get('action') !== 'create') {
@@ -35,42 +59,122 @@ export function EmployeeSwapRequestsPage() {
     setSearchParams(nextSearchParams, { replace: true })
   }, [searchParams, setSearchParams])
 
-  const filtered = useMemo(() => requests.filter((item) => {
-    const matchesSearch = !search || item.reason.toLowerCase().includes(search.toLowerCase()) || item.partner.toLowerCase().includes(search.toLowerCase())
-    const matchesStatus = statusFilter === 'ALL' || item.status === statusFilter
-    return matchesSearch && matchesStatus
-  }), [requests, search, statusFilter])
+  useEffect(() => {
+    let mounted = true
 
-  const handleSubmit = () => {
-    if (!form.currentShiftCode || !form.reason.trim()) {
-      window.alert('Phải chọn ca hiện tại và nhập lý do.')
+    const fetchRequests = async () => {
+      setLoading(true)
+      setError('')
+
+      try {
+        const result = await swapRequestService.listMine({ page: 1, pageSize: 50, search, status: statusFilter })
+        if (mounted) {
+          setData(result)
+        }
+      } catch (loadErr) {
+        if (mounted) {
+          setError(loadErr instanceof Error ? loadErr.message : 'Không thể tải yêu cầu đổi ca.')
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false)
+        }
+      }
+    }
+
+    void fetchRequests()
+
+    return () => {
+      mounted = false
+    }
+  }, [search, statusFilter])
+
+  useEffect(() => {
+    if (!showForm) {
       return
     }
 
-    if (form.currentShiftCode === form.requestedShiftCode) {
-      window.alert('Không được chọn lại chính ca hiện tại làm ca muốn đổi.')
+    let mounted = true
+
+    const loadOptions = async () => {
+      setOptionsLoading(true)
+      setOptionsError('')
+
+      try {
+        const [assignmentOptions, coworkerOptions] = await Promise.all([
+          swapRequestService.listMyAssignments(),
+          swapRequestService.listCoworkers(),
+        ])
+        if (mounted) {
+          setAssignments(assignmentOptions)
+          setCoworkers(coworkerOptions)
+        }
+      } catch (optionsErr) {
+        if (mounted) {
+          setOptionsError(optionsErr instanceof Error ? optionsErr.message : 'Không thể tải ca làm và danh sách nhân viên.')
+        }
+      } finally {
+        if (mounted) {
+          setOptionsLoading(false)
+        }
+      }
+    }
+
+    void loadOptions()
+
+    return () => {
+      mounted = false
+    }
+  }, [showForm])
+
+  const handleSubmit = async () => {
+    if (!form.requesterAssignmentId || !form.targetEmployeeId || !form.reason.trim()) {
+      window.alert('Phải chọn ca của bạn, nhân viên muốn đổi cùng và nhập lý do.')
       return
     }
 
-    setRequests((current) => [{
-      id: `SWAP-${Date.now()}`,
-      currentShiftCode: form.currentShiftCode,
-      requestedShiftCode: form.requestedShiftCode,
-      requestedDate: '2026-09-21',
-      partner: form.partner,
-      reason: form.reason,
-      note: 'Yêu cầu phải được quản lý phê duyệt',
-      status: 'PENDING',
-    }, ...current])
+    if (optionsError) {
+      window.alert(optionsError)
+      return
+    }
 
-    setShowForm(false)
-    setForm({ currentShiftCode: 'THONG_TAM', requestedShiftCode: 'NGOAI_GIO_1', partner: 'Lê Thị Hòa', reason: '', note: '' })
-    window.alert('Yêu cầu đổi ca đã được tạo và đang chờ quản lý phê duyệt.')
+    const selectedAssignment = assignments.find((assignment) => assignment.id === form.requesterAssignmentId)
+    if (selectedAssignment && selectedAssignment.periodStatus !== 'PUBLISHED') {
+      window.alert('Chỉ có thể tạo yêu cầu đổi ca khi kỳ công đã được xuất bản (PUBLISHED).')
+      return
+    }
+
+    try {
+      await swapRequestService.createMine({
+        requesterAssignmentId: form.requesterAssignmentId,
+        targetEmployeeId: form.targetEmployeeId,
+        reason: form.reason.trim(),
+      })
+      setShowForm(false)
+      setForm({ requesterAssignmentId: '', targetEmployeeId: '', reason: '' })
+      await loadData()
+      window.alert('Yêu cầu đổi ca đã được tạo và đang chờ quản lý phê duyệt.')
+    } catch (submitError) {
+      window.alert(submitError instanceof Error ? submitError.message : 'Không thể tạo yêu cầu đổi ca.')
+    }
   }
 
-  const handleCancel = (id: string) => {
-    setRequests((current) => current.map((item) => item.id === id ? { ...item, status: 'REJECTED', note: 'Nhân viên hủy yêu cầu' } : item))
-    window.alert('Yêu cầu đã được hủy trong mock state.')
+  const handleCancel = async (id: string) => {
+    try {
+      await swapRequestService.cancelMine(id)
+      await loadData()
+    } catch (cancelError) {
+      window.alert(cancelError instanceof Error ? cancelError.message : 'Không thể hủy yêu cầu.')
+    }
+  }
+
+  const handleRespond = async (id: string, accept: boolean) => {
+    try {
+      await swapRequestService.respondMine(id, accept)
+      await loadData()
+    } catch (respondError) {
+      window.alert(respondError instanceof Error ? respondError.message : 'Không thể phản hồi yêu cầu.')
+    }
   }
 
   return (
@@ -83,69 +187,92 @@ export function EmployeeSwapRequestsPage() {
             <SearchInput value={search} placeholder="Tìm theo lý do hoặc nhân viên đổi cùng" onChange={setSearch} />
             <select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); const params = new URLSearchParams(searchParams); params.set('status', event.target.value); setSearchParams(params) }} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm">
               <option value="ALL">Tất cả trạng thái</option>
-              <option value="PENDING">Chờ xử lý</option>
+              <option value="PENDING_TARGET">Chờ nhân viên phản hồi</option>
+              <option value="PENDING_APPROVAL">Chờ quản lý duyệt</option>
               <option value="APPROVED">Đã duyệt</option>
-              <option value="REJECTED">Từ chối</option>
+              <option value="REJECTED">Đã từ chối</option>
+              <option value="CANCELLED">Đã hủy</option>
             </select>
           </div>
 
-          <DataTable
-            data={filtered}
-            columns={[
-              { key: 'id', label: 'Mã yêu cầu' },
-              { key: 'currentShiftCode', label: 'Ca hiện tại', render: (item: (typeof seedRequests)[number]) => <span>{getShiftDefinition(item.currentShiftCode)?.name} · {formatShiftRangeLabel(getShiftDefinition(item.currentShiftCode)!)}</span> },
-              { key: 'requestedShiftCode', label: 'Ca muốn đổi', render: (item: (typeof seedRequests)[number]) => <span>{getShiftDefinition(item.requestedShiftCode)?.name} · {formatShiftRangeLabel(getShiftDefinition(item.requestedShiftCode)!)}</span> },
-              { key: 'partner', label: 'Nhân viên đổi cùng' },
-              { key: 'requestedDate', label: 'Ngày mong muốn' },
-              { key: 'status', label: 'Trạng thái', render: (item: (typeof seedRequests)[number]) => <StatusBadge status={item.status} /> },
-              { key: 'actions', label: 'Thao tác', render: (item: (typeof seedRequests)[number]) => (
-                <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="icon" onClick={() => setSelected(item)}><Eye className="h-4 w-4" /></Button>
-                  {item.status === 'PENDING' && <Button variant="ghost" size="icon" onClick={() => handleCancel(item.id)}><X className="h-4 w-4" /></Button>}
-                </div>
-              ) },
-            ]}
-          />
+          {loading ? (
+            <LoadingState label="Đang tải yêu cầu đổi ca..." />
+          ) : error ? (
+            <ErrorState message={error} onRetry={loadData} />
+          ) : data.data.length === 0 ? (
+            <EmptyState title="Không có yêu cầu đổi ca" description="Bạn chưa có yêu cầu nào phù hợp với bộ lọc." />
+          ) : (
+            <>
+              <DataTable
+                data={data.data}
+                columns={[
+                  { key: 'id', label: 'Mã yêu cầu' },
+                  { key: 'currentShiftName', label: 'Ca hiện tại', render: (item: SwapRequest) => <span>{item.currentShiftName ?? '—'}</span> },
+                  { key: 'requestedShiftName', label: 'Ca muốn đổi', render: (item: SwapRequest) => <span>{item.requestedShiftName ?? '—'}</span> },
+                  { key: 'partnerName', label: 'Nhân viên đổi cùng', render: (item: SwapRequest) => <span>{item.partnerName ?? '—'}</span> },
+                  { key: 'requestedDate', label: 'Ngày mong muốn' },
+                  { key: 'status', label: 'Trạng thái', render: (item: SwapRequest) => <StatusBadge status={item.status} /> },
+                  {
+                    key: 'actions',
+                    label: 'Thao tác',
+                    render: (item: SwapRequest) => {
+                      const canCancel = item.requesterEmployeeId === currentEmployeeId && item.status === 'PENDING_TARGET'
+                      const canRespond = item.targetEmployeeId === currentEmployeeId && item.status === 'PENDING_TARGET'
+                      return (
+                        <div className="flex items-center gap-2">
+                          <Button variant="ghost" size="icon" onClick={() => setSelected(item)} aria-label="Xem chi tiết"><Eye className="h-4 w-4" /></Button>
+                          {canCancel && <Button variant="ghost" size="icon" onClick={() => handleCancel(item.id)} aria-label="Hủy yêu cầu"><X className="h-4 w-4" /></Button>}
+                          {canRespond && (
+                            <>
+                              <Button variant="ghost" size="icon" onClick={() => handleRespond(item.id, true)} aria-label="Đồng ý đổi ca"><Check className="h-4 w-4" /></Button>
+                              <Button variant="ghost" size="icon" onClick={() => handleRespond(item.id, false)} aria-label="Từ chối đổi ca"><X className="h-4 w-4" /></Button>
+                            </>
+                          )}
+                        </div>
+                      )
+                    },
+                  },
+                ]}
+              />
+              <Pagination page={data.page} totalPages={data.totalPages} onPageChange={() => {}} />
+            </>
+          )}
         </CardContent>
       </Card>
 
       <ConfirmDialog
         open={showForm}
         title="Tạo yêu cầu đổi ca"
-        description="Yêu cầu sẽ được gửi để quản lý xem xét. Không tự động đổi lịch sau khi gửi." 
+        description="Yêu cầu sẽ được gửi để quản lý xem xét. Không tự động đổi lịch sau khi gửi."
         onCancel={() => setShowForm(false)}
         onConfirm={handleSubmit}
         confirmLabel="Gửi yêu cầu"
       >
         <div className="mt-4 grid gap-4">
           <div className="space-y-1">
-            <label className="text-sm text-slate-700">Ca hiện tại của bạn</label>
-            <select value={form.currentShiftCode} onChange={(event) => setForm((current) => ({ ...current, currentShiftCode: event.target.value }))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm">
-              {shiftDefinitions.map((shift) => <option key={shift.code} value={shift.code}>{shift.name} · {formatShiftRangeLabel(shift)}</option>)}
+            <label className="text-sm text-slate-700">Ca của bạn</label>
+            <select value={form.requesterAssignmentId} disabled={optionsLoading || Boolean(optionsError)} onChange={(event) => setForm((current) => ({ ...current, requesterAssignmentId: event.target.value }))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-50">
+              <option value="">{optionsLoading ? 'Đang tải ca làm...' : 'Chọn ca của bạn'}</option>
+              {assignments.map((assignment) => (
+                <option key={assignment.id} value={assignment.id}>{`${assignment.workDate} • ${assignment.shiftName} ${assignment.shiftStartTime}-${assignment.shiftEndTime} • ${assignment.periodName} (${assignment.periodStatus})`}</option>
+              ))}
             </select>
           </div>
           <div className="space-y-1">
-            <label className="text-sm text-slate-700">Ca muốn đổi</label>
-            <select value={form.requestedShiftCode} onChange={(event) => setForm((current) => ({ ...current, requestedShiftCode: event.target.value }))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm">
-              {shiftDefinitions.map((shift) => <option key={shift.code} value={shift.code}>{shift.name} · {formatShiftRangeLabel(shift)}</option>)}
-            </select>
-          </div>
-          <div className="space-y-1">
-            <label className="text-sm text-slate-700">Nhân viên đổi cùng nếu có</label>
-            <select value={form.partner} onChange={(event) => setForm((current) => ({ ...current, partner: event.target.value }))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm">
-              <option value="Lê Thị Hòa">Lê Thị Hòa</option>
-              <option value="Trần Văn Nam">Trần Văn Nam</option>
-              <option value="Hoàng Văn Tâm">Hoàng Văn Tâm</option>
+            <label className="text-sm text-slate-700">Nhân viên muốn đổi cùng</label>
+            <select value={form.targetEmployeeId} disabled={optionsLoading || Boolean(optionsError)} onChange={(event) => setForm((current) => ({ ...current, targetEmployeeId: event.target.value }))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-50">
+              <option value="">{optionsLoading ? 'Đang tải nhân viên...' : 'Chọn nhân viên'}</option>
+              {coworkers.map((coworker) => (
+                <option key={coworker.id} value={coworker.id}>{`${coworker.fullName} (${coworker.employeeCode})`}</option>
+              ))}
             </select>
           </div>
           <div className="space-y-1">
             <label className="text-sm text-slate-700">Lý do</label>
             <textarea value={form.reason} onChange={(event) => setForm((current) => ({ ...current, reason: event.target.value }))} rows={3} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
           </div>
-          <div className="space-y-1">
-            <label className="text-sm text-slate-700">Ghi chú</label>
-            <textarea value={form.note} onChange={(event) => setForm((current) => ({ ...current, note: event.target.value }))} rows={2} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
-          </div>
+          <p className="text-xs text-slate-500">Không cần chọn ca của nhân viên đối ứng trong giai đoạn này (targetAssignment không bắt buộc).</p>
+          {optionsError && <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{optionsError}</div>}
         </div>
       </ConfirmDialog>
 
@@ -160,12 +287,16 @@ export function EmployeeSwapRequestsPage() {
         {selected && (
           <div className="mt-4 space-y-3 text-sm text-slate-600">
             <div className="flex justify-between"><span>Mã yêu cầu</span><strong>{selected.id}</strong></div>
-            <div className="flex justify-between"><span>Ca hiện tại</span><strong>{getShiftDefinition(selected.currentShiftCode)?.name}</strong></div>
-            <div className="flex justify-between"><span>Ca muốn đổi</span><strong>{getShiftDefinition(selected.requestedShiftCode)?.name}</strong></div>
-            <div className="flex justify-between"><span>Nhân viên đổi cùng</span><strong>{selected.partner}</strong></div>
+            <div className="flex justify-between"><span>Người gửi</span><strong>{selected.employeeName}{selected.requesterEmployeeId ? ` (#${selected.requesterEmployeeId})` : ''}</strong></div>
+            <div className="flex justify-between"><span>Nhân viên đổi cùng</span><strong>{selected.partnerName ?? (selected.targetEmployeeId ? `#${selected.targetEmployeeId}` : '—')}</strong></div>
+            <div className="flex justify-between"><span>Ca yêu cầu (requesterAssignment)</span><strong>{selected.requesterAssignmentId ?? '—'}</strong></div>
+            <div className="flex justify-between"><span>Ca đối ứng (targetAssignment)</span><strong>{selected.targetAssignmentId ?? '—'}</strong></div>
             <div className="flex justify-between"><span>Ngày mong muốn</span><strong>{selected.requestedDate}</strong></div>
             <div className="flex justify-between"><span>Lý do</span><strong>{selected.reason}</strong></div>
+            <div className="flex justify-between"><span>Ghi chú</span><strong>{selected.note ?? selected.managerNote ?? '—'}</strong></div>
             <div className="flex justify-between"><span>Trạng thái</span><StatusBadge status={selected.status} /></div>
+            {selected.reviewedBy && <div className="flex justify-between"><span>Người duyệt</span><strong>{selected.reviewedBy}</strong></div>}
+            {selected.reviewedAt && <div className="flex justify-between"><span>Thời gian duyệt</span><strong>{selected.reviewedAt}</strong></div>}
           </div>
         )}
       </ConfirmDialog>
