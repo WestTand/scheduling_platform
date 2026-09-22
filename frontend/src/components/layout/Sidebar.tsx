@@ -17,6 +17,7 @@ import type { LucideIcon } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
+import { apiConfig } from '@/config/api'
 import { leaveRequestSeed, notificationSeed, preferenceSeed, swapRequestSeed } from '@/mocks/managementData'
 import { scheduleSeed } from '@/mocks/schedules'
 import { Role, type User } from '@/types/auth'
@@ -43,12 +44,18 @@ interface SidebarItem {
 
 const getBadgeCount = (label: string, role: Role) => {
   if (label === 'Ngày nghỉ') {
+    if (!apiConfig.useMockApi) {
+      return 0
+    }
     return leaveRequestSeed.filter((item) => item.status === 'PENDING').length
   }
   if (label === 'Nguyện vọng') {
     return preferenceSeed.filter((item) => item.status === 'PENDING').length
   }
   if (label === 'Yêu cầu đổi ca') {
+    if (!apiConfig.useMockApi) {
+      return 0
+    }
     return swapRequestSeed.filter((item) => item.status === 'PENDING_TARGET' || item.status === 'PENDING_APPROVAL').length
   }
   if (label === 'Thông báo') {
