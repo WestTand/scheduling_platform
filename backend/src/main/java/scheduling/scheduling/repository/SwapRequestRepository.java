@@ -75,6 +75,8 @@ public interface SwapRequestRepository extends JpaRepository<SwapRequest, Long> 
 
     long countByStatus(String status);
 
+    // Phase 9J: employee pending scope = PENDING_TARGET + PENDING_APPROVAL (requester or target side).
+    // Manager queue uses countByStatus(PENDING_APPROVAL) only (actionable items).
     @Query("""
             select count(s)
             from SwapRequest s
