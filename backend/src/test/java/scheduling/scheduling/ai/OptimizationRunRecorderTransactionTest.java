@@ -51,13 +51,12 @@ class OptimizationRunRecorderTransactionTest {
     void cleanUp() {
         optimizationRunRepository.deleteAll();
         schedulePeriodRepository.deleteAll();
-        accountRepository.deleteAll();
     }
 
     @Test
     void failureRecordingSurvivesCallerRollback() {
         Account manager = accountRepository.save(Account.builder()
-                .username("tx-test-manager")
+                .username(uniqueUsername("tx-test-manager"))
                 .passwordHash("hash")
                 .role(AccountRole.MANAGER)
                 .build());
@@ -88,7 +87,7 @@ class OptimizationRunRecorderTransactionTest {
     @Test
     void finishSuccessUpdatesSchedulePeriodTotalPenalty() {
         Account manager = accountRepository.save(Account.builder()
-                .username("tx-penalty-manager")
+                .username(uniqueUsername("tx-penalty-manager"))
                 .passwordHash("hash")
                 .role(AccountRole.MANAGER)
                 .build());
@@ -121,6 +120,10 @@ class OptimizationRunRecorderTransactionTest {
                 .get()
                 .extracting(SchedulePeriod::getTotalPenalty)
                 .isEqualTo(new BigDecimal("12.34"));
+    }
+
+    private static String uniqueUsername(String prefix) {
+        return prefix + "-" + System.nanoTime();
     }
 
     @TestConfiguration
