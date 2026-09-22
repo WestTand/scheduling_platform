@@ -23,6 +23,11 @@ const preferenceLabels: Record<string, string> = {
   AVOID_SHIFT: 'Tránh ca',
 }
 
+// NOTE: frontend shiftDefinitions carry no numeric id, and the only backend
+// shift-type list (GET /api/admin/shift-types) requires MANAGER/ADMIN, so it is
+// not usable from this EMPLOYEE page (would 403). Resolve therefore stays null
+// and relatedShiftCode is kept locally for display; backend creates send
+// shiftTypeId only (null) without silent loss of the local code.
 const resolveShiftTypeId = (code: string): number | null => {
   const found = shiftDefinitions.find((shift) => shift.code === code) as unknown as { id?: unknown } | undefined
   if (!found || found.id === undefined || found.id === null || found.id === '') {
@@ -136,6 +141,8 @@ export function EmployeePreferencesPage() {
         preferenceDate,
         type: form.type as PreferenceType,
         shiftTypeId: resolveShiftTypeId(form.relatedShiftCode),
+        // Kept for mock-mode display (relatedShiftCode/targetLabel); backend branch ignores it.
+        relatedShiftCode: form.relatedShiftCode,
         priority: Number(form.priority),
         note: form.note.trim(),
       }

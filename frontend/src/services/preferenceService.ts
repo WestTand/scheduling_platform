@@ -99,7 +99,8 @@ export const preferenceService = {
     return preference
   },
 
-  async updateStatus(id: string, decision: WorkPreferenceDecision) {    if (!apiConfig.useMockApi) {
+  async updateStatus(id: string, decision: WorkPreferenceDecision) {
+    if (!apiConfig.useMockApi) {
       return decision.status === 'APPROVED' ? backendPreferenceService.approveForManager(id) : backendPreferenceService.rejectForManager(id)
     }
     await delay(300)
@@ -124,7 +125,7 @@ export const preferenceService = {
     return this.list({ page, pageSize, search, month, status })
   },
 
-  async createMine(input: { preferenceDate: string; type: PreferenceType; shiftTypeId?: number | null; priority: number; note: string }) {
+  async createMine(input: { preferenceDate: string; type: PreferenceType; shiftTypeId?: number | null; relatedShiftCode?: string; priority: number; note: string }) {
     if (!apiConfig.useMockApi) {
       return backendPreferenceService.createForEmployee({
         preferenceDate: input.preferenceDate,
@@ -144,12 +145,14 @@ export const preferenceService = {
       priority: input.priority,
       submittedAt: new Date().toISOString(),
       status: 'PENDING',
+      relatedShiftCode: (input.relatedShiftCode as WorkPreference['relatedShiftCode'] | undefined) ?? undefined,
+      targetLabel: input.relatedShiftCode ?? undefined,
     }
     preferences = [created, ...preferences]
     return created
   },
 
-  async updateMine(id: string, input: { preferenceDate: string; type: PreferenceType; shiftTypeId?: number | null; priority: number; note: string }) {
+  async updateMine(id: string, input: { preferenceDate: string; type: PreferenceType; shiftTypeId?: number | null; relatedShiftCode?: string; priority: number; note: string }) {
     if (!apiConfig.useMockApi) {
       return backendPreferenceService.updateForEmployee(id, {
         preferenceDate: input.preferenceDate,
@@ -170,6 +173,8 @@ export const preferenceService = {
     preference.type = input.type
     preference.note = input.note
     preference.priority = input.priority
+    preference.relatedShiftCode = (input.relatedShiftCode as WorkPreference['relatedShiftCode'] | undefined) ?? preference.relatedShiftCode
+    preference.targetLabel = input.relatedShiftCode ?? preference.targetLabel
 
     return preference
   },
