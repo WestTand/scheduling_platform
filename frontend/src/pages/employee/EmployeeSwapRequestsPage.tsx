@@ -1,5 +1,5 @@
 import { CalendarClock, Check, Eye, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
@@ -13,7 +13,9 @@ import { SearchInput } from '@/components/common/SearchInput'
 import { StatusBadge } from '@/components/common/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { apiConfig } from '@/config/api'
 import { useAuth } from '@/contexts/useAuth'
+import { backendAuthService } from '@/services/backendAuthService'
 import { swapRequestService } from '@/services/swapRequestService'
 import type { CoworkerOption, PaginatedResult, SwapAssignmentOption, SwapRequest } from '@/types/management'
 
@@ -33,14 +35,38 @@ export function EmployeeSwapRequestsPage() {
   const [form, setForm] = useState({ requesterAssignmentId: '', targetEmployeeId: '', reason: '' })
 
   const { user } = useAuth()
-  const currentEmployeeId = user?.id
+  const [authoritativeEmployeeId, setAuthoritativeEmployeeId] = useState<string | null>(null)
+  const currentEmployeeId = authoritativeEmployeeId ?? user?.id
+
+  useEffect(() => {
+    if (apiConfig.useMockApi) {
+      return
+    }
+
+    let mounted = true
+    backendAuthService.me()
+      .then((meUser) => {
+        if (mounted) {
+          setAuthoritativeEmployeeId(meUser.id)
+        }
+      })
+      .catch(() => {
+        if (mounted) {
+          setAuthoritativeEmployeeId(null)
+        }
+      })
+
+    return () => {
+      mounted = false
+    }
+  }, [])
 
   const loadData = async () => {
     setLoading(true)
     setError('')
 
     try {
-      const result = await swapRequestService.listMine({ page: 1, pageSize: 50, search, status: statusFilter })
+      const result = await swapRequestService.listMine({ page: 1, pageSize: 50, search: '', status: statusFilter })
       setData(result)
     } catch (loadErr) {
       setError(loadErr instanceof Error ? loadErr.message : 'Không thể tải yêu cầu đổi ca.')
@@ -67,7 +93,7 @@ export function EmployeeSwapRequestsPage() {
       setError('')
 
       try {
-        const result = await swapRequestService.listMine({ page: 1, pageSize: 50, search, status: statusFilter })
+        const result = await swapRequestService.listMine({ page: 1, pageSize: 50, search: '', status: statusFilter })
         if (mounted) {
           setData(result)
         }
@@ -87,7 +113,34 @@ export function EmployeeSwapRequestsPage() {
     return () => {
       mounted = false
     }
-  }, [search, statusFilter])
+  }, [statusFilter])
+
+  const statusBadgeLabels: Record<string, string> = {
+    PENDING_TARGET: 'chờ nhân viên phản hồi',
+    PENDING_APPROVAL: 'chờ quản lý duyệt',
+    APPROVED: 'đã duyệt',
+    REJECTED: 'đã từ chối',
+    CANCELLED: 'đã hủy',
+  }
+
+  const filteredRequests = useMemo(() => {
+    const normalizedSearch = search.trim().toLowerCase()
+    if (!normalizedSearch) {
+      return data.data
+    }
+    return data.data.filter((request) => {
+      const candidates = [
+        request.reason ?? '',
+        request.partnerName ?? '',
+        request.employeeName ?? '',
+        request.currentShiftName ?? '',
+        request.requestedShiftName ?? '',
+        request.status.toLowerCase(),
+        statusBadgeLabels[request.status] ?? '',
+      ]
+      return candidates.some((value) => value.toLowerCase().includes(normalizedSearch))
+    })
+  }, [data.data, search])
 
   useEffect(() => {
     if (!showForm) {
@@ -199,12 +252,12 @@ export function EmployeeSwapRequestsPage() {
             <LoadingState label="Đang tải yêu cầu đổi ca..." />
           ) : error ? (
             <ErrorState message={error} onRetry={loadData} />
-          ) : data.data.length === 0 ? (
+          ) : filteredRequests.length === 0 ? (
             <EmptyState title="Không có yêu cầu đổi ca" description="Bạn chưa có yêu cầu nào phù hợp với bộ lọc." />
           ) : (
             <>
               <DataTable
-                data={data.data}
+                data={filteredRequests}
                 columns={[
                   { key: 'id', label: 'Mã yêu cầu' },
                   { key: 'currentShiftName', label: 'Ca hiện tại', render: (item: SwapRequest) => <span>{item.currentShiftName ?? '—'}</span> },
@@ -293,7 +346,7 @@ export function EmployeeSwapRequestsPage() {
             <div className="flex justify-between"><span>Ca đối ứng (targetAssignment)</span><strong>{selected.targetAssignmentId ?? '—'}</strong></div>
             <div className="flex justify-between"><span>Ngày mong muốn</span><strong>{selected.requestedDate}</strong></div>
             <div className="flex justify-between"><span>Lý do</span><strong>{selected.reason}</strong></div>
-            <div className="flex justify-between"><span>Ghi chú</span><strong>{selected.note ?? selected.managerNote ?? '—'}</strong></div>
+            <div className="flex justify-between"><span>Ghi chú</span><strong>{selected.note ?? selected.managerNote ?? 'Chưa có'}</strong></div>
             <div className="flex justify-between"><span>Trạng thái</span><StatusBadge status={selected.status} /></div>
             {selected.reviewedBy && <div className="flex justify-between"><span>Người duyệt</span><strong>{selected.reviewedBy}</strong></div>}
             {selected.reviewedAt && <div className="flex justify-between"><span>Thời gian duyệt</span><strong>{selected.reviewedAt}</strong></div>}

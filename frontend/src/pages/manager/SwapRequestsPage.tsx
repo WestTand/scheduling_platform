@@ -14,6 +14,7 @@ import { StatCard } from '@/components/common/StatCard'
 import { StatusBadge } from '@/components/common/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { apiConfig } from '@/config/api'
 import { formatShiftRangeLabel, getShiftDefinition } from '@/configs/shiftDefinitions'
 import { swapRequestService } from '@/services/swapRequestService'
 import type { PaginatedResult, SwapRequest, SwapRequestStatus } from '@/types/management'
@@ -96,7 +97,7 @@ export function SwapRequestsPage() {
       return
     }
 
-    if (decisionDialog.type === 'REJECTED' && !managerNote.trim()) {
+    if (decisionDialog.type === 'REJECTED' && apiConfig.useMockApi && !managerNote.trim()) {
       window.alert('Vui lòng nhập lý do từ chối.')
       return
     }
@@ -168,7 +169,7 @@ export function SwapRequestsPage() {
       <ConfirmDialog
         open={Boolean(decisionDialog)}
         title={decisionDialog?.type === 'APPROVED' ? 'Duyệt yêu cầu đổi ca' : 'Từ chối yêu cầu đổi ca'}
-        description={decisionDialog?.type === 'APPROVED' ? 'Bạn xác nhận duyệt yêu cầu đổi ca này.' : 'Bạn xác nhận từ chối yêu cầu đổi ca này.'}
+        description={decisionDialog?.type === 'APPROVED' ? 'Bạn xác nhận duyệt yêu cầu đổi ca này.' : apiConfig.useMockApi ? 'Vui lòng nhập lý do từ chối trước khi xác nhận.' : 'Bạn xác nhận từ chối yêu cầu đổi ca này. Ghi chú chỉ hiển thị cục bộ vì backend hiện không nhận lý do.'}
         onCancel={() => setDecisionDialog(null)}
         onConfirm={handleDecision}
       >
@@ -194,7 +195,7 @@ export function SwapRequestsPage() {
             <div className="flex justify-between"><span>Ngày gửi</span><strong>{new Date(selected.requestedDate).toLocaleDateString('vi-VN')}</strong></div>
             <div className="flex justify-between"><span>Nhân viên đổi cùng</span><strong>{selected.partnerName ?? 'Không có'}</strong></div>
             <div className="flex justify-between"><span>Lý do</span><strong>{selected.reason}</strong></div>
-            <div className="flex justify-between"><span>Ghi chú xử lý</span><strong>{selected.managerNote ?? 'Chưa có'}</strong></div>
+            <div className="flex justify-between"><span>Ghi chú xử lý</span><strong>{selected.note ?? selected.managerNote ?? 'Chưa có'}</strong></div>
             <div className="flex justify-between"><span>Trạng thái</span><StatusBadge status={selected.status} /></div>
           </div>
         )}
