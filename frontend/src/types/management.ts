@@ -24,7 +24,8 @@ export const LeaveRequestStatus = {
 export type LeaveRequestStatus = (typeof LeaveRequestStatus)[keyof typeof LeaveRequestStatus]
 
 export const SwapRequestStatus = {
-  PENDING: 'PENDING',
+  PENDING_TARGET: 'PENDING_TARGET',
+  PENDING_APPROVAL: 'PENDING_APPROVAL',
   APPROVED: 'APPROVED',
   REJECTED: 'REJECTED',
   CANCELLED: 'CANCELLED',
@@ -178,10 +179,16 @@ export interface LeaveRequestDecision {
 
 export interface SwapRequest {
   id: string
+  requesterEmployeeId?: string
+  targetEmployeeId?: string
+  requesterAssignmentId?: string
+  targetAssignmentId?: string
   employeeName: string
   employeeEmail: string
-  currentShiftCode: ShiftCode
-  requestedShiftCode: ShiftCode
+  currentShiftCode?: ShiftCode
+  currentShiftName?: string
+  requestedShiftCode?: ShiftCode
+  requestedShiftName?: string
   partnerName?: string
   requestedDate: string
   reason: string
@@ -191,6 +198,22 @@ export interface SwapRequest {
   reviewedBy?: string
   reviewedAt?: string
   managerNote?: string
+}
+
+export interface SwapAssignmentOption {
+  id: string
+  workDate: string
+  shiftName: string
+  shiftStartTime: string
+  shiftEndTime: string
+  periodName: string
+  periodStatus: string
+}
+
+export interface CoworkerOption {
+  id: string
+  employeeCode: string
+  fullName: string
 }
 
 export interface NotificationItem {

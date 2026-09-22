@@ -26,7 +26,9 @@ export const swapRequestService = {
     await delay(300)
 
     const filtered = swapRequests.filter((request) => {
-      const matchesSearch = !search || [request.employeeName, request.currentShiftCode, request.requestedShiftCode, getShiftDefinition(request.currentShiftCode)?.name ?? '', getShiftDefinition(request.requestedShiftCode)?.name ?? ''].some((value) => value.toLowerCase().includes(search.toLowerCase()))
+      const currentShiftName = request.currentShiftCode ? getShiftDefinition(request.currentShiftCode)?.name ?? '' : request.currentShiftName ?? ''
+      const requestedShiftName = request.requestedShiftCode ? getShiftDefinition(request.requestedShiftCode)?.name ?? '' : request.requestedShiftName ?? ''
+      const matchesSearch = !search || [request.employeeName, request.partnerName ?? '', request.reason, currentShiftName, requestedShiftName].some((value) => (value ?? '').toLowerCase().includes(search.toLowerCase()))
       const matchesStatus = status === 'ALL' || request.status === status
       const matchesStartDate = !startDate || request.requestedDate >= startDate
       const matchesEndDate = !endDate || request.requestedDate <= endDate
@@ -61,7 +63,7 @@ export const swapRequestService = {
       throw new Error('Yêu cầu đổi ca không tồn tại.')
     }
 
-    if (request.status !== 'PENDING') {
+    if (request.status !== 'PENDING_APPROVAL') {
       throw new Error('Yêu cầu đã được xử lý, không thể cập nhật lại.')
     }
 
@@ -79,7 +81,7 @@ export const swapRequestService = {
     const newRequest: SwapRequest = {
       ...data,
       id: `SWAP-${Date.now()}`,
-      status: data.status ?? 'PENDING',
+      status: data.status ?? 'PENDING_APPROVAL',
       submittedAt: new Date().toISOString(),
       reviewedAt: undefined,
       reviewedBy: undefined,
@@ -98,7 +100,7 @@ export const swapRequestService = {
       throw new Error('Yêu cầu đổi ca không tồn tại.')
     }
 
-    if (request.status !== 'PENDING') {
+    if (request.status !== 'PENDING_APPROVAL') {
       throw new Error('Chỉ có yêu cầu đang chờ xử lý mới được hủy.')
     }
 

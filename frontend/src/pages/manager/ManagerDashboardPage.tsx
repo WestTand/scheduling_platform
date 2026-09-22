@@ -26,7 +26,7 @@ export function ManagerDashboardPage() {
 
   const pendingSchedule = scheduleSeed.find((schedule) => schedule.status === 'DRAFT')
   const pendingLeave = leaveRequestSeed.find((request) => request.status === 'PENDING')
-  const pendingSwap = swapRequestSeed.find((request) => request.status === 'PENDING')
+  const pendingSwap = swapRequestSeed.find((request) => request.status === 'PENDING_TARGET' || request.status === 'PENDING_APPROVAL')
   const pendingPreference = preferenceSeed.find((preference) => preference.status === 'PENDING')
   const criticalWarning = scheduleDetailSeed.warnings.find((warning) => warning.severity === 'HIGH')
   const actionItems = [

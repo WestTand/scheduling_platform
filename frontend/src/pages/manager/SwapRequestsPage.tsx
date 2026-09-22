@@ -84,7 +84,7 @@ export function SwapRequestsPage() {
   }, [page, search, status, startDate, endDate])
 
   const stats = useMemo(() => ({
-    pending: data.data.filter((item) => item.status === 'PENDING').length,
+    pending: data.data.filter((item) => item.status === 'PENDING_TARGET' || item.status === 'PENDING_APPROVAL').length,
     approved: data.data.filter((item) => item.status === 'APPROVED').length,
     rejected: data.data.filter((item) => item.status === 'REJECTED').length,
     cancelled: data.data.filter((item) => item.status === 'CANCELLED').length,
@@ -145,15 +145,15 @@ export function SwapRequestsPage() {
                 columns={[
                   { key: 'id', label: 'Mã yêu cầu' },
                   { key: 'employeeName', label: 'Nhân viên gửi' },
-                  { key: 'currentShiftCode', label: 'Ca hiện tại', render: (item: SwapRequest) => { const shift = getShiftDefinition(item.currentShiftCode); return <span>{shift?.name} · {shift && formatShiftRangeLabel(shift)}</span> } },
-                  { key: 'requestedShiftCode', label: 'Ca muốn đổi', render: (item: SwapRequest) => { const shift = getShiftDefinition(item.requestedShiftCode); return <span>{shift?.name} · {shift && formatShiftRangeLabel(shift)}</span> } },
+                  { key: 'currentShiftCode', label: 'Ca hiện tại', render: (item: SwapRequest) => { const shift = item.currentShiftCode ? getShiftDefinition(item.currentShiftCode) : null; return <span>{shift ? `${shift.name} · ${formatShiftRangeLabel(shift)}` : item.currentShiftName ?? 'Assignment chưa rõ'}</span> } },
+                  { key: 'requestedShiftCode', label: 'Ca muốn đổi', render: (item: SwapRequest) => { const shift = item.requestedShiftCode ? getShiftDefinition(item.requestedShiftCode) : null; return <span>{shift ? `${shift.name} · ${formatShiftRangeLabel(shift)}` : item.requestedShiftName ?? 'Nhờ nhận ca'}</span> } },
                   { key: 'requestedDate', label: 'Ngày', render: (item: SwapRequest) => <span>{new Date(item.requestedDate).toLocaleDateString('vi-VN')}</span> },
                   { key: 'status', label: 'Trạng thái', render: (item: SwapRequest) => <StatusBadge status={item.status} /> },
                   { key: 'actions', label: 'Thao tác', render: (item: SwapRequest) => (
                     <div className="flex items-center gap-2">
                       <Button variant="ghost" size="icon" onClick={() => setSelected(item)} aria-label="Xem chi tiết"><Eye className="h-4 w-4" /></Button>
-                      <Button variant="ghost" size="icon" onClick={() => { setManagerNote(''); setDecisionDialog({ id: item.id, type: 'APPROVED' }) }} disabled={item.status !== 'PENDING'} aria-label="Duyệt yêu cầu"><Check className="h-4 w-4" /></Button>
-                      <Button variant="ghost" size="icon" onClick={() => { setManagerNote(''); setDecisionDialog({ id: item.id, type: 'REJECTED' }) }} disabled={item.status !== 'PENDING'} aria-label="Từ chối yêu cầu"><X className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => { setManagerNote(''); setDecisionDialog({ id: item.id, type: 'APPROVED' }) }} disabled={item.status !== 'PENDING_APPROVAL'} aria-label="Duyệt yêu cầu"><Check className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => { setManagerNote(''); setDecisionDialog({ id: item.id, type: 'REJECTED' }) }} disabled={item.status !== 'PENDING_TARGET' && item.status !== 'PENDING_APPROVAL'} aria-label="Từ chối yêu cầu"><X className="h-4 w-4" /></Button>
                     </div>
                   ) },
                 ]}
@@ -188,8 +188,8 @@ export function SwapRequestsPage() {
           <div className="mt-4 space-y-3 text-sm text-slate-600">
             <div className="flex justify-between"><span>Mã yêu cầu</span><strong>{selected.id}</strong></div>
             <div className="flex justify-between"><span>Nhân viên</span><strong>{selected.employeeName}</strong></div>
-            <div className="flex justify-between"><span>Ca hiện tại</span><strong>{getShiftDefinition(selected.currentShiftCode)?.name}</strong></div>
-            <div className="flex justify-between"><span>Ca muốn đổi</span><strong>{getShiftDefinition(selected.requestedShiftCode)?.name}</strong></div>
+            <div className="flex justify-between"><span>Ca hiện tại</span><strong>{selected.currentShiftCode ? getShiftDefinition(selected.currentShiftCode)?.name : selected.currentShiftName}</strong></div>
+            <div className="flex justify-between"><span>Ca muốn đổi</span><strong>{selected.requestedShiftCode ? getShiftDefinition(selected.requestedShiftCode)?.name : selected.requestedShiftName}</strong></div>
             <div className="flex justify-between"><span>Ngày gửi</span><strong>{new Date(selected.requestedDate).toLocaleDateString('vi-VN')}</strong></div>
             <div className="flex justify-between"><span>Nhân viên đổi cùng</span><strong>{selected.partnerName ?? 'Không có'}</strong></div>
             <div className="flex justify-between"><span>Lý do</span><strong>{selected.reason}</strong></div>

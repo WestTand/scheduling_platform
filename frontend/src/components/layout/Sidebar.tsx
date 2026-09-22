@@ -49,7 +49,7 @@ const getBadgeCount = (label: string, role: Role) => {
     return preferenceSeed.filter((item) => item.status === 'PENDING').length
   }
   if (label === 'Yêu cầu đổi ca') {
-    return swapRequestSeed.filter((item) => item.status === 'PENDING').length
+    return swapRequestSeed.filter((item) => item.status === 'PENDING_TARGET' || item.status === 'PENDING_APPROVAL').length
   }
   if (label === 'Thông báo') {
     return notificationSeed.filter((item) => !item.isRead).length

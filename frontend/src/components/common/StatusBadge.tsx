@@ -13,13 +13,15 @@ export function StatusBadge({ status, variant }: StatusBadgeProps) {
     ACTIVE: 'Đang hoạt động',
     INACTIVE: 'Tạm ngưng',
     PENDING: 'Chờ duyệt',
+    PENDING_TARGET: 'Chờ nhân viên phản hồi',
+    PENDING_APPROVAL: 'Chờ quản lý duyệt',
     APPROVED: 'Đã duyệt',
     REJECTED: 'Đã từ chối',
     REVIEWED: 'Đã xem',
     CANCELLED: 'Đã hủy',
   }[normalized] ?? status
 
-  const badgeVariant = normalized === 'ACTIVE' || normalized === 'APPROVED' ? 'default' : normalized === 'PENDING' || normalized === 'REVIEWED' ? 'secondary' : normalized === 'REJECTED' || normalized === 'INACTIVE' ? 'destructive' : 'outline'
+  const badgeVariant = normalized === 'ACTIVE' || normalized === 'APPROVED' ? 'default' : normalized === 'PENDING' || normalized === 'PENDING_TARGET' || normalized === 'PENDING_APPROVAL' || normalized === 'REVIEWED' ? 'secondary' : normalized === 'REJECTED' || normalized === 'INACTIVE' ? 'destructive' : 'outline'
 
   return <Badge variant={variant ?? badgeVariant}>{display}</Badge>
 }
