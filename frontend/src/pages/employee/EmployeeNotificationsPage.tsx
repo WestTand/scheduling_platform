@@ -1,26 +1,30 @@
 import { BellRing, CheckCheck, Eye } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { DataTable } from '@/components/common/DataTable'
+import { EmptyState } from '@/components/common/EmptyState'
+import { ErrorState } from '@/components/common/ErrorState'
+import { LoadingState } from '@/components/common/LoadingState'
 import { PageHeader } from '@/components/common/PageHeader'
+import { Pagination } from '@/components/common/Pagination'
 import { SearchInput } from '@/components/common/SearchInput'
 import { StatusBadge } from '@/components/common/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-
-const notifications = [
-  { id: 'NOTI-001', title: 'Lịch làm việc tuần tới đã cập nhật', content: 'Bạn cần kiểm tra lịch làm việc mới được bổ sung từ quản lý.', type: 'Lịch làm việc', createdAt: '2026-09-15T08:00:00', isRead: false },
-  { id: 'NOTI-002', title: 'Yêu cầu đổi ca đang chờ duyệt', content: 'Yêu cầu đổi ca của bạn đã được gửi cho quản lý. Vui lòng chờ xác nhận.', type: 'Đổi ca', createdAt: '2026-09-14T15:15:00', isRead: true },
-  { id: 'NOTI-003', title: 'Quy định nghỉ phép mới', content: 'Quy trình nghỉ phép trong tháng 09/2026 đã được cập nhật.', type: 'Ngày nghỉ', createdAt: '2026-09-12T10:30:00', isRead: true },
-]
+import { notificationService } from '@/services/notificationService'
+import type { NotificationItem, PaginatedResult } from '@/types/management'
 
 export function EmployeeNotificationsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState(() => searchParams.get('status') ?? 'ALL')
-  const [selected, setSelected] = useState<(typeof notifications)[number] | null>(() => notifications.find((item) => item.id === searchParams.get('notificationId')) ?? null)
+  const [page, setPage] = useState(1)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [data, setData] = useState<PaginatedResult<NotificationItem>>({ data: [], page: 1, pageSize: 5, total: 0, totalPages: 1 })
+  const [selected, setSelected] = useState<NotificationItem | null>(null)
 
   const closeDetails = () => {
     setSelected(null)
@@ -29,18 +33,57 @@ export function EmployeeNotificationsPage() {
     setSearchParams(params, { replace: true })
   }
 
-  const filtered = useMemo(() => notifications.filter((item) => {
-    const matchesSearch = !search || item.title.toLowerCase().includes(search.toLowerCase()) || item.content.toLowerCase().includes(search.toLowerCase())
-    const matchesStatus = statusFilter === 'ALL' || (statusFilter === 'UNREAD' ? !item.isRead : item.isRead)
-    return matchesSearch && matchesStatus
-  }), [search, statusFilter])
+  const fetchData = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const result = await notificationService.list({ page, pageSize: 5, search, status: statusFilter })
+      setData(result)
+      const selectedId = searchParams.get('notificationId')
+      setSelected(selectedId ? result.data.find((item) => item.id === selectedId) ?? null : null)
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : 'Không thể tải thông báo.')
+    } finally {
+      setLoading(false)
+    }
+  }
 
-  const handleMarkRead = (id: string) => {
-    const target = notifications.find((item) => item.id === id)
-    if (!target) return
-    target.isRead = true
-    closeDetails()
-    window.alert('Thông báo đã được đánh dấu là đã đọc.')
+  useEffect(() => {
+    let mounted = true
+    const load = async () => {
+      setLoading(true)
+      setError('')
+      try {
+        const result = await notificationService.list({ page, pageSize: 5, search, status: statusFilter })
+        if (mounted) {
+          setData(result)
+          const selectedId = searchParams.get('notificationId')
+          setSelected(selectedId ? result.data.find((item) => item.id === selectedId) ?? null : null)
+        }
+      } catch (loadError) {
+        if (mounted) setError(loadError instanceof Error ? loadError.message : 'Không thể tải thông báo.')
+      } finally {
+        if (mounted) setLoading(false)
+      }
+    }
+    void load()
+    return () => { mounted = false }
+  }, [page, search, statusFilter, searchParams])
+
+  const stats = useMemo(() => ({
+    total: data.total,
+    unread: data.data.filter((item) => !item.isRead).length,
+    read: data.data.filter((item) => item.isRead).length,
+  }), [data])
+
+  const handleMarkRead = async (id: string) => {
+    try {
+      await notificationService.markRead(id)
+      closeDetails()
+      await fetchData()
+    } catch (markError) {
+      window.alert(markError instanceof Error ? markError.message : 'Không thể đánh dấu đã đọc.')
+    }
   }
 
   return (
@@ -48,37 +91,48 @@ export function EmployeeNotificationsPage() {
       <PageHeader title="Thông báo của tôi" description="Theo dõi các cập nhật quan trọng liên quan đến lịch, nghỉ phép, và yêu cầu đổi ca." />
 
       <section className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><p className="text-sm text-slate-500">Tổng</p><p className="mt-2 text-2xl font-semibold">{notifications.length}</p></div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><p className="text-sm text-slate-500">Chưa đọc</p><p className="mt-2 text-2xl font-semibold">{notifications.filter((item) => !item.isRead).length}</p></div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><p className="text-sm text-slate-500">Đã đọc</p><p className="mt-2 text-2xl font-semibold">{notifications.filter((item) => item.isRead).length}</p></div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><p className="text-sm text-slate-500">Tổng</p><p className="mt-2 text-2xl font-semibold">{stats.total}</p></div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><p className="text-sm text-slate-500">Chưa đọc</p><p className="mt-2 text-2xl font-semibold">{stats.unread}</p></div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><p className="text-sm text-slate-500">Đã đọc</p><p className="mt-2 text-2xl font-semibold">{stats.read}</p></div>
       </section>
 
       <Card className="border-slate-200 bg-white shadow-sm">
         <CardContent className="space-y-4 p-4">
           <div className="grid gap-3 md:grid-cols-[1.2fr_0.8fr]">
             <SearchInput value={search} placeholder="Tìm kiếm thông báo" onChange={setSearch} />
-            <select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); const params = new URLSearchParams(searchParams); params.set('status', event.target.value); setSearchParams(params) }} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm">
+            <select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1); const params = new URLSearchParams(searchParams); params.set('status', event.target.value); setSearchParams(params) }} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm">
               <option value="ALL">Tất cả</option>
               <option value="UNREAD">Chưa đọc</option>
               <option value="READ">Đã đọc</option>
             </select>
           </div>
 
-          <DataTable
-            data={filtered}
-            columns={[
-              { key: 'title', label: 'Tiêu đề' },
-              { key: 'type', label: 'Loại' },
-              { key: 'createdAt', label: 'Thời gian', render: (item: (typeof notifications)[number]) => <span>{new Date(item.createdAt).toLocaleString('vi-VN')}</span> },
-              { key: 'isRead', label: 'Trạng thái', render: (item: (typeof notifications)[number]) => <StatusBadge status={item.isRead ? 'APPROVED' : 'PENDING'} /> },
-              { key: 'actions', label: 'Thao tác', render: (item: (typeof notifications)[number]) => (
-                <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="icon" onClick={() => { setSelected(item); const params = new URLSearchParams(searchParams); params.set('notificationId', item.id); setSearchParams(params) }} aria-label="Xem chi tiết thông báo"><Eye className="h-4 w-4" /></Button>
-                  {!item.isRead && <Button variant="ghost" size="icon" onClick={() => handleMarkRead(item.id)}><CheckCheck className="h-4 w-4" /></Button>}
-                </div>
-              ) },
-            ]}
-          />
+          {loading ? (
+            <LoadingState label="Đang tải thông báo..." />
+          ) : error ? (
+            <ErrorState message={error} onRetry={fetchData} />
+          ) : data.data.length === 0 ? (
+            <EmptyState title="Không có thông báo" description="Chưa có thông báo phù hợp với bộ lọc." />
+          ) : (
+            <>
+              <DataTable
+                data={data.data}
+                columns={[
+                  { key: 'title', label: 'Tiêu đề' },
+                  { key: 'type', label: 'Loại' },
+                  { key: 'createdAt', label: 'Thời gian', render: (item: NotificationItem) => <span>{new Date(item.createdAt).toLocaleString('vi-VN')}</span> },
+                  { key: 'isRead', label: 'Trạng thái', render: (item: NotificationItem) => <StatusBadge status={item.isRead ? 'APPROVED' : 'PENDING'} /> },
+                  { key: 'actions', label: 'Thao tác', render: (item: NotificationItem) => (
+                    <div className="flex items-center gap-2">
+                      <Button variant="ghost" size="icon" onClick={() => { setSelected(item); const params = new URLSearchParams(searchParams); params.set('notificationId', item.id); setSearchParams(params) }} aria-label="Xem chi tiết thông báo"><Eye className="h-4 w-4" /></Button>
+                      {!item.isRead && <Button variant="ghost" size="icon" onClick={() => handleMarkRead(item.id)}><CheckCheck className="h-4 w-4" /></Button>}
+                    </div>
+                  ) },
+                ]}
+              />
+              <Pagination page={data.page} totalPages={data.totalPages} onPageChange={setPage} />
+            </>
+          )}
         </CardContent>
       </Card>
 
