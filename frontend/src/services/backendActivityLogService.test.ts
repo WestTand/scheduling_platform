@@ -31,10 +31,10 @@ describe('backendActivityLogService', () => {
       { id: 2, accountId: 10, username: 'manager', action: 'LOCK', entityType: 'employees', entityId: 3, oldValueJson: null, newValueJson: '{}', createdAt: '2026-09-23T09:00:00', ipAddress: null },
     ]))
 
-    const result = await backendActivityLogService.list({ page: 1, pageSize: 5, search: 'leave', action: 'APPROVE', startDate: '2026-09-01', endDate: '2026-09-30' })
+    const result = await backendActivityLogService.list({ page: 1, pageSize: 5, search: 'nghỉ phép', action: 'APPROVE', startDate: '2026-09-01', endDate: '2026-09-30' })
 
     expect(fetch).toHaveBeenCalledWith('http://localhost:8080/api/admin/activity-logs?action=APPROVE&from=2026-09-01&to=2026-09-30', expect.any(Object))
     expect(result.total).toBe(1)
-    expect(result.data[0]?.target).toBe('leave_requests #2')
+    expect(result.data[0]?.target).toBe('Đơn nghỉ phép #2')
   })
 })
