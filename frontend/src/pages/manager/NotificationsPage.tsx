@@ -12,6 +12,7 @@ import { SearchInput } from '@/components/common/SearchInput'
 import { StatusBadge } from '@/components/common/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { apiConfig } from '@/config/api'
 import { notificationService } from '@/services/notificationService'
 import type { NotificationItem, PaginatedResult } from '@/types/management'
 
@@ -100,7 +101,7 @@ export function NotificationsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Quản lý thông báo" description="Theo dõi và tạo thông báo cho nhân viên trong mock state." />
+      <PageHeader title="Quản lý thông báo" description={apiConfig.useMockApi ? 'Theo dõi và tạo thông báo trong mock state.' : 'Theo dõi thông báo phát sinh từ các nghiệp vụ backend.'} />
 
       <section className="grid gap-4 md:grid-cols-3">
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><p className="text-sm text-slate-500">Tất cả</p><p className="mt-2 text-2xl font-semibold">{stats.all}</p></div>
@@ -125,6 +126,7 @@ export function NotificationsPage() {
             <Button variant="outline" onClick={() => { setSuccess('Mock state: tất cả thông báo đã được đánh dấu đã đọc.'); void notificationService.markAllRead().then(() => fetchData()) }}><CheckCheck className="mr-2 h-4 w-4" />Đánh dấu tất cả đã đọc</Button>
           </div>
 
+          {apiConfig.useMockApi && (
           <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4">
             <p className="mb-3 text-sm font-medium text-slate-700">Tạo thông báo</p>
             <div className="grid gap-3 md:grid-cols-2">
@@ -146,6 +148,7 @@ export function NotificationsPage() {
             <textarea className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm" rows={3} defaultValue="Lịch làm việc tuần tới đã được cập nhật. Vui lòng kiểm tra trước khi làm việc." />
             <div className="mt-3 flex justify-end"><Button onClick={handleCreate}><Bell className="mr-2 h-4 w-4" />Tạo thông báo</Button></div>
           </div>
+          )}
 
           {loading ? (
             <LoadingState label="Đang tải thông báo..." />

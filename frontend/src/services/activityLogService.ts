@@ -1,4 +1,6 @@
+import { apiConfig } from '@/config/api'
 import { activityLogSeed } from '@/mocks/managementData'
+import { backendActivityLogService } from '@/services/backendActivityLogService'
 import type { ActivityLog, PaginatedResult } from '@/types/management'
 
 const delay = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms))
@@ -8,6 +10,9 @@ let activityLogs: ActivityLog[] = clone(activityLogSeed)
 
 export const activityLogService = {
   async list({ page = 1, pageSize = 5, search = '', action = 'ALL', startDate = '', endDate = '' }: { page?: number; pageSize?: number; search?: string; action?: string; startDate?: string; endDate?: string }) {
+    if (!apiConfig.useMockApi) {
+      return backendActivityLogService.list({ page, pageSize, search, action, startDate, endDate })
+    }
     await delay(250)
 
     const filtered = activityLogs.filter((log) => {

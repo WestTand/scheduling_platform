@@ -1,3 +1,5 @@
+import { apiConfig } from '@/config/api'
+import { backendNotificationService } from '@/services/backendNotificationService'
 import { notificationSeed } from '@/mocks/managementData'
 import type { NotificationItem, NotificationPriority, NotificationType, PaginatedResult } from '@/types/management'
 
@@ -8,6 +10,9 @@ let notifications: NotificationItem[] = clone(notificationSeed)
 
 export const notificationService = {
   async list({ page = 1, pageSize = 5, search = '', type = 'ALL', status = 'ALL' }: { page?: number; pageSize?: number; search?: string; type?: string; status?: string }) {
+    if (!apiConfig.useMockApi) {
+      return backendNotificationService.list({ page, pageSize, search, type, status })
+    }
     await delay(250)
 
     const filtered = notifications.filter((item) => {
@@ -33,6 +38,9 @@ export const notificationService = {
   },
 
   async markRead(id: string) {
+    if (!apiConfig.useMockApi) {
+      return backendNotificationService.markRead(id)
+    }
     await delay(150)
     const item = notifications.find((notification) => notification.id === id)
 
@@ -45,12 +53,19 @@ export const notificationService = {
   },
 
   async markAllRead() {
+    if (!apiConfig.useMockApi) {
+      await backendNotificationService.markAllRead()
+      return []
+    }
     await delay(200)
     notifications = notifications.map((item) => ({ ...item, isRead: true }))
     return notifications
   },
 
   async create(data: { title: string; content: string; type: NotificationType; priority: NotificationPriority; recipient: string; recipientType: 'ALL' | 'SELECTED'; createdAt?: string; isRead?: boolean; metadata?: string }) {
+    if (!apiConfig.useMockApi) {
+      throw new Error('Backend hiện chưa hỗ trợ tạo thông báo thủ công.')
+    }
     await delay(200)
 
     const newItem: NotificationItem = {

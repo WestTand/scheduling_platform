@@ -37,4 +37,12 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
               and n.read = false
             """)
     int markAllRead(@Param("recipientId") Long recipientId);
+
+    @Query("""
+            select count(n)
+            from Notification n
+            where n.recipient.id = :recipientId
+              and n.read = false
+            """)
+    long countUnreadForRecipient(@Param("recipientId") Long recipientId);
 }
