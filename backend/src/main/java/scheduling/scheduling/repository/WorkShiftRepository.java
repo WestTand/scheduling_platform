@@ -10,6 +10,8 @@ import scheduling.scheduling.entity.WorkShift;
 
 public interface WorkShiftRepository extends JpaRepository<WorkShift, Long> {
 
+    Optional<WorkShift> findBySchedulePeriodIdAndWorkDateAndShiftTypeId(Long periodId, LocalDate workDate, Long shiftTypeId);
+
     @Query("""
             select ws
             from WorkShift ws

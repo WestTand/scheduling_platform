@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,6 +16,7 @@ import scheduling.scheduling.repository.AccountRepository;
 
 @Component
 @Profile("dev")
+@Order(20)
 public class DevManagerAccountSeeder implements ApplicationRunner {
 
     private final AccountRepository accountRepository;

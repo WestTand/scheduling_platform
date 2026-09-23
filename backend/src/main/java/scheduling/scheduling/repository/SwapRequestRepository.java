@@ -84,4 +84,7 @@ public interface SwapRequestRepository extends JpaRepository<SwapRequest, Long> 
               and s.status in ('PENDING_TARGET', 'PENDING_APPROVAL')
             """)
     long countPendingForEmployee(@Param("employeeId") Long employeeId);
+
+    boolean existsByRequesterAssignmentIdAndTargetEmployeeIdAndStatus(
+            Long requesterAssignmentId, Long targetEmployeeId, String status);
 }

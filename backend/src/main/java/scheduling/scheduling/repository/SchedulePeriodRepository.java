@@ -12,6 +12,8 @@ public interface SchedulePeriodRepository extends JpaRepository<SchedulePeriod, 
 
     boolean existsByStartDateAndEndDateAndVersionNo(LocalDate startDate, LocalDate endDate, Integer versionNo);
 
+    Optional<SchedulePeriod> findByStartDateAndEndDateAndVersionNo(LocalDate startDate, LocalDate endDate, Integer versionNo);
+
     boolean existsByStartDateAndEndDateAndVersionNoAndIdNot(
             LocalDate startDate, LocalDate endDate, Integer versionNo, Long id);
 

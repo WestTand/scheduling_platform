@@ -92,4 +92,7 @@ public interface PreferenceRepository extends JpaRepository<Preference, Long> {
     long countByStatus(String status);
 
     long countByEmployeeIdAndStatus(Long employeeId, String status);
+
+    boolean existsByEmployeeIdAndPreferenceDateAndPreferenceTypeAndStatus(
+            Long employeeId, LocalDate preferenceDate, String preferenceType, String status);
 }

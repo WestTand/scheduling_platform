@@ -25,6 +25,8 @@ public interface ShiftAssignmentRepository extends JpaRepository<ShiftAssignment
 
     boolean existsByWorkShiftIdAndEmployeeId(Long workShiftId, Long employeeId);
 
+    Optional<ShiftAssignment> findByWorkShiftIdAndEmployeeId(Long workShiftId, Long employeeId);
+
     @Query("""
             select sa
             from ShiftAssignment sa
