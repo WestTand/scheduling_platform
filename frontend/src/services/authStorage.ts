@@ -8,7 +8,11 @@ export const getStoredToken = () => {
 }
 
 export const updateStoredToken = (accessToken: string) => {
-  const storage = sessionStorage.getItem(AUTH_STORAGE_KEYS.TOKEN) ? sessionStorage : localStorage
+  const storage = sessionStorage.getItem(AUTH_STORAGE_KEYS.TOKEN) || sessionStorage.getItem(AUTH_STORAGE_KEYS.USER)
+    ? sessionStorage
+    : localStorage.getItem(AUTH_STORAGE_KEYS.TOKEN) || localStorage.getItem(AUTH_STORAGE_KEYS.USER)
+      ? localStorage
+      : sessionStorage
   storage.setItem(AUTH_STORAGE_KEYS.TOKEN, accessToken)
 }
 

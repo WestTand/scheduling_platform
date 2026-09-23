@@ -1,6 +1,7 @@
 package scheduling.scheduling.audit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -11,6 +12,8 @@ import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import scheduling.scheduling.auth.CurrentAccountPrincipal;
 import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
@@ -64,14 +67,34 @@ class ActivityLogServiceTest {
         log.setId(99L);
         log.setCreatedAt(LocalDateTime.of(2026, 9, 20, 10, 0));
         when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
-        when(activityLogRepository.search("PUBLISH", "schedule_periods", 1L,
-                LocalDate.of(2026, 9, 1).atStartOfDay(), LocalDate.of(2026, 9, 30).plusDays(1).atStartOfDay()))
+        when(activityLogRepository.findAll(any(Specification.class), any(Sort.class)))
                 .thenReturn(java.util.List.of(log));
 
         var result = service.list(principal(), "PUBLISH", "schedule_periods", 1L, LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30));
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).action()).isEqualTo("PUBLISH");
+    }
+
+    @Test
+    void managerListsActivityLogsWithoutDateFilters() {
+        Account manager = account(1L, AccountRole.MANAGER);
+        ActivityLog log = ActivityLog.builder()
+                .account(manager)
+                .action("UPDATE")
+                .entityType("employees")
+                .entityId(2L)
+                .build();
+        log.setId(100L);
+        log.setCreatedAt(LocalDateTime.of(2026, 9, 21, 8, 30));
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
+        when(activityLogRepository.findAll(any(Specification.class), any(Sort.class)))
+                .thenReturn(java.util.List.of(log));
+
+        var result = service.list(principal(), null, null, null, null, null);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).action()).isEqualTo("UPDATE");
     }
 
     private static CurrentAccountPrincipal principal() {

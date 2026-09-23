@@ -86,4 +86,18 @@ describe('requestJson', () => {
     expect(localStorage.getItem(AUTH_STORAGE_KEYS.TOKEN)).toBeNull()
     expect(localStorage.getItem(AUTH_STORAGE_KEYS.USER)).toBeNull()
   })
+
+  test('stores refreshed token in session storage when the active user is session scoped', async () => {
+    sessionStorage.setItem(AUTH_STORAGE_KEYS.USER, JSON.stringify({ id: '1' }))
+    const fetchMock = vi.mocked(fetch)
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ message: 'Unauthorized' }, { status: 401 }))
+      .mockResolvedValueOnce(jsonResponse({ accessToken: 'fresh-session-token', account: {} }))
+      .mockResolvedValueOnce(jsonResponse({ value: 'ok' }))
+
+    await requestJson('/api/employee/notifications')
+
+    expect(sessionStorage.getItem(AUTH_STORAGE_KEYS.TOKEN)).toBe('fresh-session-token')
+    expect(localStorage.getItem(AUTH_STORAGE_KEYS.TOKEN)).toBeNull()
+  })
 })

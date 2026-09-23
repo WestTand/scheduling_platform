@@ -3,9 +3,12 @@ package scheduling.scheduling.audit;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import jakarta.persistence.criteria.JoinType;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -64,9 +67,40 @@ public class ActivityLogService {
         LocalDateTime toExclusive = to == null ? null : to.plusDays(1).atStartOfDay();
         String normalizedAction = StringUtils.hasText(action) ? action.trim().toUpperCase(java.util.Locale.ROOT) : null;
         String normalizedEntityType = StringUtils.hasText(entityType) ? entityType.trim() : null;
-        return activityLogRepository.search(normalizedAction, normalizedEntityType, accountId, fromDateTime, toExclusive).stream()
+        return activityLogRepository.findAll(
+                        searchSpec(normalizedAction, normalizedEntityType, accountId, fromDateTime, toExclusive),
+                        Sort.by(Sort.Direction.DESC, "createdAt", "id"))
+                .stream()
                 .map(ActivityLogResponse::from)
                 .toList();
+    }
+
+    private static Specification<ActivityLog> searchSpec(
+            String action,
+            String entityType,
+            Long accountId,
+            LocalDateTime from,
+            LocalDateTime toExclusive) {
+        return (root, query, criteriaBuilder) -> {
+            root.fetch("account", JoinType.INNER);
+            var predicate = criteriaBuilder.conjunction();
+            if (StringUtils.hasText(action)) {
+                predicate = criteriaBuilder.and(predicate, criteriaBuilder.equal(root.get("action"), action));
+            }
+            if (StringUtils.hasText(entityType)) {
+                predicate = criteriaBuilder.and(predicate, criteriaBuilder.equal(root.get("entityType"), entityType));
+            }
+            if (accountId != null) {
+                predicate = criteriaBuilder.and(predicate, criteriaBuilder.equal(root.get("account").get("id"), accountId));
+            }
+            if (from != null) {
+                predicate = criteriaBuilder.and(predicate, criteriaBuilder.greaterThanOrEqualTo(root.get("createdAt"), from));
+            }
+            if (toExclusive != null) {
+                predicate = criteriaBuilder.and(predicate, criteriaBuilder.lessThan(root.get("createdAt"), toExclusive));
+            }
+            return predicate;
+        };
     }
 
     private Account requireManager(CurrentAccountPrincipal principal) {

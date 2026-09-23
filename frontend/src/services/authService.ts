@@ -101,16 +101,6 @@ export const updateStoredAccessToken = (accessToken: string) => {
 }
 
 export const restoreStoredUser = () => {
-  const localUser = localStorage.getItem(AUTH_STORAGE_KEYS.USER)
-
-  if (localUser) {
-    try {
-      return JSON.parse(localUser) as User
-    } catch {
-      localStorage.removeItem(AUTH_STORAGE_KEYS.USER)
-    }
-  }
-
   const sessionUser = sessionStorage.getItem(AUTH_STORAGE_KEYS.USER)
 
   if (sessionUser) {
@@ -118,6 +108,16 @@ export const restoreStoredUser = () => {
       return JSON.parse(sessionUser) as User
     } catch {
       sessionStorage.removeItem(AUTH_STORAGE_KEYS.USER)
+    }
+  }
+
+  const localUser = localStorage.getItem(AUTH_STORAGE_KEYS.USER)
+
+  if (localUser) {
+    try {
+      return JSON.parse(localUser) as User
+    } catch {
+      localStorage.removeItem(AUTH_STORAGE_KEYS.USER)
     }
   }
 
