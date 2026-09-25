@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
-import { getManagerActionItems, getManagerSummaryCards } from './ManagerDashboard.helpers'
+import { getManagerActionItems, getManagerSummaryCards, pickScheduleAlerts, pickUpcomingShifts } from './ManagerDashboard.helpers'
 
 describe('ManagerDashboard helpers', () => {
   test('builds summary cards from real counts', () => {
@@ -44,5 +44,47 @@ describe('ManagerDashboard helpers', () => {
     expect(items[2]).toMatchObject({ related: 'Trần Thị Bình', path: '/manager/swap-requests?status=PENDING_APPROVAL' })
     expect(items[3]).toMatchObject({ related: 'Lê Minh Châu', path: '/manager/preferences?status=PENDING' })
     expect(items[4]).toMatchObject({ path: '/manager/schedules/48?tab=warnings' })
+  })
+})
+
+describe('ManagerDashboard shift helpers', () => {
+  const detail = {
+    id: '48',
+    name: 'Test002',
+    startDate: '2026-09-24',
+    endDate: '2026-09-26',
+    createdBy: 'Backend',
+    createdAt: '2026-09-25T05:00:00',
+    employeeCount: 8,
+    assignmentCount: 1,
+    shiftCount: 2,
+    status: 'DRAFT',
+    isMock: false,
+    employeePool: ['Nguyễn Văn An'],
+    assignments: [
+      { id: '21', scheduleId: '48', workShiftId: '113', employeeId: '1', date: '2026-09-24', shiftCode: 'THONG_TAM', employeeNames: ['Nguyễn Văn An'], warningCount: 0, locked: false },
+      { id: 'work-shift-114', scheduleId: '48', workShiftId: '114', date: '2026-09-24', shiftCode: 'NGOAI_GIO_1', employeeNames: [], warningCount: 1, locked: false },
+    ],
+    warnings: [
+      { id: 'understaffed-shift-114', type: 'HARD_CONSTRAINT', severity: 'HIGH', employeeName: 'Pool: Nguyễn Văn An', date: '2026-09-24', shiftCode: 'NGOAI_GIO_1', content: 'Ca Ngoai gio 1 thiếu người', suggestion: 'Phân công thêm' },
+    ],
+  } as const
+
+  test('picks upcoming shifts sorted by date', () => {
+    const rows = pickUpcomingShifts([detail as never], 3)
+    expect(rows).toHaveLength(2)
+    expect(rows[0]).toMatchObject({ periodId: '48', shiftCode: 'THONG_TAM', assignedCount: 1, unassigned: false, hasWarning: false })
+    expect(rows[1]).toMatchObject({ shiftCode: 'NGOAI_GIO_1', assignedCount: 0, unassigned: true, hasWarning: true })
+  })
+
+  test('picks high-severity alerts first', () => {
+    const alerts = pickScheduleAlerts([detail as never], 3)
+    expect(alerts).toHaveLength(1)
+    expect(alerts[0]).toMatchObject({ periodId: '48', severity: 'Cao', path: '/manager/schedules/48?tab=warnings' })
+  })
+
+  test('returns empty arrays for empty details', () => {
+    expect(pickUpcomingShifts([], 3)).toEqual([])
+    expect(pickScheduleAlerts([], 3)).toEqual([])
   })
 })

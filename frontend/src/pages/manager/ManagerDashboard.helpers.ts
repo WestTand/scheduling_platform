@@ -1,3 +1,6 @@
+import { getShiftDefinition } from '@/configs/shiftDefinitions'
+import type { ScheduleDetail } from '@/types/schedule'
+
 export interface ManagerSummaryCard {
   label: string
   value: string
@@ -89,3 +92,79 @@ export const getManagerActionItems = ({
     path: criticalWarning ? `/manager/schedules/${criticalWarning.periodId}?tab=warnings` : '/manager/schedules',
   },
 ]
+
+export interface UpcomingShiftRow {
+  key: string
+  periodId: string
+  date: string
+  dateLabel: string
+  shiftCode: string
+  shiftName: string
+  assignedCount: number
+  unassigned: boolean
+  hasWarning: boolean
+  path: string
+}
+
+export interface ScheduleAlertRow {
+  id: string
+  periodId: string
+  title: string
+  detail: string
+  severity: 'Cao' | 'Trung bình' | 'Thấp'
+  path: string
+}
+
+const formatDateLabel = (date: string) => {
+  const weekday = new Date(`${date}T00:00:00`).toLocaleDateString('vi-VN', { weekday: 'long' })
+  const [, month, day] = date.split('-')
+  return `${weekday} - ${day}/${month}`
+}
+
+const alertSeverityLabel = (severity: string): ScheduleAlertRow['severity'] => {
+  if (severity === 'HIGH') return 'Cao'
+  if (severity === 'MEDIUM') return 'Trung bình'
+  return 'Thấp'
+}
+
+const alertTitle = (type: string) => {
+  if (type === 'HARD_CONSTRAINT') return 'Vi phạm ràng buộc cứng'
+  if (type === 'SOFT_CONSTRAINT') return 'Cảnh báo mềm'
+  return 'Thông tin lịch'
+}
+
+export const pickUpcomingShifts = (details: ScheduleDetail[], limit: number): UpcomingShiftRow[] => {
+  const rows = details.flatMap((detail) => detail.assignments.map((assignment) => {
+    const assignedCount = assignment.employeeNames.length
+    const unassigned = assignedCount === 0
+    const hasWarning = assignment.warningCount > 0
+    return {
+      key: `${detail.id}-${assignment.workShiftId ?? assignment.id}`,
+      periodId: detail.id,
+      date: assignment.date,
+      dateLabel: formatDateLabel(assignment.date),
+      shiftCode: assignment.shiftCode,
+      shiftName: getShiftDefinition(assignment.shiftCode)?.name ?? assignment.shiftCode,
+      assignedCount,
+      unassigned,
+      hasWarning,
+      path: hasWarning || unassigned ? `/manager/schedules/${detail.id}?tab=warnings` : `/manager/schedules/${detail.id}`,
+    } satisfies UpcomingShiftRow
+  }))
+  rows.sort((first, second) => first.date.localeCompare(second.date))
+  return rows.slice(0, limit)
+}
+
+export const pickScheduleAlerts = (details: ScheduleDetail[], limit: number): ScheduleAlertRow[] => {
+  const rank = (severity: string) => severity === 'HIGH' ? 0 : severity === 'MEDIUM' ? 1 : 2
+  const alerts = details.flatMap((detail) => detail.warnings.map((warning) => ({
+    id: warning.id,
+    periodId: detail.id,
+    title: alertTitle(warning.type),
+    detail: warning.content,
+    severity: alertSeverityLabel(warning.severity),
+    path: `/manager/schedules/${detail.id}?tab=warnings`,
+  } satisfies ScheduleAlertRow)))
+  alerts.sort((first, second) => rank(first.severity === 'Cao' ? 'HIGH' : first.severity === 'Trung bình' ? 'MEDIUM' : 'LOW') - rank(second.severity === 'Cao' ? 'HIGH' : second.severity === 'Trung bình' ? 'MEDIUM' : 'LOW'))
+  return alerts.slice(0, limit)
+}
