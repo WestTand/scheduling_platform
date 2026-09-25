@@ -15,16 +15,14 @@ export const summarizeOptimizeResult = ({ aiStatus, solverStatus, assignmentCoun
 ].filter(Boolean).join(' · ')
 
 export const buildGenerationNotice = (
-  periodName: string,
+  _periodName: string,
   result: { aiStatus: string; solverStatus: string | null; assignmentCount: number | null; errorMessage?: string | null },
 ) => {
-  const summary = summarizeOptimizeResult(result)
   if (result.aiStatus === 'SUCCESS') {
-    return { type: 'success' as const, message: `Đã sinh lịch ${periodName}. ${summary}` }
+    return { type: 'success' as const, message: 'Tạo lịch thành công.' }
   }
-  const reason = result.errorMessage ? ` Lý do: ${result.errorMessage}.` : ''
   if (result.aiStatus === 'INFEASIBLE') {
-    return { type: 'warning' as const, message: `Đã tạo ca cho ${periodName} nhưng AI chưa phân công được. ${summary}.${reason} Xem tab Cảnh báo hoặc vào Chỉnh sửa để phân công thủ công.` }
+    return { type: 'warning' as const, message: 'Đã tạo lịch nhưng chưa phân công đủ. Vui lòng xem cảnh báo hoặc chỉnh sửa lịch.' }
   }
-  return { type: 'error' as const, message: `Đã tạo ca cho ${periodName} nhưng AI tối ưu thất bại. ${summary}.${reason} Vui lòng xem tab Cảnh báo hoặc thử lại sau.` }
+  return { type: 'error' as const, message: 'Không thể tạo lịch. Vui lòng kiểm tra dữ liệu và thử lại.' }
 }

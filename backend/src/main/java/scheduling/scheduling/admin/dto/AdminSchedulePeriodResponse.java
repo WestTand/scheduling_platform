@@ -17,6 +17,7 @@ public record AdminSchedulePeriodResponse(
         String createdByUsername,
         Long approvedByAccountId,
         String approvedByUsername,
+        LocalDateTime createdAt,
         LocalDateTime publishedAt,
         BigDecimal totalPenalty) {
 
@@ -34,6 +35,7 @@ public record AdminSchedulePeriodResponse(
                 createdBy == null ? null : createdBy.getUsername(),
                 approvedBy == null ? null : approvedBy.getId(),
                 approvedBy == null ? null : approvedBy.getUsername(),
+                null,
                 period.getPublishedAt(),
                 period.getTotalPenalty());
     }

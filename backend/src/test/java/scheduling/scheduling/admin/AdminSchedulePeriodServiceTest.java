@@ -226,6 +226,18 @@ class AdminSchedulePeriodServiceTest {
     }
 
     @Test
+    void listSchedulePeriodsRejectsAllStatus() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+
+        assertThatThrownBy(() -> service.listSchedulePeriods(
+                principal, " all ", LocalDate.of(2026, 9, 21), LocalDate.of(2026, 9, 26)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
     void listSchedulePeriodsRejectsUnsupportedStatus() {
         CurrentAccountPrincipal principal = managerPrincipal();
         when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
@@ -299,8 +311,20 @@ class AdminSchedulePeriodServiceTest {
         assertThat(response.createdByUsername()).isEqualTo("manager01");
         assertThat(response.approvedByAccountId()).isEqualTo(3L);
         assertThat(response.approvedByUsername()).isEqualTo("approver01");
+        assertThat(response.createdAt()).isNull();
         assertThat(response.publishedAt()).isEqualTo(LocalDateTime.of(2026, 9, 21, 9, 0));
         assertThat(response.totalPenalty()).isEqualByComparingTo("12.50");
+    }
+
+    @Test
+    void createSchedulePeriodRejectsInvalidDateRangeWithGenericInvalidRequestMessage() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+
+        assertThatThrownBy(() -> service.createSchedulePeriod(principal, new SchedulePeriodRequest(
+                "Week 38", LocalDate.of(2026, 9, 20), LocalDate.of(2026, 9, 14), 1)))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Invalid schedule period request");
     }
 
     @Test

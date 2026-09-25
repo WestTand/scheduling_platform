@@ -42,6 +42,13 @@ describe('ScheduleGenerationPage helpers', () => {
     expect(summarizeOptimizeResult({ aiStatus: 'FAILED', solverStatus: null, assignmentCount: null })).toBe('AI: FAILED')
   })
 
+  it('builds end-user generation notices without raw codes', () => {
+    expect(buildGenerationNotice('Lịch A', { aiStatus: 'SUCCESS', solverStatus: 'OPTIMAL', assignmentCount: 3, errorMessage: null }).message)
+      .toBe('Tạo lịch thành công.')
+    expect(buildGenerationNotice('Lịch A', { aiStatus: 'INFEASIBLE', solverStatus: 'INFEASIBLE', assignmentCount: 0, errorMessage: 'x' }).message)
+      .toBe('Đã tạo lịch nhưng chưa phân công đủ. Vui lòng xem cảnh báo hoặc chỉnh sửa lịch.')
+  })
+
   it('builds warning notice for infeasible one-shot generation', () => {
     expect(buildGenerationNotice('Lịch tuần 1', {
       aiStatus: 'INFEASIBLE',
@@ -50,7 +57,7 @@ describe('ScheduleGenerationPage helpers', () => {
       errorMessage: 'NO_FEASIBLE_SCHEDULE: No schedule satisfies all hard constraints',
     })).toEqual({
       type: 'warning',
-      message: 'Đã tạo ca cho Lịch tuần 1 nhưng AI chưa phân công được. AI: INFEASIBLE · Solver: INFEASIBLE · 0 phân công. Lý do: NO_FEASIBLE_SCHEDULE: No schedule satisfies all hard constraints. Xem tab Cảnh báo hoặc vào Chỉnh sửa để phân công thủ công.',
+      message: 'Đã tạo lịch nhưng chưa phân công đủ. Vui lòng xem cảnh báo hoặc chỉnh sửa lịch.',
     })
   })
 })

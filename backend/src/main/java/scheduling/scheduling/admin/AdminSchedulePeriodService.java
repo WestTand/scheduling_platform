@@ -88,7 +88,7 @@ public class AdminSchedulePeriodService {
             CurrentAccountPrincipal principal, String status, LocalDate from, LocalDate to) {
         requireManager(principal);
         String normalizedStatus = normalizeStatus(status);
-        validateRange(from, to);
+        validateFilterRange(from, to);
         return schedulePeriodRepository.searchForAdmin(normalizedStatus, from, to).stream()
                 .map(AdminSchedulePeriodResponse::from)
                 .toList();
@@ -256,12 +256,15 @@ public class AdminSchedulePeriodService {
         if (startDate == null || endDate == null) {
             throw invalidRequest();
         }
-        validateRange(startDate, endDate);
+        if (startDate.isAfter(endDate)) {
+            throw invalidRequest();
+        }
     }
 
-    private static void validateRange(LocalDate from, LocalDate to) {
+    private static void validateFilterRange(LocalDate from, LocalDate to) {
         if (from != null && to != null && from.isAfter(to)) {
-            throw invalidRequest();
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Ngày bắt đầu lọc phải trước hoặc bằng ngày kết thúc.");
         }
     }
 

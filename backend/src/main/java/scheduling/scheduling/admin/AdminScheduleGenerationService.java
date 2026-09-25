@@ -6,9 +6,12 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
 import scheduling.scheduling.admin.dto.GenerateScheduleRequest;
@@ -24,6 +27,7 @@ import scheduling.scheduling.entity.ShiftType;
 import scheduling.scheduling.entity.WorkShift;
 import scheduling.scheduling.repository.AccountRepository;
 import scheduling.scheduling.repository.EmployeeRepository;
+import scheduling.scheduling.repository.OptimizationRunRepository;
 import scheduling.scheduling.repository.SchedulePeriodRepository;
 import scheduling.scheduling.repository.ShiftTypeRepository;
 import scheduling.scheduling.repository.WorkShiftRepository;
@@ -33,14 +37,17 @@ public class AdminScheduleGenerationService {
 
     private static final String DRAFT = "DRAFT";
     private static final String ACTIVE = "ACTIVE";
+    private static final String CANCELLED = "CANCELLED";
 
     private final AccountRepository accountRepository;
     private final SchedulePeriodRepository schedulePeriodRepository;
     private final EmployeeRepository employeeRepository;
     private final ShiftTypeRepository shiftTypeRepository;
     private final WorkShiftRepository workShiftRepository;
+    private final OptimizationRunRepository optimizationRunRepository;
     private final DayClassificationService dayClassificationService;
     private final AdminOptimizationService optimizationService;
+    private final TransactionTemplate transactionTemplate;
 
     public AdminScheduleGenerationService(
             AccountRepository accountRepository,
@@ -48,15 +55,20 @@ public class AdminScheduleGenerationService {
             EmployeeRepository employeeRepository,
             ShiftTypeRepository shiftTypeRepository,
             WorkShiftRepository workShiftRepository,
+            OptimizationRunRepository optimizationRunRepository,
             DayClassificationService dayClassificationService,
-            AdminOptimizationService optimizationService) {
+            AdminOptimizationService optimizationService,
+            ObjectProvider<PlatformTransactionManager> transactionManagerProvider) {
         this.accountRepository = accountRepository;
         this.schedulePeriodRepository = schedulePeriodRepository;
         this.employeeRepository = employeeRepository;
         this.shiftTypeRepository = shiftTypeRepository;
         this.workShiftRepository = workShiftRepository;
+        this.optimizationRunRepository = optimizationRunRepository;
         this.dayClassificationService = dayClassificationService;
         this.optimizationService = optimizationService;
+        PlatformTransactionManager transactionManager = transactionManagerProvider.getIfAvailable();
+        this.transactionTemplate = transactionManager == null ? null : new TransactionTemplate(transactionManager);
     }
 
     public GenerateScheduleResponse generate(CurrentAccountPrincipal principal, GenerateScheduleRequest request) {
@@ -64,10 +76,9 @@ public class AdminScheduleGenerationService {
         validatePeriodRange(request.startDate(), request.endDate());
         String periodName = normalizePeriodName(request.periodName());
         int versionNo = request.versionNo() == null ? 1 : request.versionNo();
-        if (versionNo < 1 || schedulePeriodRepository.existsByStartDateAndEndDateAndVersionNo(request.startDate(), request.endDate(), versionNo)) {
+        if (versionNo < 1) {
             throw invalidRequest();
         }
-
         List<Employee> employees = employeeRepository.findAllById(request.employeeIds());
         if (employees.size() != new HashSet<>(request.employeeIds()).size() || employees.stream().anyMatch(employee -> !ACTIVE.equals(employee.getStatus()))) {
             throw invalidRequest();
@@ -77,28 +88,82 @@ public class AdminScheduleGenerationService {
             throw invalidRequest();
         }
 
-        SchedulePeriod period = SchedulePeriod.builder()
-                .periodName(periodName)
-                .startDate(request.startDate())
-                .endDate(request.endDate())
-                .versionNo(versionNo)
-                .status(DRAFT)
-                .createdBy(manager)
-                .employeePool(new LinkedHashSet<>(employees))
-                .build();
-        SchedulePeriod saved = savePeriod(period);
-        createWorkShifts(saved, shiftTypes);
-
-        OptimizeScheduleResponse optimized = optimizationService.optimize(principal, saved.getId(), new OptimizeScheduleRequest(null, request.employeeIds()));
+        PreparedPeriod saved = preparePeriod(request, manager, periodName, versionNo, employees, shiftTypes);
+        OptimizeScheduleResponse optimized = optimizationService.optimize(principal, saved.id(), new OptimizeScheduleRequest(null, request.employeeIds()));
         return new GenerateScheduleResponse(
-                saved.getId(),
-                saved.getPeriodName(),
-                saved.getStatus(),
+                saved.id(),
+                saved.periodName(),
+                saved.status(),
                 optimized.aiStatus(),
                 optimized.solverStatus(),
                 optimized.assignmentCount(),
                 optimized.warnings(),
                 optimized.errorMessage());
+    }
+
+    private PreparedPeriod preparePeriod(
+            GenerateScheduleRequest request,
+            Account manager,
+            String periodName,
+            int versionNo,
+            List<Employee> employees,
+            List<ShiftType> shiftTypes) {
+        if (transactionTemplate == null) {
+            return preparePeriodInTransaction(request, manager, periodName, versionNo, employees, shiftTypes);
+        }
+        return transactionTemplate.execute(status -> preparePeriodInTransaction(
+                request, manager, periodName, versionNo, employees, shiftTypes));
+    }
+
+    private PreparedPeriod preparePeriodInTransaction(
+            GenerateScheduleRequest request,
+            Account manager,
+            String periodName,
+            int versionNo,
+            List<Employee> employees,
+            List<ShiftType> shiftTypes) {
+        List<SchedulePeriod> matchingPeriods = schedulePeriodRepository.findAllByStartDateAndEndDateAndVersionNoForUpdate(
+                request.startDate(), request.endDate(), versionNo);
+        if (matchingPeriods.stream().anyMatch(period -> !CANCELLED.equals(period.getStatus()))) {
+            throw duplicatePeriodRequest();
+        }
+
+        SchedulePeriod saved = savePeriod(preparePeriodEntity(
+                matchingPeriods, request, manager, periodName, versionNo, employees));
+        createWorkShifts(saved, shiftTypes);
+        return new PreparedPeriod(saved.getId(), saved.getPeriodName(), saved.getStatus());
+    }
+
+    private SchedulePeriod preparePeriodEntity(
+            List<SchedulePeriod> matchingPeriods,
+            GenerateScheduleRequest request,
+            Account manager,
+            String periodName,
+            int versionNo,
+            List<Employee> employees) {
+        SchedulePeriod period = matchingPeriods.stream().findFirst().orElseGet(SchedulePeriod::new);
+        if (period.getId() != null) {
+            resetGeneratedState(period);
+        }
+        period.setPeriodName(periodName);
+        period.setStartDate(request.startDate());
+        period.setEndDate(request.endDate());
+        period.setVersionNo(versionNo);
+        period.setStatus(DRAFT);
+        period.setCreatedBy(manager);
+        period.setApprovedBy(null);
+        period.setPublishedAt(null);
+        period.setTotalPenalty(null);
+        period.setEmployeePool(new LinkedHashSet<>(employees));
+        return period;
+    }
+
+    private record PreparedPeriod(Long id, String periodName, String status) {
+    }
+
+    private void resetGeneratedState(SchedulePeriod period) {
+        workShiftRepository.deleteAll(workShiftRepository.searchForPeriod(period.getId(), null, null));
+        optimizationRunRepository.deleteAll(optimizationRunRepository.findAllBySchedulePeriodId(period.getId()));
     }
 
     private void createWorkShifts(SchedulePeriod period, List<ShiftType> shiftTypes) {
@@ -147,7 +212,7 @@ public class AdminScheduleGenerationService {
         try {
             return schedulePeriodRepository.saveAndFlush(period);
         } catch (DataIntegrityViolationException ex) {
-            throw invalidRequest();
+            throw duplicatePeriodRequest();
         }
     }
 
@@ -170,5 +235,9 @@ public class AdminScheduleGenerationService {
 
     private static ResponseStatusException invalidRequest() {
         return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid schedule generation request");
+    }
+
+    private static ResponseStatusException duplicatePeriodRequest() {
+        return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Đã tồn tại lịch trong khoảng ngày này với cùng phiên bản");
     }
 }

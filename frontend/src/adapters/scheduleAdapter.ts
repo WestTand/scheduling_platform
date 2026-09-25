@@ -21,7 +21,7 @@ export const adaptBackendSchedulePeriod = (period: BackendSchedulePeriodResponse
   startDate: period.startDate,
   endDate: period.endDate,
   createdBy: period.createdByUsername ?? 'Không rõ',
-  createdAt: period.publishedAt ?? `${period.startDate}T00:00:00`,
+  createdAt: period.createdAt ?? period.publishedAt ?? `${period.startDate}T00:00:00`,
   employeeCount: 0,
   assignmentCount: 0,
   shiftCount: 0,

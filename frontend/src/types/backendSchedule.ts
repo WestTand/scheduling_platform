@@ -9,6 +9,7 @@ export interface BackendSchedulePeriodResponse {
   createdByUsername: string | null
   approvedByAccountId: number | null
   approvedByUsername: string | null
+  createdAt?: string | null
   publishedAt: string | null
   totalPenalty: number | null
 }
