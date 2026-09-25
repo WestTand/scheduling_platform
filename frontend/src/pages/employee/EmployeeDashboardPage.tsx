@@ -1,16 +1,82 @@
+import { useEffect, useMemo, useState } from 'react'
 import { BellDot, CalendarCheck2, Clock3, FileText, PlaneTakeoff } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { employeeDashboardData } from '@/mocks/dashboardData'
+import { apiConfig } from '@/config/api'
+import { getShiftDefinition } from '@/configs/shiftDefinitions'
 import { useAuth } from '@/contexts/useAuth'
-import { formatShiftRangeLabel, getShiftDefinition } from '@/configs/shiftDefinitions'
+import { employeeScheduleService } from '@/services/employeeScheduleService'
+import { navigationSummaryService } from '@/services/navigationSummaryService'
+import { notificationService } from '@/services/notificationService'
+import { adaptBackendEmployeeSchedule, getEmployeeWeekWindow } from './EmployeeSchedulePage.helpers'
+import { getEmployeeSummaryCards, pickNextShiftDays } from './EmployeeDashboard.helpers'
+import type { NavigationSummary } from '@/types/navigationSummary'
+import type { NotificationItem } from '@/types/management'
+import type { EmployeeScheduleViewItem } from './EmployeeSchedulePage.helpers'
 
 export function EmployeeDashboardPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
+
+  const week = useMemo(() => getEmployeeWeekWindow(0), [])
+  const todayInput = useMemo(() => {
+    const now = new Date()
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  }, [])
+  const [isLoading, setIsLoading] = useState(() => !apiConfig.useMockApi)
+  const [loadError, setLoadError] = useState('')
+  const [scheduleItems, setScheduleItems] = useState<EmployeeScheduleViewItem[]>([])
+  const [summary, setSummary] = useState<NavigationSummary | null>(null)
+  const [notices, setNotices] = useState<NotificationItem[]>([])
+
+  useEffect(() => {
+    if (apiConfig.useMockApi) return
+    let ignore = false
+    const load = async () => {
+      try {
+        const [rawSchedule, navSummary, noticePage] = await Promise.all([
+          employeeScheduleService.list(week),
+          navigationSummaryService.get(),
+          notificationService.list({ page: 1, pageSize: 3 }),
+        ])
+        if (ignore) return
+        setScheduleItems(adaptBackendEmployeeSchedule(rawSchedule))
+        setSummary(navSummary)
+        setNotices(noticePage.data)
+        setLoadError('')
+      } catch (loadErr) {
+        if (!ignore) setLoadError(loadErr instanceof Error ? loadErr.message : 'Không thể tải dữ liệu tổng quan.')
+      } finally {
+        if (!ignore) setIsLoading(false)
+      }
+    }
+    void load()
+    return () => { ignore = true }
+  }, [week])
+
+  const todayShiftName = scheduleItems.find((item) => item.date === todayInput)?.shiftName ?? null
+  const nextShiftItem = scheduleItems.find((item) => item.date > todayInput) ?? null
+  const nextShiftName = nextShiftItem?.shiftName ?? null
+  const totalMinutes = scheduleItems.reduce((total, item) => total + (getShiftDefinition(item.shiftCode)?.workMinutes ?? 0), 0)
+  const summaryCards = getEmployeeSummaryCards({
+    todayShiftName,
+    nextShiftName,
+    totalMinutes,
+    pendingLeave: summary?.pendingLeaveRequests ?? 0,
+    pendingPreference: summary?.pendingPreferences ?? 0,
+    pendingSwap: summary?.pendingSwapRequests ?? 0,
+  })
+  const nextShiftDays = pickNextShiftDays(scheduleItems.filter((item) => item.date >= todayInput), 3)
+
+  const summaryPaths = [
+    '/employee/schedule?view=today',
+    nextShiftItem ? `/employee/schedule?assignmentId=${nextShiftItem.id}` : '/employee/schedule',
+    '/employee/schedule?view=week',
+    '/employee/leave-requests?status=PENDING',
+  ]
 
   const quickActions = [
     { label: 'Xem lịch của tôi', icon: CalendarCheck2, path: '/employee/schedule' },
@@ -26,25 +92,30 @@ export function EmployeeDashboardPage() {
           <p className="text-sm text-slate-500">Xin chào,</p>
           <h2 className="text-2xl font-semibold text-slate-900">{user?.name ?? 'Nhân viên'}</h2>
         </div>
-        <Badge variant="secondary" className="w-fit">Tuần 38 • 16/09/2026</Badge>
+        <Badge variant="secondary" className="w-fit">{week.from} - {week.to}</Badge>
       </div>
 
+      {!apiConfig.useMockApi && isLoading && (
+        <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">Đang tải dữ liệu tổng quan...</p>
+      )}
+      {!apiConfig.useMockApi && !isLoading && loadError && (
+        <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{loadError}</p>
+      )}
+
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {employeeDashboardData.summary.map((item, index) => {
-          const paths = ['/employee/schedule?view=today', '/employee/schedule?assignmentId=assignment-05', '/employee/schedule?view=week', '/employee/leave-requests?status=PENDING']
-          const shift = 'shiftCode' in item ? getShiftDefinition(item.shiftCode ?? '') : undefined
-          return <Link key={item.label} to={paths[index]} className="block rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+        {summaryCards.map((item, index) => (
+          <Link key={item.label} to={summaryPaths[index]} className="block rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
           <Card className="h-full cursor-pointer border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md">
             <CardHeader className="px-4 pb-3 pt-4">
               <CardTitle className="text-sm text-slate-500">{item.label}</CardTitle>
             </CardHeader>
             <CardContent className="px-4 pb-4">
-              <div className="text-2xl font-bold text-slate-900">{shift?.name ?? item.value}</div>
-              <p className="mt-1 text-xs text-slate-500">{shift ? formatShiftRangeLabel(shift) : item.detail}</p>
+              <div className="text-2xl font-bold text-slate-900">{item.value}</div>
+              <p className="mt-1 text-xs text-slate-500">{item.detail}</p>
             </CardContent>
           </Card>
           </Link>
-        })}
+        ))}
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
@@ -54,15 +125,19 @@ export function EmployeeDashboardPage() {
             <CardDescription>Ca trực sắp tới của bạn.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 px-5 pb-5">
-            {employeeDashboardData.nextShifts.map((shift, index) => (
-              <Link key={shift.date} to={`/employee/schedule?assignmentId=assignment-0${index + 4}`} className="flex cursor-pointer items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
-                <div>
-                  <p className="font-medium text-slate-800">{shift.day} • {shift.date}</p>
-                  <p className="text-sm text-slate-500">{shift.shiftCodes ? shift.shiftCodes.map((code) => getShiftDefinition(code)?.name).join(' · ') : `${getShiftDefinition(shift.shiftCode)?.name} • ${formatShiftRangeLabel(getShiftDefinition(shift.shiftCode)!)}`}</p>
-                </div>
-                <Badge variant="outline">Đã xác nhận</Badge>
-              </Link>
-            ))}
+            {nextShiftDays.length === 0 ? (
+              <p className="text-sm text-slate-500">Bạn chưa có lịch làm việc trong tuần này.</p>
+            ) : (
+              nextShiftDays.map((shift) => (
+                <Link key={shift.id} to={`/employee/schedule?assignmentId=${shift.id}`} className="flex cursor-pointer items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+                  <div>
+                    <p className="font-medium text-slate-800">{shift.day} • {shift.date}</p>
+                    <p className="text-sm text-slate-500">{shift.shiftName} • {shift.timeRange}</p>
+                  </div>
+                  <Badge variant="outline">{shift.status}</Badge>
+                </Link>
+              ))
+            )}
             <Button variant="outline" className="w-full" onClick={() => navigate('/employee/schedule?view=week')}>Xem toàn bộ lịch</Button>
           </CardContent>
         </Card>
@@ -87,14 +162,21 @@ export function EmployeeDashboardPage() {
           <CardTitle>Thông báo mới</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 px-5 pb-5">
-            {employeeDashboardData.notifications.map((notice, index) => (
-            <Link key={notice} to={`/employee/notifications?notificationId=NOTI-00${index + 1}`} className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
-              <div className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-blue-700">
-                <BellDot className="h-4 w-4" />
-              </div>
-              <p className="text-sm text-slate-700">{notice}</p>
-            </Link>
-          ))}
+          {notices.length === 0 ? (
+            <p className="text-sm text-slate-500">Không có thông báo mới.</p>
+          ) : (
+            notices.map((notice) => (
+              <Link key={notice.id} to={`/employee/notifications?notificationId=${notice.id}`} className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+                <div className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-blue-700">
+                  <BellDot className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-slate-800">{notice.title}</p>
+                  <p className="text-sm text-slate-700">{notice.content}</p>
+                </div>
+              </Link>
+            ))
+          )}
             <Link to="/employee/notifications" className="inline-flex text-sm font-medium text-blue-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">Xem tất cả thông báo</Link>
         </CardContent>
       </Card>
