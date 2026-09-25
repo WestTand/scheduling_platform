@@ -18,8 +18,8 @@ public interface WorkShiftRepository extends JpaRepository<WorkShift, Long> {
             join fetch ws.schedulePeriod sp
             join fetch ws.shiftType st
             where sp.id = :periodId
-              and (:date is null or ws.workDate = :date)
-              and (:shiftTypeId is null or st.id = :shiftTypeId)
+              and ws.workDate = coalesce(:date, ws.workDate)
+              and st.id = coalesce(:shiftTypeId, st.id)
             order by ws.workDate asc, st.startTime asc, ws.id asc
             """)
     List<WorkShift> searchForPeriod(

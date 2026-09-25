@@ -16,8 +16,8 @@ public interface LeaveRequestRepository extends JpaRepository<LeaveRequest, Long
             select l from LeaveRequest l
             where l.employee.id = :employeeId
             and (:status is null or l.status = :status)
-            and (:from is null or l.endDate >= :from)
-            and (:to is null or l.startDate <= :to)
+            and l.endDate >= coalesce(:from, l.endDate)
+            and l.startDate <= coalesce(:to, l.startDate)
             order by l.id desc
             """)
     List<LeaveRequest> searchForEmployee(
@@ -54,10 +54,10 @@ public interface LeaveRequestRepository extends JpaRepository<LeaveRequest, Long
             select l from LeaveRequest l
             join fetch l.employee e
             left join fetch l.reviewedBy r
-            where (:employeeId is null or e.id = :employeeId)
+            where e.id = coalesce(:employeeId, e.id)
             and (:status is null or l.status = :status)
-            and (:from is null or l.endDate >= :from)
-            and (:to is null or l.startDate <= :to)
+            and l.endDate >= coalesce(:from, l.endDate)
+            and l.startDate <= coalesce(:to, l.startDate)
             order by l.id desc
             """)
     List<LeaveRequest> searchForAdmin(

@@ -17,8 +17,8 @@ public interface PreferenceRepository extends JpaRepository<Preference, Long> {
             left join fetch p.shiftType
             where p.employee.id = :employeeId
             and (:status is null or p.status = :status)
-            and (:from is null or p.preferenceDate >= :from)
-            and (:to is null or p.preferenceDate <= :to)
+            and p.preferenceDate >= coalesce(:from, p.preferenceDate)
+            and p.preferenceDate <= coalesce(:to, p.preferenceDate)
             order by p.preferenceDate asc, p.id desc
             """)
     List<Preference> searchForEmployee(
@@ -31,10 +31,10 @@ public interface PreferenceRepository extends JpaRepository<Preference, Long> {
             select count(p) > 0 from Preference p
             where p.employee.id = :employeeId
             and p.preferenceDate = :preferenceDate
-            and ((:shiftTypeId is null and p.shiftType is null) or p.shiftType.id = :shiftTypeId)
+            and coalesce(p.shiftType.id, -1) = coalesce(:shiftTypeId, -1)
             and p.preferenceType = :preferenceType
             and p.status in ('PENDING', 'APPROVED')
-            and (:excludedPreferenceId is null or p.id <> :excludedPreferenceId)
+            and p.id <> coalesce(:excludedPreferenceId, p.id)
             """)
     boolean existsActiveDuplicate(
             @Param("employeeId") Long employeeId,
@@ -60,8 +60,8 @@ public interface PreferenceRepository extends JpaRepository<Preference, Long> {
             join fetch p.employee e
             left join fetch p.shiftType st
             where (:status is null or p.status = :status)
-            and (:from is null or p.preferenceDate >= :from)
-            and (:to is null or p.preferenceDate <= :to)
+            and p.preferenceDate >= coalesce(:from, p.preferenceDate)
+            and p.preferenceDate <= coalesce(:to, p.preferenceDate)
             order by p.preferenceDate asc, p.id desc
             """)
     List<Preference> searchForAdmin(

@@ -49,8 +49,8 @@ public interface SchedulePeriodRepository extends JpaRepository<SchedulePeriod, 
             left join fetch sp.createdBy createdBy
             left join fetch sp.approvedBy approvedBy
             where (:status is null or sp.status = :status)
-              and (:from is null or sp.endDate >= :from)
-              and (:to is null or sp.startDate <= :to)
+              and sp.endDate >= coalesce(:from, sp.endDate)
+              and sp.startDate <= coalesce(:to, sp.startDate)
             order by sp.startDate desc, sp.id desc
             """)
     List<SchedulePeriod> searchForAdmin(

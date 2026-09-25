@@ -15,7 +15,7 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
             from Notification n
             join fetch n.recipient r
             where r.id = :recipientId
-              and (:read is null or n.read = :read)
+              and n.read = coalesce(:read, n.read)
             order by n.createdAt desc, n.id desc
             """)
     List<Notification> findForRecipient(@Param("recipientId") Long recipientId, @Param("read") Boolean read);
