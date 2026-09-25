@@ -214,11 +214,15 @@ git commit -m "feat: add manager dashboard summary and action-item helpers"
 
 - [ ] **Step 1: Write the failing test**
 
-Append this block to `frontend/src/pages/manager/ManagerDashboard.test.tsx`:
+Merge the new names into the existing top import of `frontend/src/pages/manager/ManagerDashboard.test.tsx` (keep a single top import, no mid-file imports):
 
 ```tsx
-import { pickScheduleAlerts, pickUpcomingShifts } from './ManagerDashboard.helpers'
+import { getManagerActionItems, getManagerSummaryCards, pickScheduleAlerts, pickUpcomingShifts } from './ManagerDashboard.helpers'
+```
 
+Then append this block to the same file:
+
+```tsx
 describe('ManagerDashboard shift helpers', () => {
   const detail = {
     id: '48',
@@ -268,7 +272,7 @@ Run: `npm.cmd test -- ManagerDashboard.test.tsx`
 
 Workdir: `frontend`
 
-Expected: FAIL with "pickUpcomingShifts is not a function" (or "does not provide an export").
+Expected: FAIL with "pickUpcomingShifts is not a function" (or "does not provide an export"). Note: the fixture rows share the same date, so the implementation sorts date-only (stable sort preserves input order); do not add a shiftCode tiebreak or the first test will fail.
 
 - [ ] **Step 3: Write minimal implementation**
 
@@ -302,7 +306,7 @@ export interface ScheduleAlertRow {
 
 const formatDateLabel = (date: string) => {
   const weekday = new Date(`${date}T00:00:00`).toLocaleDateString('vi-VN', { weekday: 'long' })
-  const [year, month, day] = date.split('-')
+  const [, month, day] = date.split('-')
   return `${weekday} - ${day}/${month}`
 }
 
@@ -336,7 +340,7 @@ export const pickUpcomingShifts = (details: ScheduleDetail[], limit: number): Up
       path: hasWarning || unassigned ? `/manager/schedules/${detail.id}?tab=warnings` : `/manager/schedules/${detail.id}`,
     } satisfies UpcomingShiftRow
   }))
-  rows.sort((first, second) => first.date.localeCompare(second.date) || first.shiftCode.localeCompare(second.shiftCode))
+  rows.sort((first, second) => first.date.localeCompare(second.date))
   return rows.slice(0, limit)
 }
 
