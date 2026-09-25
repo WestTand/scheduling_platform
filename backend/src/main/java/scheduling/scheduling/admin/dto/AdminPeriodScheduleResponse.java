@@ -1,5 +1,6 @@
 package scheduling.scheduling.admin.dto;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
@@ -12,7 +13,24 @@ public record AdminPeriodScheduleResponse(
         LocalDate startDate,
         LocalDate endDate,
         List<EmployeePoolItem> employeePool,
+        LatestOptimizationRun latestOptimizationRun,
         List<ScheduledShift> workShifts) {
+
+    public record LatestOptimizationRun(
+            Long runId,
+            String status,
+            BigDecimal totalPenalty,
+            String penaltyDetailsJson,
+            String errorMessage,
+            List<OptimizationDiagnostic> diagnostics) {
+    }
+
+    public record OptimizationDiagnostic(
+            String code,
+            String message,
+            Long employeeId,
+            Long workShiftId) {
+    }
 
     public record EmployeePoolItem(
             Long id,

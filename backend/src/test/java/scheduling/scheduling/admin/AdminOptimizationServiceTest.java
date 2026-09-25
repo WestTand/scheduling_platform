@@ -509,7 +509,7 @@ class AdminOptimizationServiceTest {
                 null,
                 Map.of(),
                 List.of(),
-                List.of(new AiSchedulingResponseDto.DiagnosticDto("NO_STAFF", "Not enough staff", null, null)),
+                List.of(new AiSchedulingResponseDto.DiagnosticDto("NO_STAFF", "Not enough staff", 7L, 100L)),
                 "Infeasible",
                 new AiSchedulingResponseDto.StatisticsDto(new BigDecimal("0.5"), 3, 5));
         OptimizationRun startedRun = startedRun(900L, period, manager);
@@ -531,7 +531,10 @@ class AdminOptimizationServiceTest {
         assertThat(response.periodId()).isEqualTo(5L);
         assertThat(response.aiStatus()).isEqualTo("INFEASIBLE");
         assertThat(response.errorMessage()).contains("Not enough staff");
-        verify(optimizationRunRecorder).finishFailure(eq(900L), eq("INFEASIBLE"), contains("Not enough staff"), eq(aiResponse));
+        ArgumentCaptor<String> errorCaptor = ArgumentCaptor.forClass(String.class);
+        verify(optimizationRunRecorder).finishFailure(eq(900L), eq("INFEASIBLE"), errorCaptor.capture(), eq(aiResponse));
+        assertThat(errorCaptor.getValue())
+                .contains("[NO_STAFF employeeId=7 workShiftId=100] Not enough staff");
         verify(optimizationRunRecorder, never()).finishSuccess(any(), any());
         verifyNoInteractions(assignmentPersistenceService);
 
@@ -540,7 +543,7 @@ class AdminOptimizationServiceTest {
         inOrder.verify(optimizationRunRecorder).start(eq(period), eq(manager), eq(weights));
         inOrder.verify(payloadBuilder).buildFrom(any(), eq(period), eq(900L));
         inOrder.verify(aiSchedulingClient).optimize(eq(payload));
-        inOrder.verify(optimizationRunRecorder).finishFailure(eq(900L), eq("INFEASIBLE"), contains("Not enough staff"), eq(aiResponse));
+        inOrder.verify(optimizationRunRecorder).finishFailure(eq(900L), eq("INFEASIBLE"), any(), eq(aiResponse));
     }
 
     @Test

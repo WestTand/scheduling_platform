@@ -121,6 +121,8 @@ def _infeasible_diagnostics(request: SchedulingRequest) -> list[DiagnosticOutput
         )
     ]
     shift_by_id = {shift.work_shift_id: shift for shift in request.work_shifts}
+    shift_type_by_id = {item.shift_type_id: item for item in request.shift_types}
+    employees = [item.employee_id for item in request.employees]
     leaves_by_employee = defaultdict(list)
     for leave in request.approved_leaves:
         leaves_by_employee[leave.employee_id].append(leave)
@@ -150,6 +152,124 @@ def _infeasible_diagnostics(request: SchedulingRequest) -> list[DiagnosticOutput
                 message="Approved leave leaves too few employees for this shift",
                 work_shift_id=shift.work_shift_id,
             ))
+
+    rest_minutes = request.rules.hard_rules.min_rest_hours_between_shifts * 60
+    for employee_id in employees:
+        for index, first in enumerate(request.work_shifts):
+            for second in request.work_shifts[index + 1:]:
+                if _conflict(first.starts_at, first.ends_at, second.starts_at, second.ends_at, rest_minutes):
+                    diagnostics.append(DiagnosticOutput(
+                        code="MIN_REST_CONFLICT",
+                        message="Employee cannot cover both shifts because minimum rest would be violated",
+                        employee_id=employee_id,
+                        work_shift_id=second.work_shift_id,
+                    ))
+        for boundary in request.boundary_assignments:
+            if boundary.employee_id != employee_id:
+                continue
+            for shift in request.work_shifts:
+                if _conflict(boundary.starts_at, boundary.ends_at, shift.starts_at, shift.ends_at, rest_minutes):
+                    diagnostics.append(DiagnosticOutput(
+                        code="MIN_REST_CONFLICT",
+                        message="Existing assignment leaves insufficient rest before this shift",
+                        employee_id=employee_id,
+                        work_shift_id=shift.work_shift_id,
+                    ))
+
+    shifts_by_date = defaultdict(list)
+    shifts_by_week = defaultdict(list)
+    for shift in request.work_shifts:
+        shifts_by_date[shift.work_date].append(shift)
+        shifts_by_week[_week_key(shift.work_date)].append(shift)
+
+    boundaries_by_employee_date = defaultdict(int)
+    boundaries_by_employee_week = defaultdict(int)
+    for boundary in request.boundary_assignments:
+        duration_minutes = int((boundary.ends_at - boundary.starts_at).total_seconds() // 60)
+        boundaries_by_employee_date[boundary.employee_id, boundary.starts_at.date()] += duration_minutes
+        boundaries_by_employee_week[boundary.employee_id, _week_key(boundary.starts_at.date())] += 1
+
+    max_daily_minutes = request.rules.hard_rules.max_work_hours_per_day * 60
+    for employee_id in employees:
+        for work_date, daily_shifts in shifts_by_date.items():
+            total_minutes = boundaries_by_employee_date[employee_id, work_date]
+            for shift in sorted(daily_shifts, key=lambda item: item.starts_at):
+                total_minutes += shift_type_by_id[shift.shift_type_id].duration_minutes
+                if total_minutes > max_daily_minutes:
+                    diagnostics.append(DiagnosticOutput(
+                        code="MAX_WORK_HOURS_EXCEEDED",
+                        message="Employee would exceed maximum work hours for the day",
+                        employee_id=employee_id,
+                        work_shift_id=shift.work_shift_id,
+                    ))
+        for week, weekly_shifts in shifts_by_week.items():
+            total_shifts = boundaries_by_employee_week[employee_id, week]
+            for shift in sorted(weekly_shifts, key=lambda item: item.starts_at):
+                total_shifts += 1
+                if total_shifts > request.rules.hard_rules.max_shifts_per_week:
+                    diagnostics.append(DiagnosticOutput(
+                        code="MAX_SHIFTS_PER_WEEK_EXCEEDED",
+                        message="Employee would exceed maximum shifts for the week",
+                        employee_id=employee_id,
+                        work_shift_id=shift.work_shift_id,
+                    ))
+
+    quota_limits = {
+        "OVERTIME": request.rules.quotas.overtime_shifts_per_week,
+        "BATHING": request.rules.quotas.bathing_shifts_per_week,
+    }
+    for category, limit in quota_limits.items():
+        for employee_id in employees:
+            for week, weekly_shifts in shifts_by_week.items():
+                counted_dates = {
+                    boundary.starts_at.date()
+                    for boundary in request.boundary_assignments
+                    if boundary.employee_id == employee_id
+                    and _week_key(boundary.starts_at.date()) == week
+                    and shift_type_by_id[boundary.shift_type_id].quota_category == category
+                }
+                for shift in sorted(weekly_shifts, key=lambda item: item.starts_at):
+                    if shift_type_by_id[shift.shift_type_id].quota_category != category:
+                        continue
+                    counted_dates.add(shift.work_date)
+                    if len(counted_dates) > limit:
+                        diagnostics.append(DiagnosticOutput(
+                            code="QUOTA_EXCEEDED",
+                            message=f"Employee would exceed {category} weekly quota",
+                            employee_id=employee_id,
+                            work_shift_id=shift.work_shift_id,
+                        ))
+
+    on_call_gap = request.rules.quotas.on_call_every_n_days
+    on_call_shifts = [
+        shift
+        for shift in request.work_shifts
+        if shift_type_by_id[shift.shift_type_id].quota_category == "ON_CALL"
+    ]
+    for employee_id in employees:
+        for index, first in enumerate(on_call_shifts):
+            for second in on_call_shifts[index + 1:]:
+                if abs((second.work_date - first.work_date).days) < on_call_gap:
+                    diagnostics.append(DiagnosticOutput(
+                        code="ON_CALL_GAP_CONFLICT",
+                        message="Employee would be assigned on-call shifts too close together",
+                        employee_id=employee_id,
+                        work_shift_id=second.work_shift_id,
+                    ))
+        for boundary in request.boundary_assignments:
+            if (
+                boundary.employee_id != employee_id
+                or shift_type_by_id[boundary.shift_type_id].quota_category != "ON_CALL"
+            ):
+                continue
+            for shift in on_call_shifts:
+                if abs((shift.work_date - boundary.starts_at.date()).days) < on_call_gap:
+                    diagnostics.append(DiagnosticOutput(
+                        code="ON_CALL_GAP_CONFLICT",
+                        message="Existing on-call assignment is too close to this shift",
+                        employee_id=employee_id,
+                        work_shift_id=shift.work_shift_id,
+                    ))
     return diagnostics
 
 

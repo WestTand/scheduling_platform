@@ -223,8 +223,7 @@ public class AdminOptimizationService {
                     break;
                 }
                 if (diagnostic != null && StringUtils.hasText(diagnostic.message())) {
-                    String code = diagnostic.code() == null ? "" : diagnostic.code() + ": ";
-                    parts.add(code + diagnostic.message());
+                    parts.add(formatDiagnostic(diagnostic));
                 }
             }
         }
@@ -247,6 +246,23 @@ public class AdminOptimizationService {
             capped.append(part.substring(0, Math.min(part.length(), remaining)));
         }
         return capped.toString();
+    }
+
+    private static String formatDiagnostic(AiSchedulingResponseDto.DiagnosticDto diagnostic) {
+        if (!StringUtils.hasText(diagnostic.code())) {
+            return diagnostic.message();
+        }
+        if (diagnostic.employeeId() == null && diagnostic.workShiftId() == null) {
+            return diagnostic.code() + ": " + diagnostic.message();
+        }
+        StringBuilder builder = new StringBuilder("[").append(diagnostic.code());
+        if (diagnostic.employeeId() != null) {
+            builder.append(" employeeId=").append(diagnostic.employeeId());
+        }
+        if (diagnostic.workShiftId() != null) {
+            builder.append(" workShiftId=").append(diagnostic.workShiftId());
+        }
+        return builder.append("] ").append(diagnostic.message()).toString();
     }
 
     private void recordOptimizationRun(Account manager, OptimizationRun finished) {

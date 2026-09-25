@@ -25,6 +25,7 @@ import scheduling.scheduling.entity.SchedulePeriod;
 import scheduling.scheduling.repository.AccountRepository;
 import scheduling.scheduling.repository.OptimizationRunRepository;
 import scheduling.scheduling.repository.SchedulePeriodRepository;
+import scheduling.scheduling.repository.SwapRequestRepository;
 
 @SpringBootTest(properties = {
         "app.jwt.secret=test-secret-key-with-at-least-32-characters",
@@ -45,10 +46,14 @@ class OptimizationRunRecorderTransactionTest {
     private AccountRepository accountRepository;
 
     @Autowired
+    private SwapRequestRepository swapRequestRepository;
+
+    @Autowired
     private FailingOptimizationRunner failingRunner;
 
     @BeforeEach
     void cleanUp() {
+        swapRequestRepository.deleteAll();
         optimizationRunRepository.deleteAll();
         schedulePeriodRepository.deleteAll();
     }

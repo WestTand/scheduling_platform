@@ -169,4 +169,62 @@ describe('scheduleAdapter', () => {
     expect(detail.assignments[0]?.warningCount).toBe(1)
     expect(detail.warnings[0]?.content).toBe('Ca Ngoai gio 1 ngày 22/09/2026 thiếu 1 nhân viên (cần 2, hiện có 1).')
   })
+
+  test('maps latest optimization diagnostics into warnings and shift warning counts', () => {
+    const detail = adaptBackendPeriodSchedule({
+      periodId: 10,
+      periodName: 'Lịch có cảnh báo AI',
+      status: 'DRAFT',
+      startDate: '2026-09-23',
+      endDate: '2026-09-23',
+      employeePool: [{ id: 31, employeeCode: 'EMP001', fullName: 'Nguyễn Văn An' }],
+      latestOptimizationRun: {
+        runId: 90,
+        status: 'INFEASIBLE',
+        totalPenalty: 12.5,
+        penaltyDetailsJson: '{"fairness":12.5}',
+        errorMessage: '[MIN_REST_CONFLICT employeeId=31 workShiftId=14] Employee cannot cover both shifts',
+        diagnostics: [
+          {
+            code: 'MIN_REST_CONFLICT',
+            message: 'Employee cannot cover both shifts',
+            employeeId: 31,
+            workShiftId: 14,
+          },
+        ],
+      },
+      workShifts: [
+        {
+          id: 14,
+          workDate: '2026-09-23',
+          shiftTypeId: 100,
+          shiftName: 'Truc sang',
+          shiftStartTime: '08:00:00',
+          shiftEndTime: '16:00:00',
+          startsAt: '2026-09-23T08:00:00+07:00',
+          endsAt: '2026-09-23T16:00:00+07:00',
+          workMinutes: 480,
+          isTransitionShift: false,
+          overnight: false,
+          requiredStaff: 1,
+          maxStaff: 20,
+          assignments: [
+            { id: 24, workShiftId: 14, periodId: 10, employeeId: 31, employeeCode: 'EMP001', fullName: 'Nguyễn Văn An', assignmentStatus: 'ASSIGNED', assignedSource: 'AUTO', locked: false },
+          ],
+        },
+      ],
+    })
+
+    expect(detail.assignments[0]?.warningCount).toBe(1)
+    expect(detail.warnings).toContainEqual({
+      id: 'optimization-diagnostic-90-0',
+      type: 'HARD_CONSTRAINT',
+      severity: 'HIGH',
+      employeeName: 'Nguyễn Văn An',
+      date: '2026-09-23',
+      shiftCode: 'TRUC_SANG',
+      content: 'MIN_REST_CONFLICT: Employee cannot cover both shifts',
+      suggestion: 'Đổi nhân viên, gỡ khóa phân công liên quan, hoặc chạy tối ưu lại sau khi chỉnh lịch.',
+    })
+  })
 })

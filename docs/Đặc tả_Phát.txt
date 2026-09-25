@@ -1,0 +1,525 @@
+# ĐẶC TẢ BACKEND VÀ DATABASE – CA LÀM VIỆC VÀ LỊCH NGHỈ LỄ
+
+## 1. Mục tiêu
+
+Backend và database phải:
+
+- Quản lý đúng sáu loại ca làm việc.
+- Phân biệt ngày thường, cuối tuần và ngày lễ.
+- Tự sinh các ngày lễ Dương lịch cố định.
+- Import Tết Âm lịch, Giỗ Tổ Hùng Vương, ngày nghỉ bù và các ngày nghỉ bổ sung từ file JSON theo từng năm.
+- Ưu tiên ngày lễ khi trùng với ngày thường, cuối tuần hoặc ca đã tạo.
+- Xử lý chính xác ca qua nửa đêm và ca chuyển tiếp.
+- Kiểm tra lại lịch do CP-SAT tạo trước khi lưu hoặc công bố.
+
+Múi giờ hệ thống:
+
+`Asia/Ho_Chi_Minh`
+
+Ngày được lưu theo lịch Dương Việt Nam với định dạng:
+
+`YYYY-MM-DD`
+
+---
+
+## 2. Danh mục ca làm việc
+
+Hệ thống có đúng sáu mã ca:
+
+| Mã ca | Tên ca | Nhóm | Thời gian | Làm thực tế | Ngày áp dụng |
+|---|---|---|---|---:|---|
+| `THONG_TAM` | Ca thông tầm | `REGULAR` | 08:00–17:00, nghỉ 12:00–13:00 | 480 phút | Thứ Hai–Thứ Sáu |
+| `NGOAI_GIO_1` | Ca ngoài giờ 1 | `OUTSIDE_HOURS` | 17:00–00:30 | 450 phút | Thứ Hai–Thứ Sáu |
+| `NGOAI_GIO_2` | Ca ngoài giờ 2 | `OUTSIDE_HOURS` | 00:30–08:00 | 450 phút | Thứ Hai–Thứ Sáu |
+| `TRUC_SANG` | Trực sáng | `ON_CALL` | 08:00–16:00 | 480 phút | Cuối tuần/ngày lễ |
+| `TRUC_CHIEU` | Trực chiều | `ON_CALL` | 16:00–00:00 | 480 phút | Cuối tuần/ngày lễ |
+| `TRUC_DEM` | Trực đêm | `ON_CALL` | 00:00–08:00 | 480 phút | Cuối tuần/ngày lễ |
+
+Ca qua ngày hôm sau:
+
+- `NGOAI_GIO_1`
+- `TRUC_CHIEU`
+
+Bắt buộc phải có đủ ba ca trực:
+
+- `TRUC_SANG`
+- `TRUC_CHIEU`
+- `TRUC_DEM`
+
+Không sử dụng các mã cũ:
+
+- `BATHING`
+- `OVERTIME`
+- `DAY`
+- `EVENING`
+- `NIGHT`
+
+---
+
+## 3. Cơ chế lấy lịch nghỉ lễ
+
+Áp dụng mô hình:
+
+**Backend tự sinh ngày lễ Dương cố định và import lịch nghỉ biến đổi từ nguồn nội bộ.**
+
+### 3.1. Ngày lễ cố định do backend tự sinh
+
+Backend tự tạo theo năm:
+
+| Ngày | Tên ngày lễ |
+|---|---|
+| 01/01 | Tết Dương lịch |
+| 30/04 | Ngày Giải phóng miền Nam |
+| 01/05 | Ngày Quốc tế Lao động |
+| 02/09 | Quốc khánh |
+
+Các ngày này được tạo tự động dựa trên năm cần lập lịch.
+
+### 3.2. Ngày nghỉ theo từng năm
+
+Các ngày sau không được tự tính cứng vì thay đổi theo năm:
+
+- Tết Âm lịch.
+- Giỗ Tổ Hùng Vương.
+- Ngày nghỉ bù.
+- Ngày nghỉ liền kề Quốc khánh.
+- Ngày nghỉ đặc biệt khác do Nhà nước công bố.
+
+Các ngày trên được lưu trong file JSON nội bộ:
+
+`backend/src/main/resources/holidays/holidays-YYYY.json`
+
+Ví dụ:
+
+`holidays-2026.json`
+
+    [
+      {
+        "date": "2026-02-16",
+        "name": "Nghỉ Tết Nguyên đán",
+        "type": "LUNAR_HOLIDAY",
+        "sourceReference": "Thông báo lịch nghỉ năm 2026"
+      },
+      {
+        "date": "2026-04-26",
+        "name": "Giỗ Tổ Hùng Vương",
+        "type": "LUNAR_HOLIDAY",
+        "sourceReference": "Thông báo lịch nghỉ năm 2026"
+      },
+      {
+        "date": "2026-09-01",
+        "name": "Ngày nghỉ liền kề Quốc khánh",
+        "type": "PUBLIC_HOLIDAY",
+        "sourceReference": "Thông báo lịch nghỉ năm 2026"
+      },
+      {
+        "date": "2026-09-03",
+        "name": "Ngày nghỉ bù",
+        "type": "SUBSTITUTE_HOLIDAY",
+        "sourceReference": "Thông báo lịch nghỉ năm 2026"
+      }
+    ]
+
+Các ngày trong JSON phải là ngày Dương lịch đã được xác định từ lịch nghỉ chính thức của Nhà nước.
+
+Không lưu ngày Âm lịch dạng chuỗi trong database và không tự chuyển đổi Âm–Dương trong CP-SAT.
+
+---
+
+## 4. `HolidaySeedService`
+
+Backend cần có `HolidaySeedService`.
+
+Khi ứng dụng khởi động, service thực hiện:
+
+1. Xác định các năm cần sử dụng.
+2. Tự sinh bốn ngày lễ Dương lịch cố định.
+3. Đọc các file `holidays-YYYY.json`.
+4. Kiểm tra định dạng ngày và năm.
+5. Loại bỏ dữ liệu trùng.
+6. Upsert dữ liệu vào bảng `holidays`.
+7. Không tạo bản ghi trùng khi khởi động lại.
+8. Lưu nguồn tạo dữ liệu.
+9. Đánh dấu năm đã có lịch nghỉ đầy đủ.
+
+Khóa upsert:
+
+`holiday_date`
+
+Nguồn dữ liệu:
+
+- `FIXED_RULE`: ngày lễ Dương cố định do backend sinh.
+- `ANNUAL_SEED`: ngày nghỉ đọc từ file JSON theo năm.
+
+Nếu file JSON có ngày trùng với ngày cố định, backend cập nhật bản ghi hiện có thay vì tạo thêm bản ghi mới.
+
+Không cho người quản lý nhập ngày lễ thủ công trong giai đoạn đầu.
+
+---
+
+## 5. Kiểm tra lịch nghỉ theo năm
+
+Cần theo dõi trạng thái lịch nghỉ từng năm.
+
+### Bảng `holiday_calendar_status`
+
+| Cột | Ý nghĩa |
+|---|---|
+| `calendar_year` | Năm áp dụng |
+| `status` | `INCOMPLETE` hoặc `COMPLETE` |
+| `source_reference` | Nguồn lịch nghỉ |
+| `seed_file` | Tên file JSON |
+| `checksum` | Mã kiểm tra nội dung file |
+| `synced_at` | Thời gian cập nhật |
+
+Quy tắc:
+
+- Bốn ngày lễ cố định không đủ để xem lịch năm đó là hoàn chỉnh.
+- Chỉ đánh dấu `COMPLETE` khi có file lịch nghỉ theo năm đã được kiểm tra.
+- Nếu năm chưa có file JSON, backend vẫn sinh các ngày cố định nhưng trạng thái là `INCOMPLETE`.
+- Không cho tạo hoặc công bố lịch chính thức cho năm có trạng thái `INCOMPLETE`.
+- Trả lỗi:
+
+`HOLIDAY_CALENDAR_INCOMPLETE`
+
+Mỗi năm chỉ cần bổ sung file mới, ví dụ:
+
+`holidays-2027.json`
+
+Ứng dụng sẽ tự đồng bộ khi khởi động.
+
+---
+
+## 6. Thứ tự ưu tiên loại ngày
+
+Backend phân loại ngày theo thứ tự:
+
+1. `HOLIDAY`
+2. `WEEKEND`
+3. `WEEKDAY`
+
+Quy tắc:
+
+- Nếu ngày tồn tại trong bảng `holidays`, kết quả là `HOLIDAY`.
+- Nếu không phải ngày lễ nhưng là thứ Bảy hoặc Chủ nhật, kết quả là `WEEKEND`.
+- Các ngày còn lại là `WEEKDAY`.
+
+Nếu ngày lễ trùng thứ Bảy hoặc Chủ nhật thì vẫn phân loại:
+
+`HOLIDAY`
+
+Ngày lễ luôn được ưu tiên cao nhất.
+
+Logic:
+
+    if (holidayRepository.existsActiveByDate(date)) {
+        return HOLIDAY;
+    }
+
+    if (date is Saturday or Sunday) {
+        return WEEKEND;
+    }
+
+    return WEEKDAY;
+
+---
+
+## 7. Quy tắc tạo ca theo loại ngày
+
+### Ngày thường
+
+Chỉ tạo:
+
+- `THONG_TAM`
+- `NGOAI_GIO_1`
+- `NGOAI_GIO_2`
+
+### Cuối tuần hoặc ngày lễ
+
+Chỉ tạo:
+
+- `TRUC_DEM`
+- `TRUC_SANG`
+- `TRUC_CHIEU`
+
+Nếu ngày lễ rơi vào thứ Hai–Thứ Sáu:
+
+- Không tạo ca thông tầm.
+- Không tạo hai ca ngoài giờ.
+- Phải tạo đủ ba ca trực.
+
+Backend phải kiểm tra quy tắc này khi:
+
+- Tạo ca.
+- Cập nhật ca.
+- Nhận kết quả từ CP-SAT.
+- Lưu lịch.
+- Công bố lịch.
+
+---
+
+## 8. Ngày lễ chen ngang lịch đã tạo
+
+Nếu lịch nghỉ lễ được cập nhật sau khi lịch làm việc đã được tạo:
+
+1. Cập nhật bảng `holidays`.
+2. Tìm các lịch chứa ngày bị ảnh hưởng.
+3. Đánh dấu lịch là `NEEDS_REVIEW`.
+4. Không tự động công bố lại.
+5. Ghi nhật ký thay đổi.
+6. Hủy hoặc thay thế ca ngày thường trên ngày lễ.
+7. Tạo đủ ba ca trực cho ngày lễ.
+8. Chạy lại CP-SAT hoặc yêu cầu quản lý xác nhận.
+
+Ngày lễ được ưu tiên so với:
+
+- Ngày thường.
+- Cuối tuần.
+- Ca thông tầm.
+- Ca ngoài giờ.
+- Lịch đã tạo nhưng chưa công bố.
+- Lịch đã công bố nhưng bị thay đổi bởi quy định mới.
+
+Nếu lịch đã công bố, backend không được âm thầm thay đổi phân công. Lịch phải chuyển sang `NEEDS_REVIEW` và phát thông báo.
+
+---
+
+## 9. Xử lý ca chuyển tiếp
+
+Do giờ ca ngày thường và ca trực không cùng ranh giới, backend phải xử lý chuyển tiếp bằng `start_at` và `end_at` thực tế.
+
+### Ngày thường chuyển sang cuối tuần hoặc ngày lễ
+
+Ca ngoài giờ 1 thông thường:
+
+`17:00–00:30`
+
+Nếu ngày hôm sau là cuối tuần hoặc ngày lễ:
+
+`17:00–00:00`
+
+Sau đó bắt đầu:
+
+`TRUC_DEM: 00:00–08:00`
+
+Ca trực được ưu tiên, không để trùng 00:00–00:30.
+
+### Cuối tuần hoặc ngày lễ chuyển sang ngày thường
+
+Ca trực chiều kết thúc:
+
+`16:00–00:00`
+
+Ca ngoài giờ 2 của ngày làm việc kế tiếp được điều chỉnh:
+
+`00:00–08:00`
+
+Không để trống khoảng 00:00–00:30.
+
+Các ca được điều chỉnh phải có:
+
+`is_transition_shift = true`
+
+Không thay đổi giờ chuẩn trong bảng `shift_types`; chỉ điều chỉnh ca cụ thể trong `work_shifts`.
+
+---
+
+## 10. Thiết kế bảng `shift_types`
+
+| Cột | Kiểu gợi ý | Ràng buộc |
+|---|---|---|
+| `id` | BIGINT/UUID | PK |
+| `shift_code` | VARCHAR(30) | UNIQUE, NOT NULL |
+| `shift_name` | VARCHAR(100) | NOT NULL |
+| `shift_group` | VARCHAR(30) | NOT NULL |
+| `start_time` | TIME | NOT NULL |
+| `end_time` | TIME | NOT NULL |
+| `crosses_midnight` | BOOLEAN | NOT NULL |
+| `break_start` | TIME | NULL |
+| `break_end` | TIME | NULL |
+| `break_minutes` | INTEGER | NOT NULL |
+| `work_minutes` | INTEGER | NOT NULL |
+| `applies_on_holidays` | BOOLEAN | NOT NULL |
+| `is_active` | BOOLEAN | NOT NULL |
+| `created_at` | TIMESTAMP | NOT NULL |
+| `updated_at` | TIMESTAMP | NOT NULL |
+
+Không dùng tên ca làm khóa.
+
+Seeder cập nhật theo:
+
+`shift_code`
+
+Không lưu hệ số penalty trong bảng loại ca.
+
+---
+
+## 11. Thiết kế bảng `shift_type_weekdays`
+
+| Cột | Kiểu | Ràng buộc |
+|---|---|---|
+| `shift_type_id` | BIGINT/UUID | FK |
+| `weekday` | VARCHAR(3) | NOT NULL |
+
+Khóa chính:
+
+`PRIMARY KEY (shift_type_id, weekday)`
+
+Ngày áp dụng:
+
+- `THONG_TAM`, `NGOAI_GIO_1`, `NGOAI_GIO_2`: `MON–FRI`.
+- `TRUC_SANG`, `TRUC_CHIEU`, `TRUC_DEM`: `SAT–SUN`.
+
+Ba ca trực có:
+
+`applies_on_holidays = true`
+
+---
+
+## 12. Thiết kế bảng `holidays`
+
+| Cột | Kiểu gợi ý | Ràng buộc |
+|---|---|---|
+| `id` | BIGINT/UUID | PK |
+| `holiday_date` | DATE | UNIQUE, NOT NULL |
+| `holiday_name` | VARCHAR(150) | NOT NULL |
+| `holiday_year` | INTEGER | NOT NULL |
+| `holiday_type` | VARCHAR(30) | NOT NULL |
+| `source_type` | VARCHAR(30) | NOT NULL |
+| `source_reference` | VARCHAR(255) | NULL |
+| `is_active` | BOOLEAN | NOT NULL |
+| `created_at` | TIMESTAMP | NOT NULL |
+| `updated_at` | TIMESTAMP | NOT NULL |
+
+`holiday_type`:
+
+- `PUBLIC_HOLIDAY`
+- `LUNAR_HOLIDAY`
+- `SUBSTITUTE_HOLIDAY`
+- `SPECIAL_HOLIDAY`
+
+`source_type`:
+
+- `FIXED_RULE`
+- `ANNUAL_SEED`
+
+Tất cả ngày lễ được lưu dưới dạng ngày Dương lịch Việt Nam.
+
+---
+
+## 13. Thiết kế bảng `work_shifts`
+
+| Cột | Kiểu gợi ý | Ràng buộc |
+|---|---|---|
+| `id` | BIGINT/UUID | PK |
+| `work_date` | DATE | NOT NULL |
+| `shift_type_id` | BIGINT/UUID | FK, NOT NULL |
+| `start_at` | TIMESTAMP | NOT NULL |
+| `end_at` | TIMESTAMP | NOT NULL |
+| `work_minutes` | INTEGER | NOT NULL |
+| `is_transition_shift` | BOOLEAN | NOT NULL |
+| `required_min_staff` | INTEGER | NOT NULL |
+| `required_max_staff` | INTEGER | NOT NULL |
+| `status` | VARCHAR(30) | NOT NULL |
+| `created_at` | TIMESTAMP | NOT NULL |
+| `updated_at` | TIMESTAMP | NOT NULL |
+
+Backend phải tự tính:
+
+`work_minutes = thời gian ca - thời gian nghỉ`
+
+Không tin giá trị thời lượng do client gửi.
+
+Ràng buộc:
+
+- `work_minutes > 0`
+- `work_minutes <= 480`
+- `end_at > start_at`
+- `required_max_staff >= required_min_staff`
+
+---
+
+## 14. Kiểm tra phân công
+
+Backend phải kiểm tra lại lịch do CP-SAT trả về:
+
+- Đúng loại ca theo loại ngày.
+- Có đủ ba ca trực vào cuối tuần và ngày lễ.
+- Không trùng thời gian.
+- Không để trống vận hành 24/24.
+- Nhân viên đang hoạt động.
+- Nhân viên không nghỉ phép.
+- Nghỉ tối thiểu 12 giờ giữa hai ca.
+- Mỗi ca không vượt quá 8 giờ thực tế.
+- Không vượt quá 12 giờ làm việc/ngày.
+- Ca ngoài giờ tối đa 1 ngày/tuần/người.
+- Ca thông tầm tối đa 2 ngày/tuần/người.
+- Đủ số nhân viên tối thiểu trước khi công bố.
+
+Backend không được lưu hoặc công bố trực tiếp kết quả CP-SAT chưa qua kiểm tra.
+
+---
+
+## 15. Migration và seeder
+
+Sử dụng Flyway hoặc Liquibase, ưu tiên Flyway.
+
+Migration cần:
+
+1. Thêm `shift_code` và unique constraint.
+2. Chuẩn hóa sáu loại ca.
+3. Loại bỏ các mã ca cũ.
+4. Tạo `shift_type_weekdays`.
+5. Tạo `holidays`.
+6. Tạo `holiday_calendar_status`.
+7. Bổ sung `start_at`, `end_at`, `work_minutes`.
+8. Bổ sung `is_transition_shift`.
+9. Chuyển dữ liệu ca cũ sang mã ca mới.
+10. Tạo index cho ngày lễ, ngày làm và nhân viên.
+
+Seeder cần:
+
+- Seed đúng sáu loại ca.
+- Tự sinh ngày lễ Dương cố định.
+- Đọc file JSON theo năm.
+- Upsert theo ngày.
+- Chạy lặp lại không tạo dữ liệu trùng.
+- Ghi nhận checksum file để phát hiện thay đổi.
+
+---
+
+## 16. Kiểm thử bắt buộc
+
+- Seed đúng sáu loại ca.
+- Có đúng ba ca trực.
+- Hai ca ngoài giờ thông thường đều 450 phút.
+- Ca thông tầm và ba ca trực đều 480 phút.
+- Ngày Dương cố định được sinh đúng theo năm.
+- File JSON theo năm được import thành công.
+- Khởi động lại không tạo ngày lễ trùng.
+- Ngày lễ được ưu tiên hơn cuối tuần và ngày thường.
+- Ngày lễ rơi vào ngày thường vẫn tạo ba ca trực.
+- Ngày nghỉ bù được nhận dạng là `HOLIDAY`.
+- Năm chưa có file JSON bị đánh dấu `INCOMPLETE`.
+- Không công bố lịch khi lịch nghỉ năm chưa hoàn chỉnh.
+- Lịch bị ảnh hưởng bởi cập nhật ngày lễ chuyển sang `NEEDS_REVIEW`.
+- Không trùng hoặc trống ca tại thời điểm chuyển ngày.
+- Backend từ chối kết quả CP-SAT vi phạm ràng buộc cứng.
+
+---
+
+## 17. Tiêu chí hoàn thành
+
+- Có đúng sáu loại ca và ba ca trực.
+- Có mã `shift_code` duy nhất.
+- Không còn mã ca cũ.
+- Có bảng `holidays`.
+- Có bảng trạng thái lịch nghỉ theo năm.
+- Backend tự sinh bốn ngày lễ Dương cố định.
+- Backend import lịch Âm, nghỉ bù và ngày nghỉ bổ sung từ JSON.
+- Tất cả ngày lễ được lưu dưới dạng ngày Dương Việt Nam.
+- Ngày lễ luôn được ưu tiên khi trùng với ca khác.
+- Không cho tạo lịch chính thức khi lịch nghỉ năm chưa đầy đủ.
+- Seeder và migration chạy lặp lại an toàn.
+- Backend kiểm tra lại kết quả CP-SAT.
+- Toàn bộ kiểm thử backend thành công.

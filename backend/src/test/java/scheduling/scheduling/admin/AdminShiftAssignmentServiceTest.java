@@ -40,6 +40,7 @@ import scheduling.scheduling.entity.AccountRole;
 import scheduling.scheduling.entity.AccountStatus;
 import scheduling.scheduling.entity.Employee;
 import scheduling.scheduling.entity.LeaveRequest;
+import scheduling.scheduling.entity.OptimizationRun;
 import scheduling.scheduling.entity.SchedulePeriod;
 import scheduling.scheduling.entity.SchedulingRule;
 import scheduling.scheduling.entity.ShiftAssignment;
@@ -48,6 +49,7 @@ import scheduling.scheduling.entity.WorkShift;
 import scheduling.scheduling.repository.AccountRepository;
 import scheduling.scheduling.repository.EmployeeRepository;
 import scheduling.scheduling.repository.LeaveRequestRepository;
+import scheduling.scheduling.repository.OptimizationRunRepository;
 import scheduling.scheduling.repository.SchedulePeriodRepository;
 import scheduling.scheduling.repository.SchedulingRuleRepository;
 import scheduling.scheduling.repository.ShiftAssignmentRepository;
@@ -62,13 +64,14 @@ class AdminShiftAssignmentServiceTest {
     private final LeaveRequestRepository leaveRequestRepository = mock(LeaveRequestRepository.class);
     private final AccountRepository accountRepository = mock(AccountRepository.class);
     private final SchedulingRuleRepository schedulingRuleRepository = mock(SchedulingRuleRepository.class);
+    private final OptimizationRunRepository optimizationRunRepository = mock(OptimizationRunRepository.class);
     private static final Clock FIXED_CLOCK =
             Clock.fixed(Instant.parse("2026-09-17T00:00:00Z"), ZoneOffset.UTC);
     private final ActivityLogService activityLogService = mock(ActivityLogService.class);
     private final AdminShiftAssignmentService service = new AdminShiftAssignmentService(
             shiftAssignmentRepository, workShiftRepository, schedulePeriodRepository,
             employeeRepository, leaveRequestRepository, accountRepository,
-            schedulingRuleRepository, FIXED_CLOCK, activityLogService);
+            schedulingRuleRepository, optimizationRunRepository, FIXED_CLOCK, activityLogService);
 
     @BeforeEach
     void setUpSchedulingRules() {
@@ -746,6 +749,37 @@ class AdminShiftAssignmentServiceTest {
         assertThat(response.workShifts().get(1).endsAt()).isEqualTo(OffsetDateTime.parse("2026-09-14T22:00:00+07:00"));
         assertThat(response.workShifts().get(1).workMinutes()).isEqualTo(480);
         assertThat(response.workShifts().get(1).isTransitionShift()).isFalse();
+    }
+
+    @Test
+    void scheduleViewReturnsLatestOptimizationDiagnostics() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        OptimizationRun run = OptimizationRun.builder()
+                .status("INFEASIBLE")
+                .errorMessage("[NO_FEASIBLE_SCHEDULE] No schedule satisfies all hard constraints; "
+                        + "[MIN_REST_CONFLICT employeeId=7 workShiftId=200] Employee cannot cover both shifts")
+                .totalPenalty(BigDecimal.valueOf(12.5))
+                .penaltyDetailsJson("{\"fairness\":12.5}")
+                .build();
+        run.setId(99L);
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(draftPeriod()));
+        when(workShiftRepository.searchForPeriod(20L, null, null)).thenReturn(List.of(workShift()));
+        when(shiftAssignmentRepository.listForPeriod(20L)).thenReturn(List.of());
+        when(optimizationRunRepository.findTopBySchedulePeriodIdOrderByStartedAtDescIdDesc(20L))
+                .thenReturn(Optional.of(run));
+
+        AdminPeriodScheduleResponse response = service.getSchedule(principal, 20L);
+
+        assertThat(response.latestOptimizationRun()).isNotNull();
+        assertThat(response.latestOptimizationRun().runId()).isEqualTo(99L);
+        assertThat(response.latestOptimizationRun().status()).isEqualTo("INFEASIBLE");
+        assertThat(response.latestOptimizationRun().totalPenalty()).isEqualByComparingTo("12.5");
+        assertThat(response.latestOptimizationRun().diagnostics())
+                .extracting(AdminPeriodScheduleResponse.OptimizationDiagnostic::code)
+                .contains("NO_FEASIBLE_SCHEDULE", "MIN_REST_CONFLICT");
+        assertThat(response.latestOptimizationRun().diagnostics().get(1).employeeId()).isEqualTo(7L);
+        assertThat(response.latestOptimizationRun().diagnostics().get(1).workShiftId()).isEqualTo(200L);
     }
 
     @Test

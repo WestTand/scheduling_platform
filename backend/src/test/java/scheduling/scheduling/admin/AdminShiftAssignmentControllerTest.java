@@ -101,7 +101,7 @@ class AdminShiftAssignmentControllerTest {
         when(adminShiftAssignmentService.getSchedule(any(CurrentAccountPrincipal.class), eq(20L)))
                 .thenReturn(new AdminPeriodScheduleResponse(
                         20L, "Week 38", "DRAFT",
-                        LocalDate.of(2026, 9, 14), LocalDate.of(2026, 9, 20), List.of(), List.of()));
+                        LocalDate.of(2026, 9, 14), LocalDate.of(2026, 9, 20), List.of(), null, List.of()));
 
         mockMvc.perform(get("/api/admin/schedule-periods/20/schedule")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer manager-token"))

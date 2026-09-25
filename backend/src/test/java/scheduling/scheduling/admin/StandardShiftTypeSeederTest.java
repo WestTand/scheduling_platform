@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.same;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -112,7 +113,7 @@ class StandardShiftTypeSeederTest {
         assertThat(existing.getStatus()).isEqualTo("ACTIVE");
         assertThat(existing.getMinStaff()).isEqualTo(1);
         assertThat(existing.getMaxStaff()).isEqualTo(20);
-        verify(shiftTypeRepository).saveAndFlush(existing);
+        verify(shiftTypeRepository).saveAndFlush(same(existing));
     }
 
     @Test
@@ -149,7 +150,7 @@ class StandardShiftTypeSeederTest {
         assertThat(legacy.getEndTime()).isEqualTo(LocalTime.of(17, 0));
         assertThat(legacy.getQuotaCategory()).isEqualTo("BATHING");
         assertThat(legacy.getStatus()).isEqualTo("ACTIVE");
-        verify(shiftTypeRepository).saveAndFlush(legacy);
+        verify(shiftTypeRepository).saveAndFlush(same(legacy));
     }
 
     @Test

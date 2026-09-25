@@ -12,6 +12,8 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +30,7 @@ import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
 import scheduling.scheduling.entity.Employee;
 import scheduling.scheduling.entity.LeaveRequest;
+import scheduling.scheduling.entity.OptimizationRun;
 import scheduling.scheduling.entity.SchedulePeriod;
 import scheduling.scheduling.entity.SchedulingRule;
 import scheduling.scheduling.entity.ShiftAssignment;
@@ -36,6 +39,7 @@ import scheduling.scheduling.entity.WorkShift;
 import scheduling.scheduling.repository.AccountRepository;
 import scheduling.scheduling.repository.EmployeeRepository;
 import scheduling.scheduling.repository.LeaveRequestRepository;
+import scheduling.scheduling.repository.OptimizationRunRepository;
 import scheduling.scheduling.repository.SchedulePeriodRepository;
 import scheduling.scheduling.repository.ShiftAssignmentRepository;
 import scheduling.scheduling.repository.SchedulingRuleRepository;
@@ -52,6 +56,9 @@ public class AdminShiftAssignmentService {
     private static final String MAX_WORK_HOURS_PER_DAY = "MAX_WORK_HOURS_PER_DAY";
     private static final int DEFAULT_MAX_WORK_HOURS_PER_DAY = 12;
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final Pattern DIAGNOSTIC_WITH_CONTEXT = Pattern.compile(
+            "^\\[(?<code>[A-Z0-9_]+)(?: employeeId=(?<employeeId>\\d+))?(?: workShiftId=(?<workShiftId>\\d+))?] (?<message>.+)$");
+    private static final Pattern DIAGNOSTIC_WITH_CODE = Pattern.compile("^(?<code>[A-Z0-9_]+): (?<message>.+)$");
 
     private final ShiftAssignmentRepository shiftAssignmentRepository;
     private final WorkShiftRepository workShiftRepository;
@@ -60,6 +67,7 @@ public class AdminShiftAssignmentService {
     private final LeaveRequestRepository leaveRequestRepository;
     private final AccountRepository accountRepository;
     private final SchedulingRuleRepository schedulingRuleRepository;
+    private final OptimizationRunRepository optimizationRunRepository;
     private final Clock clock;
     private final ActivityLogService activityLogService;
 
@@ -71,6 +79,7 @@ public class AdminShiftAssignmentService {
             LeaveRequestRepository leaveRequestRepository,
             AccountRepository accountRepository,
             SchedulingRuleRepository schedulingRuleRepository,
+            OptimizationRunRepository optimizationRunRepository,
             Clock clock,
             ActivityLogService activityLogService) {
         this.shiftAssignmentRepository = shiftAssignmentRepository;
@@ -80,6 +89,7 @@ public class AdminShiftAssignmentService {
         this.leaveRequestRepository = leaveRequestRepository;
         this.accountRepository = accountRepository;
         this.schedulingRuleRepository = schedulingRuleRepository;
+        this.optimizationRunRepository = optimizationRunRepository;
         this.clock = clock;
         this.activityLogService = activityLogService;
     }
@@ -219,7 +229,52 @@ public class AdminShiftAssignmentService {
                 period.getStartDate(),
                 period.getEndDate(),
                 employeePool,
+                latestOptimizationRun(periodId),
                 scheduled);
+    }
+
+    private AdminPeriodScheduleResponse.LatestOptimizationRun latestOptimizationRun(Long periodId) {
+        return optimizationRunRepository.findTopBySchedulePeriodIdOrderByStartedAtDescIdDesc(periodId)
+                .map(run -> new AdminPeriodScheduleResponse.LatestOptimizationRun(
+                        run.getId(),
+                        run.getStatus(),
+                        run.getTotalPenalty(),
+                        run.getPenaltyDetailsJson(),
+                        run.getErrorMessage(),
+                        parseDiagnostics(run)))
+                .orElse(null);
+    }
+
+    private List<AdminPeriodScheduleResponse.OptimizationDiagnostic> parseDiagnostics(OptimizationRun run) {
+        String errorMessage = run.getErrorMessage();
+        if (errorMessage == null || errorMessage.isBlank()) {
+            return List.of();
+        }
+        return List.of(errorMessage.split("; ")).stream()
+                .map(AdminShiftAssignmentService::parseDiagnostic)
+                .filter(diagnostic -> diagnostic != null)
+                .toList();
+    }
+
+    private static AdminPeriodScheduleResponse.OptimizationDiagnostic parseDiagnostic(String value) {
+        Matcher contextual = DIAGNOSTIC_WITH_CONTEXT.matcher(value);
+        if (contextual.matches()) {
+            return new AdminPeriodScheduleResponse.OptimizationDiagnostic(
+                    contextual.group("code"),
+                    contextual.group("message"),
+                    parseLong(contextual.group("employeeId")),
+                    parseLong(contextual.group("workShiftId")));
+        }
+        Matcher coded = DIAGNOSTIC_WITH_CODE.matcher(value);
+        if (coded.matches()) {
+            return new AdminPeriodScheduleResponse.OptimizationDiagnostic(
+                    coded.group("code"), coded.group("message"), null, null);
+        }
+        return new AdminPeriodScheduleResponse.OptimizationDiagnostic("OPTIMIZATION_MESSAGE", value, null, null);
+    }
+
+    private static Long parseLong(String value) {
+        return value == null || value.isBlank() ? null : Long.valueOf(value);
     }
 
     @Transactional(readOnly = true)

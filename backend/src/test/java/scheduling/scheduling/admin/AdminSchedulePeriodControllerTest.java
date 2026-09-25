@@ -54,6 +54,9 @@ class AdminSchedulePeriodControllerTest {
     private AdminSchedulePeriodService adminSchedulePeriodService;
 
     @MockitoBean
+    private AdminScheduleGenerationService adminScheduleGenerationService;
+
+    @MockitoBean
     private JwtService jwtService;
 
     @MockitoBean

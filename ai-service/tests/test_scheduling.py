@@ -329,3 +329,115 @@ def test_infeasible_diagnostics_include_locked_leave_conflict() -> None:
         and item["workShiftId"] == 1000
         for item in body["diagnostics"]
     )
+
+
+def test_infeasible_diagnostics_include_rest_conflict() -> None:
+    request = base_request()
+    request["employees"] = [{"employeeId": 1}]
+    request["period"]["endDate"] = "2026-09-15"
+    request["workShifts"].append(
+        {
+            "workShiftId": 1001,
+            "shiftTypeId": 100,
+            "workDate": "2026-09-15",
+            "startsAt": "2026-09-15T02:00:00+07:00",
+            "endsAt": "2026-09-15T10:00:00+07:00",
+            "requiredStaff": 1,
+        }
+    )
+
+    response = client.post("/api/v1/scheduling/optimize", json=request)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "INFEASIBLE"
+    assert any(
+        item["code"] == "MIN_REST_CONFLICT"
+        and item["employeeId"] == 1
+        and item["workShiftId"] == 1001
+        for item in body["diagnostics"]
+    )
+
+
+def test_infeasible_diagnostics_include_daily_hour_conflict() -> None:
+    request = base_request()
+    request["employees"] = [{"employeeId": 1}]
+    request["rules"]["hardRules"]["minRestHoursBetweenShifts"] = 0
+    request["rules"]["hardRules"]["maxWorkHoursPerDay"] = 8
+    request["workShifts"].append(
+        {
+            "workShiftId": 1001,
+            "shiftTypeId": 100,
+            "workDate": "2026-09-14",
+            "startsAt": "2026-09-14T17:00:00+07:00",
+            "endsAt": "2026-09-14T21:00:00+07:00",
+            "requiredStaff": 1,
+        }
+    )
+
+    response = client.post("/api/v1/scheduling/optimize", json=request)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "INFEASIBLE"
+    assert any(
+        item["code"] == "MAX_WORK_HOURS_EXCEEDED"
+        and item["employeeId"] == 1
+        and item["workShiftId"] == 1001
+        for item in body["diagnostics"]
+    )
+
+
+def test_infeasible_diagnostics_include_weekly_shift_conflict() -> None:
+    request = base_request()
+    request["employees"] = [{"employeeId": 1}]
+    request["period"]["endDate"] = "2026-09-15"
+    request["rules"]["hardRules"]["minRestHoursBetweenShifts"] = 0
+    request["rules"]["hardRules"]["maxShiftsPerWeek"] = 1
+    request["workShifts"].append(
+        {
+            "workShiftId": 1001,
+            "shiftTypeId": 100,
+            "workDate": "2026-09-15",
+            "startsAt": "2026-09-15T08:00:00+07:00",
+            "endsAt": "2026-09-15T16:00:00+07:00",
+            "requiredStaff": 1,
+        }
+    )
+
+    response = client.post("/api/v1/scheduling/optimize", json=request)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "INFEASIBLE"
+    assert any(
+        item["code"] == "MAX_SHIFTS_PER_WEEK_EXCEEDED"
+        and item["employeeId"] == 1
+        and item["workShiftId"] == 1001
+        for item in body["diagnostics"]
+    )
+
+
+def test_infeasible_diagnostics_include_quota_conflict() -> None:
+    request = base_request()
+    request["employees"] = [{"employeeId": 1}]
+    request["period"]["endDate"] = "2026-09-15"
+    request["rules"]["hardRules"]["minRestHoursBetweenShifts"] = 0
+    request["shiftTypes"][0]["durationMinutes"] = 60
+    request["shiftTypes"][0]["quotaCategory"] = "OVERTIME"
+    request["workShifts"] = [
+        {"workShiftId": 1000, "shiftTypeId": 100, "workDate": "2026-09-14", "startsAt": "2026-09-14T08:00:00+07:00", "endsAt": "2026-09-14T09:00:00+07:00", "requiredStaff": 1},
+        {"workShiftId": 1001, "shiftTypeId": 100, "workDate": "2026-09-15", "startsAt": "2026-09-15T08:00:00+07:00", "endsAt": "2026-09-15T09:00:00+07:00", "requiredStaff": 1},
+    ]
+
+    response = client.post("/api/v1/scheduling/optimize", json=request)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "INFEASIBLE"
+    assert any(
+        item["code"] == "QUOTA_EXCEEDED"
+        and item["employeeId"] == 1
+        and item["workShiftId"] == 1001
+        for item in body["diagnostics"]
+    )

@@ -1,5 +1,5 @@
 import type { ShiftCode } from '@/configs/shiftDefinitions'
-import type { BackendPeriodScheduleResponse, BackendSchedulePeriodResponse, BackendScheduledShiftResponse, BackendShiftAssignmentResponse } from '@/types/backendSchedule'
+import type { BackendOptimizationDiagnostic, BackendPeriodScheduleResponse, BackendScheduleEmployeePoolItem, BackendSchedulePeriodResponse, BackendScheduledShiftResponse, BackendShiftAssignmentResponse } from '@/types/backendSchedule'
 import { ScheduleStatus, type ScheduleAssignment, type ScheduleDetail, type ScheduleWarning, type WorkSchedule } from '@/types/schedule'
 
 const normalizeStatus = (status: string) => Object.values(ScheduleStatus).includes(status as ScheduleStatus) ? status as ScheduleStatus : ScheduleStatus.DRAFT
@@ -36,9 +36,11 @@ const formatWarningDate = (date: string) => {
 
 const shortageFor = (shift: BackendScheduledShiftResponse) => Math.max(0, shift.requiredStaff - shift.assignments.length)
 
-const shiftWarningCount = (shift: BackendScheduledShiftResponse) => shortageFor(shift) > 0 ? 1 : 0
+const diagnosticCountForShift = (shiftId: number, diagnostics: BackendOptimizationDiagnostic[]) => diagnostics.filter((diagnostic) => diagnostic.workShiftId === shiftId).length
 
-const adaptAssignment = (assignment: BackendShiftAssignmentResponse, shift: BackendScheduledShiftResponse): ScheduleAssignment => ({
+const shiftWarningCount = (shift: BackendScheduledShiftResponse, diagnostics: BackendOptimizationDiagnostic[] = []) => (shortageFor(shift) > 0 ? 1 : 0) + diagnosticCountForShift(shift.id, diagnostics)
+
+const adaptAssignment = (assignment: BackendShiftAssignmentResponse, shift: BackendScheduledShiftResponse, diagnostics: BackendOptimizationDiagnostic[]): ScheduleAssignment => ({
   id: String(assignment.id),
   scheduleId: String(assignment.periodId),
   workShiftId: String(assignment.workShiftId),
@@ -46,18 +48,18 @@ const adaptAssignment = (assignment: BackendShiftAssignmentResponse, shift: Back
   date: shift.workDate,
   shiftCode: shiftNameToCode(shift.shiftName),
   employeeNames: [assignment.fullName],
-  warningCount: shiftWarningCount(shift),
+  warningCount: shiftWarningCount(shift, diagnostics),
   locked: assignment.locked,
 })
 
-const adaptUnassignedShift = (shift: BackendScheduledShiftResponse, periodId: number): ScheduleAssignment => ({
+const adaptUnassignedShift = (shift: BackendScheduledShiftResponse, periodId: number, diagnostics: BackendOptimizationDiagnostic[]): ScheduleAssignment => ({
   id: `work-shift-${shift.id}`,
   scheduleId: String(periodId),
   workShiftId: String(shift.id),
   date: shift.workDate,
   shiftCode: shiftNameToCode(shift.shiftName),
   employeeNames: [],
-  warningCount: shiftWarningCount(shift),
+  warningCount: shiftWarningCount(shift, diagnostics),
   locked: false,
 })
 
@@ -80,8 +82,30 @@ const buildStaffingWarnings = (schedule: BackendPeriodScheduleResponse): Schedul
     } satisfies ScheduleWarning
   })
 
+const buildDiagnosticWarnings = (schedule: BackendPeriodScheduleResponse): ScheduleWarning[] => {
+  const latestRun = schedule.latestOptimizationRun
+  if (!latestRun?.diagnostics?.length) return []
+  const shiftById = new Map(schedule.workShifts.map((shift) => [shift.id, shift]))
+  const employeeById = new Map((schedule.employeePool ?? []).map((employee: BackendScheduleEmployeePoolItem) => [employee.id, employee]))
+  return latestRun.diagnostics.map((diagnostic, index) => {
+    const shift = diagnostic.workShiftId == null ? undefined : shiftById.get(diagnostic.workShiftId)
+    const employee = diagnostic.employeeId == null ? undefined : employeeById.get(diagnostic.employeeId)
+    return {
+      id: `optimization-diagnostic-${latestRun.runId}-${index}`,
+      type: 'HARD_CONSTRAINT',
+      severity: 'HIGH',
+      employeeName: employee?.fullName ?? (diagnostic.employeeId == null ? 'Không áp dụng cho nhân viên cụ thể' : `Nhân viên #${diagnostic.employeeId}`),
+      date: shift?.workDate ?? schedule.startDate,
+      shiftCode: shift ? shiftNameToCode(shift.shiftName) : '',
+      content: `${diagnostic.code}: ${diagnostic.message}`,
+      suggestion: 'Đổi nhân viên, gỡ khóa phân công liên quan, hoặc chạy tối ưu lại sau khi chỉnh lịch.',
+    } satisfies ScheduleWarning
+  })
+}
+
 export const adaptBackendPeriodSchedule = (schedule: BackendPeriodScheduleResponse): ScheduleDetail => {
-  const assignments = schedule.workShifts.flatMap((shift) => shift.assignments.length ? shift.assignments.map((assignment) => adaptAssignment(assignment, shift)) : [adaptUnassignedShift(shift, schedule.periodId)])
+  const diagnostics = schedule.latestOptimizationRun?.diagnostics ?? []
+  const assignments = schedule.workShifts.flatMap((shift) => shift.assignments.length ? shift.assignments.map((assignment) => adaptAssignment(assignment, shift, diagnostics)) : [adaptUnassignedShift(shift, schedule.periodId, diagnostics)])
   const assignedEmployeeNames = [...new Set(assignments.flatMap((assignment) => assignment.employeeNames))]
   const employeePool = schedule.employeePool?.length ? schedule.employeePool.map((employee) => employee.fullName) : assignedEmployeeNames
   const employeeCount = employeePool.length
@@ -100,7 +124,7 @@ export const adaptBackendPeriodSchedule = (schedule: BackendPeriodScheduleRespon
     isMock: false,
     employeePool,
     assignments,
-    warnings: buildStaffingWarnings(schedule),
+    warnings: [...buildStaffingWarnings(schedule), ...buildDiagnosticWarnings(schedule)],
   }
 }
 

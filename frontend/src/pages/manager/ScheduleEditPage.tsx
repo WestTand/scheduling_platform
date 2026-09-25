@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowLeft, CalendarDays, Save, Send, Trash2, UserRound } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, CalendarDays, Save, Send, Sparkles, Trash2, UserRound } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
@@ -11,7 +11,7 @@ import { apiConfig } from '@/config/api'
 import { scheduleDetailSeed, scheduleStatusLabels } from '@/mocks/schedules'
 import { backendEmployeeService } from '@/services/backendEmployeeService'
 import { backendScheduleService } from '@/services/backendScheduleService'
-import { getScheduleEditLockedMessage, getScheduleEditModeLabel, getScheduleEditNoticeClass, reloadScheduleEditDetail, shouldShowMockStatusActions } from './ScheduleEditPage.helpers'
+import { canRunScheduleEditOptimize, filterScheduleEditAssignments, getScheduleEditLockedMessage, getScheduleEditModeLabel, getScheduleEditNoticeClass, reloadScheduleEditDetail, shouldShowMockStatusActions, type ScheduleEditAssignmentFilter } from './ScheduleEditPage.helpers'
 import type { ShiftCode } from '@/configs/shiftDefinitions'
 import type { Employee } from '@/types/management'
 import type { ScheduleAssignment, ScheduleDetail } from '@/types/schedule'
@@ -44,6 +44,8 @@ export function ScheduleEditPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [notice, setNotice] = useState<ScheduleEditNotice | null>(null)
+  const [assignmentFilter, setAssignmentFilter] = useState<ScheduleEditAssignmentFilter>('ALL')
+  const [isOptimizing, setIsOptimizing] = useState(false)
 
   const mockDetail = scheduleId === scheduleDetailSeed.id ? scheduleDetailSeed : null
   const detail = apiConfig.useMockApi ? mockDetail : backendResult && scheduleId === backendResult.scheduleId ? backendResult.detail : null
@@ -91,6 +93,7 @@ export function ScheduleEditPage() {
   const isLoading = !apiConfig.useMockApi && Boolean(scheduleId) && (!backendResult || backendResult.scheduleId !== scheduleId)
   const lockedMessage = getScheduleEditLockedMessage(apiConfig.useMockApi, detail?.status)
   const isEditingLocked = Boolean(lockedMessage)
+  const filteredAssignments = filterScheduleEditAssignments(assignments, assignmentFilter)
 
   if (isLoading) {
     return <div className="rounded-xl border border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-600">Đang tải dữ liệu chỉnh sửa lịch...</div>
@@ -226,6 +229,20 @@ export function ScheduleEditPage() {
     showSuccess(`Mock state: chuyển lịch sang trạng thái ${scheduleStatusLabels[status] ?? status}.`)
   }
 
+  const handleOptimize = async () => {
+    if (!canRunScheduleEditOptimize({ useMockApi: apiConfig.useMockApi, scheduleId: scheduleId ?? '', isEditingLocked, isOptimizing })) return
+    setIsOptimizing(true)
+    try {
+      const result = await backendScheduleService.optimize(scheduleId!)
+      await refreshScheduleDetail()
+      showSuccess(`Đã tối ưu lại lịch. AI: ${result.aiStatus}${result.solverStatus ? ` · Solver: ${result.solverStatus}` : ''}.`)
+    } catch (optimizeError) {
+      showError(optimizeError instanceof Error ? optimizeError.message : 'Không thể tối ưu lại lịch.')
+    } finally {
+      setIsOptimizing(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <Button variant="ghost" asChild>
@@ -251,8 +268,27 @@ export function ScheduleEditPage() {
         <CardContent className="space-y-4 p-4">
           <div className="flex flex-wrap gap-3">
             <Button onClick={openCreate} disabled={isEditingLocked}><CalendarDays className="mr-2 h-4 w-4" />Thêm phân công</Button>
+            {!apiConfig.useMockApi && <Button variant="outline" onClick={() => void handleOptimize()} disabled={!canRunScheduleEditOptimize({ useMockApi: apiConfig.useMockApi, scheduleId: scheduleId ?? '', isEditingLocked, isOptimizing })}><Sparkles className="mr-2 h-4 w-4" />{isOptimizing ? 'Đang tối ưu...' : 'Tối ưu lại'}</Button>}
             {shouldShowMockStatusActions(apiConfig.useMockApi) && <Button variant="outline" onClick={() => handleSubmitStatus('DRAFT')}><Save className="mr-2 h-4 w-4" />Lưu bản nháp</Button>}
             {shouldShowMockStatusActions(apiConfig.useMockApi) && <Button variant="outline" onClick={() => handleSubmitStatus('PENDING_APPROVAL')}><Send className="mr-2 h-4 w-4" />Gửi duyệt</Button>}
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {[
+              { value: 'ALL', label: `Tất cả (${assignments.length})` },
+              { value: 'UNASSIGNED', label: `Chưa phân công (${assignments.filter((assignment) => assignment.employeeNames.length === 0).length})` },
+              { value: 'WARNING', label: `Có cảnh báo (${assignments.filter((assignment) => assignment.warningCount > 0).length})` },
+            ].map((option) => (
+              <Button
+                key={option.value}
+                type="button"
+                variant={assignmentFilter === option.value ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setAssignmentFilter(option.value as ScheduleEditAssignmentFilter)}
+              >
+                {option.label}
+              </Button>
+            ))}
           </div>
 
           <div className="grid gap-3 md:grid-cols-[1fr_1fr_1fr_1fr]">
@@ -269,12 +305,12 @@ export function ScheduleEditPage() {
           </div>
 
           <div className="space-y-3">
-            {assignments.map((assignment) => (
+            {filteredAssignments.map((assignment) => (
               <div key={assignment.id} className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 md:flex-row md:items-center md:justify-between">
                 <div>
                   <p className="font-medium text-slate-900">{getShiftDefinition(assignment.shiftCode)?.name} • {assignment.date}</p>
-                  <p className="text-sm text-slate-500">{getShiftDefinition(assignment.shiftCode) && formatShiftRangeLabel(getShiftDefinition(assignment.shiftCode)!)} • {assignment.employeeNames.join(', ')}</p>
-                  {assignment.warningCount > 0 && <p className="mt-1 inline-flex items-center gap-2 text-xs text-amber-700"><AlertTriangle className="h-3.5 w-3.5" />Có cảnh báo mẫu</p>}
+                  <p className="text-sm text-slate-500">{getShiftDefinition(assignment.shiftCode) && formatShiftRangeLabel(getShiftDefinition(assignment.shiftCode)!)} • {assignment.employeeNames.length ? assignment.employeeNames.join(', ') : 'Chưa phân công'}</p>
+                  {assignment.warningCount > 0 && <p className="mt-1 inline-flex items-center gap-2 text-xs text-amber-700"><AlertTriangle className="h-3.5 w-3.5" />Có cảnh báo cần xử lý</p>}
                 </div>
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" onClick={() => openEdit(assignment)} disabled={isEditingLocked}>Sửa</Button>
@@ -282,6 +318,7 @@ export function ScheduleEditPage() {
                 </div>
               </div>
             ))}
+            {filteredAssignments.length === 0 && <div className="rounded-xl border border-dashed border-slate-200 bg-white p-4 text-sm text-slate-500">Không có phân công phù hợp bộ lọc này.</div>}
           </div>
         </CardContent>
       </Card>

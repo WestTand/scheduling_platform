@@ -48,6 +48,22 @@ export interface BackendScheduleEmployeePoolItem {
   fullName: string
 }
 
+export interface BackendOptimizationDiagnostic {
+  code: string
+  message: string
+  employeeId: number | null
+  workShiftId: number | null
+}
+
+export interface BackendLatestOptimizationRun {
+  runId: number
+  status: string
+  totalPenalty: number | null
+  penaltyDetailsJson: string | null
+  errorMessage: string | null
+  diagnostics: BackendOptimizationDiagnostic[]
+}
+
 export interface BackendPeriodScheduleResponse {
   periodId: number
   periodName: string
@@ -55,6 +71,7 @@ export interface BackendPeriodScheduleResponse {
   startDate: string
   endDate: string
   employeePool: BackendScheduleEmployeePoolItem[]
+  latestOptimizationRun?: BackendLatestOptimizationRun | null
   workShifts: BackendScheduledShiftResponse[]
 }
 
