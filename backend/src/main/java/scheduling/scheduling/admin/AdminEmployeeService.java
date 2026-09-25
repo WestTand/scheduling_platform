@@ -49,6 +49,11 @@ public class AdminEmployeeService {
                     .map(AdminEmployeeResponse::from)
                     .toList();
         }
+        if (normalizedQuery == null) {
+            return employeeRepository.findByStatusOrderByEmployeeCodeAsc(normalizedStatus).stream()
+                    .map(AdminEmployeeResponse::from)
+                    .toList();
+        }
         return employeeRepository.search(normalizedQuery, normalizedStatus).stream()
                 .map(AdminEmployeeResponse::from)
                 .toList();

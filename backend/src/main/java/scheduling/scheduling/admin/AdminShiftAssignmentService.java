@@ -8,6 +8,7 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -204,12 +205,20 @@ public class AdminShiftAssignmentService {
                             byShift.getOrDefault(shift.getId(), List.of()));
                 })
                 .toList();
+        List<AdminPeriodScheduleResponse.EmployeePoolItem> employeePool = period.getEmployeePool() == null
+                ? List.of()
+                : period.getEmployeePool().stream()
+                        .sorted(Comparator.comparing(Employee::getEmployeeCode))
+                        .map(employee -> new AdminPeriodScheduleResponse.EmployeePoolItem(
+                                employee.getId(), employee.getEmployeeCode(), employee.getFullName()))
+                        .toList();
         return new AdminPeriodScheduleResponse(
                 period.getId(),
                 period.getPeriodName(),
                 period.getStatus(),
                 period.getStartDate(),
                 period.getEndDate(),
+                employeePool,
                 scheduled);
     }
 

@@ -5,6 +5,7 @@ export const ScheduleStatus = {
   PENDING_APPROVAL: 'PENDING_APPROVAL',
   APPROVED: 'APPROVED',
   PUBLISHED: 'PUBLISHED',
+  CANCELLED: 'CANCELLED',
 } as const
 
 export type ScheduleStatus = (typeof ScheduleStatus)[keyof typeof ScheduleStatus]
@@ -34,10 +35,13 @@ export interface WorkSchedule {
 export interface ScheduleAssignment {
   id: string
   scheduleId: string
+  workShiftId?: string
+  employeeId?: string
   date: string
   shiftCode: ShiftCode
   employeeNames: string[]
   warningCount: number
+  locked?: boolean
 }
 
 export interface ScheduleWarning {
@@ -52,6 +56,7 @@ export interface ScheduleWarning {
 }
 
 export interface ScheduleDetail extends WorkSchedule {
+  employeePool: string[]
   assignments: ScheduleAssignment[]
   warnings: ScheduleWarning[]
 }

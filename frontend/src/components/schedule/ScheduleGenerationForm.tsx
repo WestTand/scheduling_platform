@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { employeeSeed } from '@/mocks/managementData'
 import { shiftTypeSeed } from '@/mocks/managementData'
+import type { ShiftType } from '@/types/management'
 
 export interface ScheduleGenerationValues {
   name: string
@@ -15,15 +16,60 @@ export interface ScheduleGenerationValues {
   shiftCodes: string[]
 }
 
+interface BackendGenerationEmployee {
+  id: string
+  fullName: string
+  employeeCode: string
+}
+
+export interface BackendGenerationShiftType {
+  id: number
+  shiftName: string
+  shiftCode: string | null
+  startTime: string
+  endTime: string
+  status: string
+}
+
+interface GenerationShiftOption {
+  id: string
+  code: string
+  name: string
+  startTime: string
+  endTime: string
+  color: string
+  description: string
+}
+
 interface ScheduleGenerationFormProps {
   onSubmit: (values: ScheduleGenerationValues) => void
   onCancel: () => void
+  backendMode?: boolean
+  backendEmployees?: BackendGenerationEmployee[]
+  backendShiftTypes?: BackendGenerationShiftType[]
 }
 
 
-export function ScheduleGenerationForm({ onSubmit, onCancel }: ScheduleGenerationFormProps) {
-  const activeEmployees = useMemo(() => employeeSeed.filter((employee) => employee.status === 'ACTIVE'), [])
-  const activeShifts = useMemo(() => shiftTypeSeed.filter((shift) => shift.status === 'ACTIVE'), [])
+export function ScheduleGenerationForm({ onSubmit, onCancel, backendMode = false, backendEmployees = [], backendShiftTypes = [] }: ScheduleGenerationFormProps) {
+  const activeEmployees = useMemo(() => backendMode ? backendEmployees : employeeSeed.filter((employee) => employee.status === 'ACTIVE'), [backendMode, backendEmployees])
+  const activeShifts = useMemo(() => backendMode ? backendShiftTypes : shiftTypeSeed.filter((shift) => shift.status === 'ACTIVE'), [backendMode, backendShiftTypes])
+  const shiftOptions = useMemo<GenerationShiftOption[]>(() => activeShifts.map((shift) => backendMode ? {
+    id: String((shift as BackendGenerationShiftType).id),
+    code: (shift as BackendGenerationShiftType).shiftCode ?? String((shift as BackendGenerationShiftType).id),
+    name: (shift as BackendGenerationShiftType).shiftName,
+    startTime: (shift as BackendGenerationShiftType).startTime,
+    endTime: (shift as BackendGenerationShiftType).endTime,
+    color: '#2563eb',
+    description: 'Backend shift type',
+  } : {
+    id: (shift as ShiftType).code,
+    code: (shift as ShiftType).code,
+    name: (shift as ShiftType).name,
+    startTime: (shift as ShiftType).startTime,
+    endTime: (shift as ShiftType).endTime,
+    color: (shift as ShiftType).color,
+    description: (shift as ShiftType).applicableDayType === 'WEEKDAY' ? 'Thứ Hai đến Thứ Sáu' : 'Thứ Bảy, Chủ nhật & ngày lễ',
+  }), [activeShifts, backendMode])
   const [name, setName] = useState('')
   const [startDate, setStartDate] = useState('2026-09-21')
   const [endDate, setEndDate] = useState('2026-09-27')
@@ -31,7 +77,7 @@ export function ScheduleGenerationForm({ onSubmit, onCancel }: ScheduleGeneratio
   const [period, setPeriod] = useState<'WEEK' | 'MONTH'>('WEEK')
   const [employeeIds, setEmployeeIds] = useState<string[]>(activeEmployees.map((employee) => employee.id))
   const [employeeSearch, setEmployeeSearch] = useState('')
-  const [shiftCodes, setShiftCodes] = useState<string[]>(activeShifts.map((shift) => shift.code))
+  const [shiftCodes, setShiftCodes] = useState<string[]>(shiftOptions.map((shift) => shift.id))
   const [error, setError] = useState('')
   const visibleEmployees = activeEmployees.filter((employee) => [employee.fullName, employee.employeeCode].some((value) => value.toLowerCase().includes(employeeSearch.toLowerCase())))
 
@@ -65,7 +111,7 @@ export function ScheduleGenerationForm({ onSubmit, onCancel }: ScheduleGeneratio
     setPeriod('WEEK')
     setEmployeeIds(activeEmployees.map((employee) => employee.id))
     setEmployeeSearch('')
-    setShiftCodes(activeShifts.map((shift) => shift.code))
+    setShiftCodes(shiftOptions.map((shift) => shift.id))
     setError('')
   }
 
@@ -82,6 +128,8 @@ export function ScheduleGenerationForm({ onSubmit, onCancel }: ScheduleGeneratio
         </CardContent>
       </Card>
 
+      {backendMode && <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">Backend sẽ tạo kỳ lịch, tạo ca làm việc theo loại ca đã chọn, rồi gọi AI Optimize để phân công nhân viên.</div>}
+
       <Card className="border-slate-200 shadow-sm">
         <CardHeader><div className="flex flex-wrap items-center justify-between gap-3"><CardTitle className="text-base">Phạm vi nhân viên <span className="text-sm font-normal text-slate-500">({activeEmployees.length} đang hoạt động)</span></CardTitle><Button type="button" variant="outline" size="sm" onClick={() => setEmployeeIds(employeeIds.length === activeEmployees.length ? [] : activeEmployees.map((employee) => employee.id))}>{employeeIds.length === activeEmployees.length ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}</Button></div><input value={employeeSearch} onChange={(event) => setEmployeeSearch(event.target.value)} placeholder="Tìm theo tên hoặc mã nhân viên" className="mt-3 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none" /></CardHeader>
         <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{visibleEmployees.map((employee) => <label key={employee.id} className="flex items-center gap-3 rounded-xl border border-slate-200 p-3 text-sm text-slate-700"><input type="checkbox" checked={employeeIds.includes(employee.id)} onChange={() => toggleValue(employeeIds, employee.id, setEmployeeIds)} />{employee.fullName}<span className="ml-auto text-xs text-slate-400">{employee.employeeCode}</span></label>)}</CardContent>
@@ -89,7 +137,9 @@ export function ScheduleGenerationForm({ onSubmit, onCancel }: ScheduleGeneratio
 
       <Card className="border-slate-200 shadow-sm">
         <CardHeader><CardTitle className="text-base">Loại ca áp dụng</CardTitle></CardHeader>
-        <CardContent className="grid gap-3 lg:grid-cols-3">{activeShifts.map((shift) => <label key={shift.code} className="cursor-pointer rounded-xl border p-4" style={{ borderLeftColor: shift.color, borderLeftWidth: 4 }}><div className="flex items-start gap-3"><input type="checkbox" checked={shiftCodes.includes(shift.code)} onChange={() => toggleValue(shiftCodes, shift.code, setShiftCodes)} /><div><p className="font-semibold text-slate-900">{shift.name} <span className="text-xs font-normal text-slate-500">({shift.code})</span></p><p className="mt-1 text-sm text-slate-500">{shift.startTime} - {shift.endTime} · {shift.applicableDayType === 'WEEKDAY' ? 'Thứ Hai đến Thứ Sáu' : 'Thứ Bảy, Chủ nhật & ngày lễ'}</p></div></div></label>)}</CardContent>
+        <CardContent className="grid gap-3 lg:grid-cols-3">{shiftOptions.map((shift) => {
+          return <label key={shift.id} className="cursor-pointer rounded-xl border p-4" style={{ borderLeftColor: shift.color, borderLeftWidth: 4 }}><div className="flex items-start gap-3"><input type="checkbox" checked={shiftCodes.includes(shift.id)} onChange={() => toggleValue(shiftCodes, shift.id, setShiftCodes)} /><div><p className="font-semibold text-slate-900">{shift.name} <span className="text-xs font-normal text-slate-500">({shift.code})</span></p><p className="mt-1 text-sm text-slate-500">{shift.startTime} - {shift.endTime} · {shift.description}</p></div></div></label>
+        })}</CardContent>
       </Card>
 
       {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}

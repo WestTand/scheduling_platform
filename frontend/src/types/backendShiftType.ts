@@ -1,13 +1,13 @@
 import type { ShiftTypeStatus } from '@/types/management'
 
-export type BackendQuotaCategory = 'REGULAR' | 'OVERTIME' | 'BATHING' | 'ON_CALL'
+export type BackendQuotaCategory = 'BATHING' | 'OVERTIME' | 'ON_CALL' | 'REGULAR'
 
 export interface BackendShiftTypeResponse {
   id: number
   shiftName: string
   startTime: string
   endTime: string
-  durationHours: number | string
+  durationHours: number
   overnight: boolean
   heavy: boolean
   minStaff: number
@@ -17,7 +17,7 @@ export interface BackendShiftTypeResponse {
   shiftCode: string
   applicableWeekdays: string
   appliesOnHolidays: boolean
-  penaltyWeightMultiplier: number | string
+  penaltyWeightMultiplier: number
 }
 
 export interface BackendCreateShiftTypeRequest {

@@ -57,6 +57,7 @@ public class SecurityConfig {
                                 "/api/auth/password/change-required",
                                 "/api/auth/refresh",
                                 "/api/auth/logout",
+                                "/error",
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html")

@@ -24,6 +24,12 @@ export function ScheduleAssignmentCard({ assignment }: ScheduleAssignmentCardPro
         {assignment.warningCount > 0 && <AlertTriangle className="h-4 w-4 text-amber-500" aria-label="Có cảnh báo" />}
       </div>
       <div className="mt-3 space-y-1 text-sm text-slate-600">
+        {assignment.employeeNames.length === 0 && (
+          <div className="flex items-center gap-2 text-amber-700">
+            <Users className="h-3.5 w-3.5 text-amber-500" />
+            <span>Chưa phân công</span>
+          </div>
+        )}
         {assignment.employeeNames.map((employeeName) => (
           <div key={employeeName} className="flex items-center gap-2">
             <Users className="h-3.5 w-3.5 text-slate-400" />

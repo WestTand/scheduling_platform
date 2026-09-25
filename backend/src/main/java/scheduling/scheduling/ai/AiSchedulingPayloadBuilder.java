@@ -3,6 +3,8 @@ package scheduling.scheduling.ai;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -32,6 +34,7 @@ public class AiSchedulingPayloadBuilder {
 
     private static final String SCHEMA_VERSION = "1.0";
     private static final String TIMEZONE = "Asia/Ho_Chi_Minh";
+    private static final ZoneId SCHEDULING_ZONE = ZoneId.of(TIMEZONE);
     private static final String ACTIVE = "ACTIVE";
     private static final String APPROVED = "APPROVED";
     private static final String PENDING = "PENDING";
@@ -90,7 +93,12 @@ public class AiSchedulingPayloadBuilder {
      */
     public PayloadSnapshot prepareSnapshot(
             SchedulePeriod period, AiSchedulingRequestDto.SolverOptionsDto solverOptions) {
-        return loadAndValidate(period, solverOptions);
+        return loadAndValidate(period, solverOptions, null);
+    }
+
+    public PayloadSnapshot prepareSnapshot(
+            SchedulePeriod period, AiSchedulingRequestDto.SolverOptionsDto solverOptions, List<Long> employeeIds) {
+        return loadAndValidate(period, solverOptions, employeeIds);
     }
 
     public Map<String, Object> weightsSnapshotFrom(PayloadSnapshot snapshot) {
@@ -125,19 +133,23 @@ public class AiSchedulingPayloadBuilder {
                         .map(assignment -> new AiSchedulingRequestDto.BoundaryAssignmentDto(
                                 assignment.getEmployee().getId(),
                                 assignment.getWorkShift().getShiftType().getId(),
-                                assignment.getWorkShift().getStartsAt(),
-                                assignment.getWorkShift().getEndsAt()))
+                                toSchedulingZone(assignment.getWorkShift().getStartsAt()),
+                                toSchedulingZone(assignment.getWorkShift().getEndsAt())))
                         .toList(),
                 snapshot.rules(),
                 snapshot.solverOptions());
     }
 
     private PayloadSnapshot loadAndValidate(
-            SchedulePeriod period, AiSchedulingRequestDto.SolverOptionsDto solverOptions) {
+            SchedulePeriod period, AiSchedulingRequestDto.SolverOptionsDto solverOptions, List<Long> employeeIds) {
         AiSchedulingRequestDto.SolverOptionsDto effectiveOptions = resolveSolverOptions(solverOptions);
         AiSchedulingRequestDto.RulesDto rules = loadRules();
 
         List<Employee> employees = employeeRepository.findSchedulableForAi();
+        if (employeeIds != null && !employeeIds.isEmpty()) {
+            Set<Long> scopedIds = Set.copyOf(employeeIds);
+            employees = employees.stream().filter(employee -> scopedIds.contains(employee.getId())).toList();
+        }
         if (employees == null || employees.isEmpty()) {
             throw badRequest("No active employees to schedule");
         }
@@ -332,9 +344,13 @@ public class AiSchedulingPayloadBuilder {
                 workShift.getId(),
                 workShift.getShiftType().getId(),
                 workShift.getWorkDate(),
-                workShift.getStartsAt(),
-                workShift.getEndsAt(),
+                toSchedulingZone(workShift.getStartsAt()),
+                toSchedulingZone(workShift.getEndsAt()),
                 workShift.getRequiredStaff());
+    }
+
+    private static OffsetDateTime toSchedulingZone(OffsetDateTime value) {
+        return value == null ? null : value.atZoneSameInstant(SCHEDULING_ZONE).toOffsetDateTime();
     }
 
     private AiSchedulingRequestDto.ApprovedLeaveDto toApprovedLeaveDto(LeaveRequest leave) {

@@ -134,6 +134,23 @@ class AiSchedulingPayloadBuilderTest {
     }
 
     @Test
+    void buildPayloadRestoresVietnamOffsetForDatabaseNormalizedShiftWindows() {
+        Fixture fixture = happyPath();
+        fixture.workShift().setWorkDate(LocalDate.of(2042, 8, 27));
+        fixture.workShift().setStartsAt(OffsetDateTime.parse("2042-08-26T17:30:00Z"));
+        fixture.workShift().setEndsAt(OffsetDateTime.parse("2042-08-27T01:00:00Z"));
+
+        AiSchedulingRequestDto payload = builder.build(fixture.period(), 900L, null);
+
+        assertThat(payload.workShifts())
+                .extracting(AiSchedulingRequestDto.WorkShiftDto::startsAt)
+                .containsExactly(OffsetDateTime.parse("2042-08-27T00:30:00+07:00"));
+        assertThat(payload.workShifts())
+                .extracting(AiSchedulingRequestDto.WorkShiftDto::endsAt)
+                .containsExactly(OffsetDateTime.parse("2042-08-27T08:00:00+07:00"));
+    }
+
+    @Test
     void rejectsTimeLimitZeroBeforeCallingAiSchema() {
         Fixture fixture = happyPath();
 

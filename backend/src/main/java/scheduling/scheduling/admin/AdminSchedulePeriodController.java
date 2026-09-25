@@ -19,6 +19,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import scheduling.scheduling.admin.dto.AdminSchedulePeriodResponse;
+import scheduling.scheduling.admin.dto.GenerateScheduleRequest;
+import scheduling.scheduling.admin.dto.GenerateScheduleResponse;
 import scheduling.scheduling.admin.dto.SchedulePeriodRequest;
 import scheduling.scheduling.auth.CurrentAccountPrincipal;
 
@@ -30,9 +32,20 @@ public class AdminSchedulePeriodController {
     private static final String DRAFT = "DRAFT";
 
     private final AdminSchedulePeriodService adminSchedulePeriodService;
+    private final AdminScheduleGenerationService adminScheduleGenerationService;
 
-    public AdminSchedulePeriodController(AdminSchedulePeriodService adminSchedulePeriodService) {
+    public AdminSchedulePeriodController(AdminSchedulePeriodService adminSchedulePeriodService,
+            AdminScheduleGenerationService adminScheduleGenerationService) {
         this.adminSchedulePeriodService = adminSchedulePeriodService;
+        this.adminScheduleGenerationService = adminScheduleGenerationService;
+    }
+
+    @PostMapping("/generate")
+    ResponseEntity<GenerateScheduleResponse> generateSchedule(
+            @AuthenticationPrincipal CurrentAccountPrincipal principal,
+            @Valid @RequestBody GenerateScheduleRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(adminScheduleGenerationService.generate(principal, request));
     }
 
     @PostMapping

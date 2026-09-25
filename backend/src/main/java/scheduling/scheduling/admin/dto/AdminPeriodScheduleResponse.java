@@ -11,7 +11,14 @@ public record AdminPeriodScheduleResponse(
         String status,
         LocalDate startDate,
         LocalDate endDate,
+        List<EmployeePoolItem> employeePool,
         List<ScheduledShift> workShifts) {
+
+    public record EmployeePoolItem(
+            Long id,
+            String employeeCode,
+            String fullName) {
+    }
 
     public record ScheduledShift(
             Long id,

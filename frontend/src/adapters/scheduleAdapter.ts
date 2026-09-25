@@ -1,0 +1,107 @@
+import type { ShiftCode } from '@/configs/shiftDefinitions'
+import type { BackendPeriodScheduleResponse, BackendSchedulePeriodResponse, BackendScheduledShiftResponse, BackendShiftAssignmentResponse } from '@/types/backendSchedule'
+import { ScheduleStatus, type ScheduleAssignment, type ScheduleDetail, type ScheduleWarning, type WorkSchedule } from '@/types/schedule'
+
+const normalizeStatus = (status: string) => Object.values(ScheduleStatus).includes(status as ScheduleStatus) ? status as ScheduleStatus : ScheduleStatus.DRAFT
+
+const shiftNameToCode = (shiftName: string): ShiftCode => {
+  const normalized = shiftName.trim().toLowerCase()
+  if (normalized === 'thong tam') return 'THONG_TAM'
+  if (normalized === 'ngoai gio 1') return 'NGOAI_GIO_1'
+  if (normalized === 'ngoai gio 2') return 'NGOAI_GIO_2'
+  if (normalized === 'truc sang') return 'TRUC_SANG'
+  if (normalized === 'truc chieu') return 'TRUC_CHIEU'
+  if (normalized === 'truc dem') return 'TRUC_DEM'
+  return 'THONG_TAM'
+}
+
+export const adaptBackendSchedulePeriod = (period: BackendSchedulePeriodResponse): WorkSchedule => ({
+  id: String(period.id),
+  name: period.periodName,
+  startDate: period.startDate,
+  endDate: period.endDate,
+  createdBy: period.createdByUsername ?? 'Không rõ',
+  createdAt: period.publishedAt ?? `${period.startDate}T00:00:00`,
+  employeeCount: 0,
+  assignmentCount: 0,
+  shiftCount: 0,
+  status: normalizeStatus(period.status),
+  isMock: false,
+})
+
+const formatWarningDate = (date: string) => {
+  const [year, month, day] = date.split('-')
+  return `${day}/${month}/${year}`
+}
+
+const shortageFor = (shift: BackendScheduledShiftResponse) => Math.max(0, shift.requiredStaff - shift.assignments.length)
+
+const shiftWarningCount = (shift: BackendScheduledShiftResponse) => shortageFor(shift) > 0 ? 1 : 0
+
+const adaptAssignment = (assignment: BackendShiftAssignmentResponse, shift: BackendScheduledShiftResponse): ScheduleAssignment => ({
+  id: String(assignment.id),
+  scheduleId: String(assignment.periodId),
+  workShiftId: String(assignment.workShiftId),
+  employeeId: String(assignment.employeeId),
+  date: shift.workDate,
+  shiftCode: shiftNameToCode(shift.shiftName),
+  employeeNames: [assignment.fullName],
+  warningCount: shiftWarningCount(shift),
+  locked: assignment.locked,
+})
+
+const adaptUnassignedShift = (shift: BackendScheduledShiftResponse, periodId: number): ScheduleAssignment => ({
+  id: `work-shift-${shift.id}`,
+  scheduleId: String(periodId),
+  workShiftId: String(shift.id),
+  date: shift.workDate,
+  shiftCode: shiftNameToCode(shift.shiftName),
+  employeeNames: [],
+  warningCount: shiftWarningCount(shift),
+  locked: false,
+})
+
+const buildStaffingWarnings = (schedule: BackendPeriodScheduleResponse): ScheduleWarning[] => schedule.workShifts
+  .filter((shift) => shortageFor(shift) > 0)
+  .map((shift) => {
+    const shiftCode = shiftNameToCode(shift.shiftName)
+    const assignedCount = shift.assignments.length
+    const missingCount = shortageFor(shift)
+    const poolNames = schedule.employeePool?.map((employee) => employee.fullName) ?? []
+    return {
+      id: `understaffed-shift-${shift.id}`,
+      type: 'HARD_CONSTRAINT',
+      severity: 'HIGH',
+      employeeName: poolNames.length ? `Pool: ${poolNames.join(', ')}` : 'Pool nhân viên chưa ghi nhận',
+      date: shift.workDate,
+      shiftCode,
+      content: `Ca ${shift.shiftName} ngày ${formatWarningDate(shift.workDate)} thiếu ${missingCount} nhân viên (cần ${shift.requiredStaff}, hiện có ${assignedCount}).`,
+      suggestion: 'Chọn thêm nhân viên phù hợp trong pool, giảm định mức nhân sự của ca, bỏ bớt loại ca/ngày, hoặc vào trang Chỉnh sửa để phân công thủ công.',
+    } satisfies ScheduleWarning
+  })
+
+export const adaptBackendPeriodSchedule = (schedule: BackendPeriodScheduleResponse): ScheduleDetail => {
+  const assignments = schedule.workShifts.flatMap((shift) => shift.assignments.length ? shift.assignments.map((assignment) => adaptAssignment(assignment, shift)) : [adaptUnassignedShift(shift, schedule.periodId)])
+  const assignedEmployeeNames = [...new Set(assignments.flatMap((assignment) => assignment.employeeNames))]
+  const employeePool = schedule.employeePool?.length ? schedule.employeePool.map((employee) => employee.fullName) : assignedEmployeeNames
+  const employeeCount = employeePool.length
+  const assignmentCount = schedule.workShifts.reduce((total, shift) => total + shift.assignments.length, 0)
+  return {
+    id: String(schedule.periodId),
+    name: schedule.periodName,
+    startDate: schedule.startDate,
+    endDate: schedule.endDate,
+    createdBy: 'Backend',
+    createdAt: `${schedule.startDate}T00:00:00`,
+    employeeCount,
+    assignmentCount,
+    shiftCount: schedule.workShifts.length,
+    status: normalizeStatus(schedule.status),
+    isMock: false,
+    employeePool,
+    assignments,
+    warnings: buildStaffingWarnings(schedule),
+  }
+}
+
+export const adaptBackendShiftAssignment = (assignment: BackendShiftAssignmentResponse): BackendShiftAssignmentResponse => assignment

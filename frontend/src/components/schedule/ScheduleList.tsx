@@ -1,18 +1,20 @@
-import { CalendarDays, Eye, MoreHorizontal } from 'lucide-react'
+import { CalendarDays, Eye, Pencil, Send, ShieldCheck, XCircle } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { scheduleStatusLabels } from '@/mocks/schedules'
-import type { WorkSchedule } from '@/types/schedule'
+import { ScheduleStatus, type WorkSchedule } from '@/types/schedule'
 
 interface ScheduleListProps {
   schedules: WorkSchedule[]
-  onPlaceholderAction: (label: string) => void
+  onApprove: (schedule: WorkSchedule) => void
+  onPublish: (schedule: WorkSchedule) => void
+  onCancel: (schedule: WorkSchedule) => void
 }
 
-export function ScheduleList({ schedules, onPlaceholderAction }: ScheduleListProps) {
+export function ScheduleList({ schedules, onApprove, onPublish, onCancel }: ScheduleListProps) {
   if (!schedules.length) {
     return <div className="rounded-xl border border-dashed border-slate-300 px-4 py-12 text-center text-sm text-slate-500">Không có lịch phù hợp với bộ lọc.</div>
   }
@@ -25,7 +27,7 @@ export function ScheduleList({ schedules, onPlaceholderAction }: ScheduleListPro
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="font-semibold text-slate-900">{schedule.name}</h2>
-                <Badge variant="outline">Dữ liệu minh họa</Badge>
+                {schedule.isMock && <Badge variant="outline">Dữ liệu minh họa</Badge>}
               </div>
               <div className="mt-2 grid gap-2 text-sm text-slate-500 sm:grid-cols-2 lg:grid-cols-4">
                 <span><CalendarDays className="mr-1 inline h-4 w-4" />{schedule.startDate} - {schedule.endDate}</span>
@@ -37,7 +39,10 @@ export function ScheduleList({ schedules, onPlaceholderAction }: ScheduleListPro
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant={schedule.status === 'PUBLISHED' ? 'default' : schedule.status === 'DRAFT' ? 'secondary' : 'outline'}>{scheduleStatusLabels[schedule.status]}</Badge>
               <Button variant="outline" size="sm" asChild><Link to={`/manager/schedules/${schedule.id}`}><Eye className="mr-2 h-4 w-4" />Xem chi tiết</Link></Button>
-              <Button variant="ghost" size="icon" onClick={() => onPlaceholderAction('Mở lịch')} aria-label="Mở lịch"><MoreHorizontal className="h-4 w-4" /></Button>
+              <Button variant="outline" size="sm" asChild><Link to={`/manager/schedules/${schedule.id}/edit`}><Pencil className="mr-2 h-4 w-4" />Chỉnh sửa</Link></Button>
+              {schedule.status === ScheduleStatus.DRAFT && <Button variant="outline" size="sm" onClick={() => onApprove(schedule)}><ShieldCheck className="mr-2 h-4 w-4" />Duyệt</Button>}
+              {schedule.status === ScheduleStatus.APPROVED && <Button variant="outline" size="sm" onClick={() => onPublish(schedule)}><Send className="mr-2 h-4 w-4" />Công bố</Button>}
+              {(schedule.status === ScheduleStatus.DRAFT || schedule.status === ScheduleStatus.APPROVED) && <Button variant="outline" size="sm" className="text-red-600" onClick={() => onCancel(schedule)}><XCircle className="mr-2 h-4 w-4" />Hủy</Button>}
             </div>
           </CardContent>
         </Card>

@@ -14,6 +14,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import scheduling.scheduling.admin.WorkShiftWindowService;
 import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
 import scheduling.scheduling.entity.AccountStatus;
@@ -157,16 +158,24 @@ public class DevSampleDataSeeder implements ApplicationRunner {
     }
 
     private WorkShift upsertWorkShift(SchedulePeriod period, ShiftType shiftType, LocalDate date, int requiredStaff, String note) {
+        WorkShiftWindowService.Window window = new WorkShiftWindowService().derive(date, shiftType);
         return workShiftRepository.findBySchedulePeriodIdAndWorkDateAndShiftTypeId(period.getId(), date, shiftType.getId())
-                .orElseGet(() -> workShiftRepository.save(WorkShift.builder()
+                .map(workShift -> saveSeedWorkShift(workShift, requiredStaff, note, window))
+                .orElseGet(() -> saveSeedWorkShift(WorkShift.builder()
                         .schedulePeriod(period)
                         .shiftType(shiftType)
                         .workDate(date)
-                        .requiredStaff(requiredStaff)
-                        .note(note)
-                        .workMinutes(shiftType.getDurationHours().multiply(java.math.BigDecimal.valueOf(60)).intValue())
-                        .transitionShift(Boolean.FALSE)
-                        .build()));
+                        .build(), requiredStaff, note, window));
+    }
+
+    private WorkShift saveSeedWorkShift(WorkShift workShift, int requiredStaff, String note, WorkShiftWindowService.Window window) {
+        workShift.setRequiredStaff(requiredStaff);
+        workShift.setNote(note);
+        workShift.setStartsAt(window.startsAt());
+        workShift.setEndsAt(window.endsAt());
+        workShift.setWorkMinutes(window.workMinutes());
+        workShift.setTransitionShift(window.transitionShift());
+        return workShiftRepository.save(workShift);
     }
 
     private ShiftAssignment upsertAssignment(WorkShift workShift, Employee employee) {

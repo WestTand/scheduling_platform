@@ -9,6 +9,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.same;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
@@ -64,6 +65,18 @@ class AdminEmployeeServiceTest {
 
         assertThat(response).extracting(AdminEmployeeResponse::employeeCode).containsExactly("EMP002");
         assertThat(response).extracting(AdminEmployeeResponse::status).containsExactly("INACTIVE");
+    }
+
+    @Test
+    void listEmployeesFiltersByStatusWithoutNullableTextSearch() {
+        Employee employee = employee(12L, "EMP003", "Le Van C", "ACTIVE");
+        when(employeeRepository.findByStatusOrderByEmployeeCodeAsc("ACTIVE")).thenReturn(List.of(employee));
+
+        List<AdminEmployeeResponse> response = service.listEmployees(null, "ACTIVE");
+
+        assertThat(response).extracting(AdminEmployeeResponse::employeeCode).containsExactly("EMP003");
+        verify(employeeRepository).findByStatusOrderByEmployeeCodeAsc("ACTIVE");
+        verify(employeeRepository, never()).search(null, "ACTIVE");
     }
 
     @Test

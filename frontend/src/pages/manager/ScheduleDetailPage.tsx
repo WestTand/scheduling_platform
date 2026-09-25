@@ -1,5 +1,5 @@
-import { AlertTriangle, ArrowLeft, ClipboardCheck, Clock3, Users } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { AlertTriangle, ArrowLeft, ClipboardCheck, Clock3, Pencil, Send, ShieldCheck, Users, XCircle } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
 import { Badge } from '@/components/ui/badge'
@@ -10,8 +10,13 @@ import { PageHeader } from '@/components/common/PageHeader'
 import { ScheduleCalendar } from '@/components/schedule/ScheduleCalendar'
 import { ScheduleSummaryCard } from '@/components/schedule/ScheduleSummaryCard'
 import { ScheduleWarningList } from '@/components/schedule/ScheduleWarningList'
+import { apiConfig } from '@/config/api'
 import { scheduleDetailSeed, scheduleStatusLabels } from '@/mocks/schedules'
+import { backendScheduleService } from '@/services/backendScheduleService'
+import { getScheduleDetailActions, getScheduleDetailNoticeClass, getScheduleDetailReadOnlyMessage } from './ScheduleDetailPage.helpers'
+import type { ScheduleDetail } from '@/types/schedule'
 import { ScheduleViewMode } from '@/types/schedule'
+import type { ScheduleDetailAction, ScheduleDetailNotice } from './ScheduleDetailPage.helpers'
 
 export function ScheduleDetailPage() {
   const { scheduleId } = useParams()
@@ -26,20 +31,75 @@ export function ScheduleDetailPage() {
   const [shiftFilter, setShiftFilter] = useState('')
   const [dateFilter, setDateFilter] = useState('')
   const [warningOnly, setWarningOnly] = useState(false)
-  const detail = scheduleId === scheduleDetailSeed.id ? scheduleDetailSeed : null
+  const [backendResult, setBackendResult] = useState<{ scheduleId: string; detail: ScheduleDetail | null; error: string } | null>(null)
+  const [notice, setNotice] = useState<ScheduleDetailNotice | null>(null)
+  const mockDetail = scheduleId === scheduleDetailSeed.id ? scheduleDetailSeed : null
+  const detail = apiConfig.useMockApi ? mockDetail : backendResult && scheduleId === backendResult.scheduleId ? backendResult.detail : null
 
-  const employees = useMemo(() => [...new Set(detail?.assignments.flatMap((assignment) => assignment.employeeNames) ?? [])], [detail])
+  const loadBackendDetail = async (id: string) => {
+    const [period, schedule] = await Promise.all([backendScheduleService.getPeriod(id), backendScheduleService.getScheduleDetail(id)])
+    return { ...schedule, createdBy: period.createdBy, createdAt: period.createdAt, status: period.status }
+  }
+
+  useEffect(() => {
+    if (apiConfig.useMockApi || !scheduleId) return
+    let ignore = false
+    loadBackendDetail(scheduleId)
+      .then((schedule) => { if (!ignore) setBackendResult({ scheduleId, detail: schedule, error: '' }) })
+      .catch((loadError) => {
+        if (!ignore) {
+          const message = loadError instanceof Error ? loadError.message : 'Không thể tải chi tiết lịch.'
+          setBackendResult({ scheduleId, detail: null, error: message })
+          setNotice({ type: 'error', message })
+        }
+      })
+    return () => { ignore = true }
+  }, [scheduleId])
+
+  const isLoading = !apiConfig.useMockApi && Boolean(scheduleId) && (!backendResult || backendResult.scheduleId !== scheduleId)
+  const error = !apiConfig.useMockApi && backendResult && backendResult.scheduleId === scheduleId ? backendResult.error : ''
+
+  const employees = useMemo(() => detail?.employeePool ?? [], [detail])
   const shifts = useMemo(() => [...new Set(detail?.assignments.map((assignment) => assignment.shiftCode) ?? [])], [detail])
 
-  if (!detail) {
-    return <EmptyState title="Không tìm thấy lịch" description="Lịch này không có trong bộ dữ liệu minh họa." action={<Button onClick={() => navigate('/manager/schedules')}>Quay lại danh sách</Button>} />
+  const runScheduleAction = async (action: ScheduleDetailAction) => {
+    if (!detail || apiConfig.useMockApi) return
+    try {
+      if (action === 'approve') await backendScheduleService.approvePeriod(detail.id)
+      if (action === 'publish') await backendScheduleService.publishPeriod(detail.id)
+      if (action === 'cancel') await backendScheduleService.cancelPeriod(detail.id)
+      const refreshed = await loadBackendDetail(detail.id)
+      setBackendResult({ scheduleId: detail.id, detail: refreshed, error: '' })
+      setNotice({ type: 'success', message: 'Đã cập nhật trạng thái lịch.' })
+    } catch (actionError) {
+      setNotice({ type: 'error', message: actionError instanceof Error ? actionError.message : 'Không thể cập nhật trạng thái lịch.' })
+    }
   }
+
+  if (isLoading) {
+    return <div className="rounded-xl border border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-600">Đang tải chi tiết lịch...</div>
+  }
+
+  if (!detail) {
+    return <EmptyState title="Không tìm thấy lịch" description={error || 'Không có dữ liệu lịch phù hợp.'} action={<Button onClick={() => navigate('/manager/schedules')}>Quay lại danh sách</Button>} />
+  }
+
+  const readOnlyMessage = getScheduleDetailReadOnlyMessage(detail.status)
+  const statusActions = apiConfig.useMockApi ? [] : getScheduleDetailActions(detail.status)
 
   return (
     <div className="space-y-6">
       <Button variant="ghost" asChild><Link to="/manager/schedules"><ArrowLeft className="mr-2 h-4 w-4" />Quay lại danh sách lịch</Link></Button>
       <PageHeader title={detail.name} description={`${detail.startDate} - ${detail.endDate} · Người tạo: ${detail.createdBy}`} />
-      <div className="flex flex-wrap items-center gap-2"><Badge>{scheduleStatusLabels[detail.status]}</Badge><Badge variant="outline">Dữ liệu minh họa</Badge><span className="text-sm text-slate-500">Tạo lúc {new Date(detail.createdAt).toLocaleString('vi-VN')}</span></div>
+      <div className="flex flex-wrap items-center gap-2"><Badge>{scheduleStatusLabels[detail.status]}</Badge>{detail.isMock && <Badge variant="outline">Dữ liệu minh họa</Badge>}<span className="text-sm text-slate-500">Tạo lúc {new Date(detail.createdAt).toLocaleString('vi-VN')}</span></div>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button variant="outline" asChild><Link to={`/manager/schedules/${detail.id}/edit`}><Pencil className="mr-2 h-4 w-4" />Chỉnh sửa</Link></Button>
+        {statusActions.includes('approve') && <Button variant="outline" onClick={() => void runScheduleAction('approve')}><ShieldCheck className="mr-2 h-4 w-4" />Duyệt</Button>}
+        {statusActions.includes('publish') && <Button variant="outline" onClick={() => void runScheduleAction('publish')}><Send className="mr-2 h-4 w-4" />Công bố</Button>}
+        {statusActions.includes('cancel') && <Button variant="outline" className="text-red-600" onClick={() => void runScheduleAction('cancel')}><XCircle className="mr-2 h-4 w-4" />Hủy</Button>}
+      </div>
+      {notice && <div className={getScheduleDetailNoticeClass(notice.type)}>{notice.message}</div>}
+      {readOnlyMessage && <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{readOnlyMessage}</div>}
 
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <ScheduleSummaryCard label="Tổng nhân viên" value={detail.employeeCount} icon={<Users className="h-5 w-5" />} tone="blue" />

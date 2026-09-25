@@ -55,4 +55,11 @@ public class SchedulePeriod extends BaseEntity {
 
     @OneToMany(mappedBy = "schedulePeriod", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     private Set<OptimizationRun> optimizationRuns;
+
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "schedule_period_employee_pool",
+            joinColumns = @JoinColumn(name = "period_id"),
+            inverseJoinColumns = @JoinColumn(name = "employee_id"))
+    private Set<Employee> employeePool;
 }

@@ -77,8 +77,11 @@ public class AdminOptimizationService {
         }
         AiSchedulingRequestDto.SolverOptionsDto options =
                 request == null || request.solverOptions() == null ? null : request.solverOptions();
+        List<Long> employeeIds = request == null ? null : request.employeeIds();
 
-        AiSchedulingPayloadBuilder.PayloadSnapshot snapshot = payloadBuilder.prepareSnapshot(period, options);
+        AiSchedulingPayloadBuilder.PayloadSnapshot snapshot = employeeIds == null || employeeIds.isEmpty()
+                ? payloadBuilder.prepareSnapshot(period, options)
+                : payloadBuilder.prepareSnapshot(period, options, employeeIds);
 
         Map<String, Object> weights = payloadBuilder.weightsSnapshotFrom(snapshot);
         OptimizationRun run = optimizationRunRecorder.start(period, manager, weights);

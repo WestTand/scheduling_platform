@@ -32,6 +32,7 @@ export const scheduleSeed: WorkSchedule[] = [
 
 export const scheduleDetailSeed: ScheduleDetail = {
   ...scheduleSeed[0],
+  employeePool: ['Trần Văn Nam', 'Lê Thị Hòa', 'Hoàng Văn Tâm', 'Phạm Minh Khoa'],
   assignments: [
     { id: 'assignment-01', scheduleId: 'schedule-demo-01', date: '2026-09-14', shiftCode: 'THONG_TAM', employeeNames: ['Trần Văn Nam', 'Lê Thị Hòa'], warningCount: 0 },
     { id: 'assignment-02', scheduleId: 'schedule-demo-01', date: '2026-09-14', shiftCode: 'NGOAI_GIO_1', employeeNames: ['Hoàng Văn Tâm', 'Phạm Minh Khoa'], warningCount: 1 },
@@ -56,4 +57,5 @@ export const scheduleStatusLabels: Record<WorkSchedule['status'], string> = {
   PENDING_APPROVAL: 'Chờ duyệt',
   APPROVED: 'Đã duyệt',
   PUBLISHED: 'Đã công bố',
+  CANCELLED: 'Đã hủy',
 }

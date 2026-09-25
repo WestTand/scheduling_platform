@@ -12,6 +12,8 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
 
     Optional<Employee> findByEmployeeCode(String employeeCode);
 
+    List<Employee> findByStatusOrderByEmployeeCodeAsc(String status);
+
     @Query("""
             select e from Employee e
             where (:query is null
