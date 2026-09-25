@@ -1,0 +1,90 @@
+import { describe, expect, test } from 'vitest'
+
+import { getManagerActionItems, getManagerSummaryCards, pickScheduleAlerts, pickUpcomingShifts } from './ManagerDashboard.helpers'
+
+describe('ManagerDashboard helpers', () => {
+  test('builds summary cards from real counts', () => {
+    expect(getManagerSummaryCards({
+      employeeTotal: 8,
+      weekShiftCount: 4,
+      pendingLeave: 1,
+      pendingSwap: 2,
+      pendingPreference: 0,
+      warningCount: 3,
+    })).toEqual([
+      { label: 'Tổng nhân viên', value: '8', context: 'đang hoạt động', path: '/manager/employees' },
+      { label: 'Ca trực tuần này', value: '4', context: 'tuần hiện tại', path: '/manager/schedules' },
+      { label: 'Yêu cầu chờ duyệt', value: '3', context: 'nghỉ phép, đổi ca, nguyện vọng', path: '/manager/dashboard#action-center' },
+      { label: 'Cảnh báo xung đột', value: '3', context: 'kỳ nháp tuần này', path: '/manager/schedules' },
+    ])
+  })
+
+  test('builds action items with empty fallbacks', () => {
+    const items = getManagerActionItems({
+      draftPeriod: null,
+      leave: null,
+      swap: null,
+      preference: null,
+      criticalWarning: null,
+    })
+    expect(items).toHaveLength(5)
+    expect(items[0]).toMatchObject({ title: 'Lịch nháp chờ xử lý', related: 'Không có lịch nháp', path: '/manager/schedules?status=DRAFT' })
+    expect(items[4]).toMatchObject({ title: 'Cảnh báo lịch nghiêm trọng', related: 'Không có cảnh báo' })
+  })
+
+  test('maps real queue heads into action items', () => {
+    const items = getManagerActionItems({
+      draftPeriod: { id: '48', name: 'Test002' },
+      leave: { employeeName: 'Nguyễn Văn An', startDate: '2026-09-24', endDate: '2026-09-25' },
+      swap: { employeeName: 'Trần Thị Bình', reason: 'Cover me' },
+      preference: { employeeName: 'Lê Minh Châu', note: 'Muốn nghỉ thứ 7' },
+      criticalWarning: { periodId: '48', employeeName: 'Nguyễn Văn An', content: 'Ca Truc sang thiếu người' },
+    })
+    expect(items[1]).toMatchObject({ related: 'Nguyễn Văn An', path: '/manager/leave-requests?status=PENDING' })
+    expect(items[2]).toMatchObject({ related: 'Trần Thị Bình', path: '/manager/swap-requests?status=PENDING_APPROVAL' })
+    expect(items[3]).toMatchObject({ related: 'Lê Minh Châu', path: '/manager/preferences?status=PENDING' })
+    expect(items[4]).toMatchObject({ path: '/manager/schedules/48?tab=warnings' })
+  })
+})
+
+describe('ManagerDashboard shift helpers', () => {
+  const detail = {
+    id: '48',
+    name: 'Test002',
+    startDate: '2026-09-24',
+    endDate: '2026-09-26',
+    createdBy: 'Backend',
+    createdAt: '2026-09-25T05:00:00',
+    employeeCount: 8,
+    assignmentCount: 1,
+    shiftCount: 2,
+    status: 'DRAFT',
+    isMock: false,
+    employeePool: ['Nguyễn Văn An'],
+    assignments: [
+      { id: '21', scheduleId: '48', workShiftId: '113', employeeId: '1', date: '2026-09-24', shiftCode: 'THONG_TAM', employeeNames: ['Nguyễn Văn An'], warningCount: 0, locked: false },
+      { id: 'work-shift-114', scheduleId: '48', workShiftId: '114', date: '2026-09-24', shiftCode: 'NGOAI_GIO_1', employeeNames: [], warningCount: 1, locked: false },
+    ],
+    warnings: [
+      { id: 'understaffed-shift-114', type: 'HARD_CONSTRAINT', severity: 'HIGH', employeeName: 'Pool: Nguyễn Văn An', date: '2026-09-24', shiftCode: 'NGOAI_GIO_1', content: 'Ca Ngoai gio 1 thiếu người', suggestion: 'Phân công thêm' },
+    ],
+  } as const
+
+  test('picks upcoming shifts sorted by date', () => {
+    const rows = pickUpcomingShifts([detail as never], 3)
+    expect(rows).toHaveLength(2)
+    expect(rows[0]).toMatchObject({ periodId: '48', shiftCode: 'THONG_TAM', assignedCount: 1, unassigned: false, hasWarning: false })
+    expect(rows[1]).toMatchObject({ shiftCode: 'NGOAI_GIO_1', assignedCount: 0, unassigned: true, hasWarning: true })
+  })
+
+  test('picks high-severity alerts first', () => {
+    const alerts = pickScheduleAlerts([detail as never], 3)
+    expect(alerts).toHaveLength(1)
+    expect(alerts[0]).toMatchObject({ periodId: '48', severity: 'Cao', path: '/manager/schedules/48?tab=warnings' })
+  })
+
+  test('returns empty arrays for empty details', () => {
+    expect(pickUpcomingShifts([], 3)).toEqual([])
+    expect(pickScheduleAlerts([], 3)).toEqual([])
+  })
+})
