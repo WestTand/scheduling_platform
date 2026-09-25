@@ -144,6 +144,40 @@ class AdminSchedulePeriodControllerTest {
     }
 
     @Test
+    void managerListsSchedulePeriodsWithDateFilters() throws Exception {
+        givenToken("manager-token", manager());
+        when(adminSchedulePeriodService.listSchedulePeriods(
+                any(CurrentAccountPrincipal.class), eq("DRAFT"),
+                eq(LocalDate.of(2026, 9, 21)), eq(LocalDate.of(2026, 9, 26))))
+                .thenReturn(List.of(response()));
+
+        mockMvc.perform(get("/api/admin/schedule-periods")
+                        .param("status", "DRAFT")
+                        .param("from", "2026-09-21")
+                        .param("to", "2026-09-26")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer manager-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(20));
+
+        verify(adminSchedulePeriodService).listSchedulePeriods(
+                any(CurrentAccountPrincipal.class), eq("DRAFT"),
+                eq(LocalDate.of(2026, 9, 21)), eq(LocalDate.of(2026, 9, 26)));
+    }
+
+    @Test
+    void managerListSchedulePeriodsRejectsInvertedDateFilters() throws Exception {
+        givenToken("manager-token", manager());
+
+        mockMvc.perform(get("/api/admin/schedule-periods")
+                        .param("from", "2026-09-26")
+                        .param("to", "2026-09-21")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer manager-token"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(adminSchedulePeriodService);
+    }
+
+    @Test
     void managerListsSchedulePeriodsWithoutStatusAsDraft() throws Exception {
         givenToken("manager-token", manager());
         when(adminSchedulePeriodService.listSchedulePeriods(
@@ -371,6 +405,7 @@ class AdminSchedulePeriodControllerTest {
                 "DRAFT",
                 1L,
                 "manager01",
+                null,
                 null,
                 null,
                 null,

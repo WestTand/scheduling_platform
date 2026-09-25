@@ -10,6 +10,7 @@ import { ScheduleList } from '@/components/schedule/ScheduleList'
 import { apiConfig } from '@/config/api'
 import { scheduleSeed, scheduleStatusLabels } from '@/mocks/schedules'
 import { backendScheduleService } from '@/services/backendScheduleService'
+import { SCHEDULES_PAGE_SIZE, getPaginatedSchedules, getTotalSchedulePages } from './SchedulesPage.helpers'
 import type { ScheduleStatus } from '@/types/schedule'
 import type { WorkSchedule } from '@/types/schedule'
 
@@ -21,6 +22,7 @@ export function SchedulesPage() {
   const [startDate, setStartDate] = useState(() => searchParams.get('startDate') ?? '')
   const [endDate, setEndDate] = useState(() => searchParams.get('endDate') ?? '')
   const [notice, setNotice] = useState('')
+  const [page, setPage] = useState(1)
   const [backendResult, setBackendResult] = useState<{ key: string; schedules: WorkSchedule[]; error: string } | null>(null)
   const requestKey = `${search}|${status}|${startDate}|${endDate}`
 
@@ -43,6 +45,8 @@ export function SchedulesPage() {
   }), [search, status, startDate, endDate, searchParams])
 
   const schedules = apiConfig.useMockApi ? mockSchedules : backendResult?.key === requestKey ? backendResult.schedules : []
+  const totalPages = getTotalSchedulePages(schedules, SCHEDULES_PAGE_SIZE)
+  const visibleSchedules = getPaginatedSchedules(schedules, page, SCHEDULES_PAGE_SIZE)
   const isLoading = !apiConfig.useMockApi && backendResult?.key !== requestKey
   const error = !apiConfig.useMockApi && backendResult?.key === requestKey ? backendResult.error : ''
 
@@ -50,6 +54,7 @@ export function SchedulesPage() {
     const params = new URLSearchParams(searchParams)
     Object.entries(next).forEach(([key, value]) => value ? params.set(key, value) : params.delete(key))
     setSearchParams(params)
+    setPage(1)
   }
 
   const reloadSchedules = async () => {
@@ -83,11 +88,18 @@ export function SchedulesPage() {
       {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
       {notice && <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">{notice}</div>}
       <ScheduleList
-        schedules={schedules}
+        schedules={visibleSchedules}
         onApprove={(schedule) => void runScheduleAction(schedule, 'approve')}
         onPublish={(schedule) => void runScheduleAction(schedule, 'publish')}
         onCancel={(schedule) => void runScheduleAction(schedule, 'cancel')}
       />
+      {schedules.length > SCHEDULES_PAGE_SIZE && (
+        <div className="flex items-center justify-end gap-2">
+          <Button variant="outline" disabled={page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))}>Trước</Button>
+          <span className="text-sm text-slate-500">Trang {page}/{totalPages}</span>
+          <Button variant="outline" disabled={page >= totalPages} onClick={() => setPage((current) => Math.min(totalPages, current + 1))}>Sau</Button>
+        </div>
+      )}
     </div>
   )
 }

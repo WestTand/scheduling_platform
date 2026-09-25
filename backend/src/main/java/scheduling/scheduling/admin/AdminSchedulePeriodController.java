@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 import scheduling.scheduling.admin.dto.AdminSchedulePeriodResponse;
 import scheduling.scheduling.admin.dto.GenerateScheduleRequest;
 import scheduling.scheduling.admin.dto.GenerateScheduleResponse;
@@ -62,6 +63,7 @@ public class AdminSchedulePeriodController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        validateListRange(from, to);
         return ResponseEntity.ok(adminSchedulePeriodService.listSchedulePeriods(principal, listStatus(status), from, to));
     }
 
@@ -103,5 +105,12 @@ public class AdminSchedulePeriodController {
 
     private static String listStatus(String status) {
         return StringUtils.hasText(status) ? status : DRAFT;
+    }
+
+    private static void validateListRange(LocalDate from, LocalDate to) {
+        if (from != null && to != null && from.isAfter(to)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Ngày bắt đầu lọc phải trước hoặc bằng ngày kết thúc.");
+        }
     }
 }

@@ -33,6 +33,24 @@ describe('scheduleAdapter', () => {
     })
   })
 
+  test('prefers backend createdAt for display time', () => {
+    expect(adaptBackendSchedulePeriod({
+      id: 9,
+      periodName: 'Kỳ có createdAt',
+      startDate: '2026-09-21',
+      endDate: '2026-09-27',
+      versionNo: 1,
+      status: 'DRAFT',
+      createdByAccountId: 1,
+      createdByUsername: 'manager@example.com',
+      approvedByAccountId: null,
+      approvedByUsername: null,
+      createdAt: '2026-09-25T05:00:00',
+      publishedAt: null,
+      totalPenalty: null,
+    }).createdAt).toBe('2026-09-25T05:00:00')
+  })
+
   test('preserves cancelled backend schedule status', () => {
     expect(adaptBackendSchedulePeriod({
       id: 8,

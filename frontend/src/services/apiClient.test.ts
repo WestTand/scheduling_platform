@@ -87,6 +87,31 @@ describe('requestJson', () => {
     expect(localStorage.getItem(AUTH_STORAGE_KEYS.USER)).toBeNull()
   })
 
+  test('stores refreshed token in local storage when current token is local scoped', async () => {
+    localStorage.setItem(AUTH_STORAGE_KEYS.TOKEN, 'expired-local-token')
+    localStorage.setItem(AUTH_STORAGE_KEYS.USER, JSON.stringify({ id: '1' }))
+    const fetchMock = vi.mocked(fetch)
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ message: 'Unauthorized' }, { status: 401 }))
+      .mockResolvedValueOnce(jsonResponse({ accessToken: 'fresh-local-token', account: {} }))
+      .mockResolvedValueOnce(jsonResponse({ value: 'ok' }))
+
+    await requestJson('/api/admin/schedule-periods')
+
+    expect(localStorage.getItem(AUTH_STORAGE_KEYS.TOKEN)).toBe('fresh-local-token')
+    expect(sessionStorage.getItem(AUTH_STORAGE_KEYS.TOKEN)).toBeNull()
+  })
+
+  test('does not clear stored auth for non-401 API errors', async () => {
+    localStorage.setItem(AUTH_STORAGE_KEYS.TOKEN, 'valid-token')
+    localStorage.setItem(AUTH_STORAGE_KEYS.USER, JSON.stringify({ id: '1' }))
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ message: 'Bad request' }, { status: 400 }))
+
+    await expect(requestJson('/api/admin/schedule-periods/generate', { method: 'POST', body: {} })).rejects.toThrow('Bad request')
+
+    expect(localStorage.getItem(AUTH_STORAGE_KEYS.TOKEN)).toBe('valid-token')
+  })
+
   test('stores refreshed token in session storage when the active user is session scoped', async () => {
     sessionStorage.setItem(AUTH_STORAGE_KEYS.USER, JSON.stringify({ id: '1' }))
     const fetchMock = vi.mocked(fetch)
