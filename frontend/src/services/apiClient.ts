@@ -104,10 +104,8 @@ const sendRequest = async (path: string, options: RequestOptions, accessToken: s
   })
 }
 
-export async function requestJson<T>(path: string, options: RequestOptions = {}): Promise<T> {
+const fetchWithAuthRetry = async (path: string, options: RequestOptions): Promise<Response> => {
   let response = await sendRequest(path, options, options.auth === false ? null : getStoredToken())
-
-  let body = await parseResponseBody(response)
 
   if (!response.ok && response.status === 401 && options.auth !== false) {
     const refreshedToken = await refreshAccessToken()
@@ -115,17 +113,50 @@ export async function requestJson<T>(path: string, options: RequestOptions = {})
     if (refreshedToken) {
       updateStoredToken(refreshedToken)
       response = await sendRequest(path, options, refreshedToken)
-      body = await parseResponseBody(response)
     } else {
       clearStoredAuth()
     }
   }
+
+  return response
+}
+
+export async function requestJson<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const response = await fetchWithAuthRetry(path, options)
+  const body = await parseResponseBody(response)
 
   if (!response.ok) {
     throw new ApiError(errorMessage(body), response.status, errorCode(body))
   }
 
   return body as T
+}
+
+const parseAttachmentFilename = (header: string | null): string | null => {
+  if (!header) {
+    return null
+  }
+  const utf8 = /filename\*=UTF-8''([^;]+)/i.exec(header)
+  if (utf8?.[1]) {
+    try {
+      return decodeURIComponent(utf8[1])
+    } catch {
+      return utf8[1]
+    }
+  }
+  const quoted = /filename="([^"]+)"/i.exec(header)
+  return quoted?.[1] ?? null
+}
+
+export async function requestBlob(path: string, options: RequestOptions = {}): Promise<{ blob: Blob; filename: string | null }> {
+  const response = await fetchWithAuthRetry(path, options)
+
+  if (!response.ok) {
+    const body = await parseResponseBody(response)
+    throw new ApiError(errorMessage(body), response.status, errorCode(body))
+  }
+
+  return { blob: await response.blob(), filename: parseAttachmentFilename(response.headers.get('Content-Disposition')) }
 }
 
 export async function requestVoid(path: string, options: RequestOptions = {}): Promise<void> {
