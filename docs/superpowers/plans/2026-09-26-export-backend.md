@@ -182,11 +182,6 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { EXPORT_OPTIONS, exportService } from './exportService'
 import { AUTH_STORAGE_KEYS } from './authStorage'
 
-const jsonResponse = (body: unknown, init: ResponseInit = {}) => new Response(JSON.stringify(body), {
-  headers: { 'Content-Type': 'application/json' },
-  ...init,
-})
-
 describe('exportService', () => {
   beforeEach(() => {
     const store = new Map<string, string>()
