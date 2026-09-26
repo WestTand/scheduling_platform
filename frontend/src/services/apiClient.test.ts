@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
-import { requestJson } from '@/services/apiClient'
+import { requestBlob, requestJson } from '@/services/apiClient'
 import { AUTH_STORAGE_KEYS } from '@/services/authStorage'
 
 const jsonResponse = (body: unknown, init: ResponseInit = {}) => {
@@ -124,5 +124,43 @@ describe('requestJson', () => {
 
     expect(sessionStorage.getItem(AUTH_STORAGE_KEYS.TOKEN)).toBe('fresh-session-token')
     expect(localStorage.getItem(AUTH_STORAGE_KEYS.TOKEN)).toBeNull()
+  })
+})
+
+describe('requestBlob', () => {
+  beforeEach(() => {
+    vi.stubGlobal('localStorage', createStorage())
+    vi.stubGlobal('sessionStorage', createStorage())
+    localStorage.clear()
+    sessionStorage.clear()
+    vi.stubGlobal('fetch', vi.fn())
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  test('returns blob and filename for binary download responses', async () => {
+    const bytes = new Uint8Array([1, 2, 3])
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(bytes, {
+      headers: {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': 'attachment; filename="schedule-period-48.xlsx"',
+      },
+    }))
+
+    const result = await requestBlob('/api/admin/schedule-periods/48/exports/schedule.xlsx')
+
+    expect(result.filename).toBe('schedule-period-48.xlsx')
+    expect(result.blob.size).toBe(3)
+  })
+
+  test('throws ApiError with backend message for failed downloads', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ message: 'Schedule period not found' }, { status: 404 }))
+
+    await expect(requestBlob('/api/admin/schedule-periods/999/exports/schedule.xlsx')).rejects.toMatchObject({
+      status: 404,
+      message: 'Schedule period not found',
+    })
   })
 })
