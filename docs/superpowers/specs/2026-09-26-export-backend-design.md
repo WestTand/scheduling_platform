@@ -2,7 +2,7 @@
 
 **Goal:** Wire the manager exports page to the three real backend file-download APIs and remove all unsupported export options.
 
-**Approach:** Frontend-only changes. Rework `ExportsPage` around period selection plus one button per supported file, backed by a new blob-download client and a thin export service. No backend changes. Mock mode disables downloads with an explanatory hint.
+**Approach:** Frontend-only changes. Rework `ExportsPage` around period selection plus the existing single download button: the user picks one of the three supported options, picks a period, then presses download. Backed by a new blob-download client and a thin export service. No backend changes. Mock mode disables downloads with an explanatory hint.
 
 **Scope:** `ExportsPage`, `apiClient` blob support, new `exportService`, unit tests. No AI solver, scheduling, or auth changes.
 
@@ -37,5 +37,5 @@ None of the three accepts date-range, status, or format parameters; all are keye
 
 - `apiClient` blob test: successful binary response returns a `Blob`; error JSON response throws `ApiError` with the backend message.
 - Export service tests: assert the three request URLs and the filename fallback behavior.
-- Page helper tests: option-to-endpoint mapping and period-required validation message.
+- Page helper tests: option-to-endpoint mapping and period-required validation message (exact text: "Vui lòng chọn kỳ lịch để xuất file.").
 - Existing suite must stay green: frontend `npm.cmd test -- --run`, `npm.cmd run build`, `npm.cmd run lint` with zero errors.
