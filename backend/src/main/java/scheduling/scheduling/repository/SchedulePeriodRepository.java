@@ -35,10 +35,11 @@ public interface SchedulePeriodRepository extends JpaRepository<SchedulePeriod, 
             LocalDate startDate, LocalDate endDate, Integer versionNo, Long id);
 
     @Query("""
-            select sp
+            select distinct sp
             from SchedulePeriod sp
             left join fetch sp.createdBy createdBy
             left join fetch sp.approvedBy approvedBy
+            left join fetch sp.employeePool employeePool
             where sp.id = :id
             """)
     Optional<SchedulePeriod> findDetailById(@Param("id") Long id);

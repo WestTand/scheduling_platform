@@ -2,6 +2,20 @@ export type ScheduleGenerationNoticeType = 'success' | 'warning' | 'error'
 
 export const canOptimizeSchedulePeriod = ({ selectedPeriodId, isSubmitting }: { selectedPeriodId: string; isSubmitting: boolean }) => Boolean(selectedPeriodId) && !isSubmitting
 
+export const canEditSelectedPeriodPool = ({ selectedPeriodId, isSubmitting }: { selectedPeriodId: string; isSubmitting: boolean }) => Boolean(selectedPeriodId) && !isSubmitting
+
+const technicalOptimizeErrorPatterns = [
+  'Cannot lazily initialize collection',
+  'org.hibernate',
+  'LazyInitializationException',
+]
+
+export const getOptimizeErrorMessage = (error: unknown) => {
+  const message = error instanceof Error ? error.message : ''
+  if (message && !technicalOptimizeErrorPatterns.some((pattern) => message.includes(pattern))) return message
+  return 'Không thể tối ưu lịch. Vui lòng kiểm tra pool nhân viên hoặc thử lại.'
+}
+
 export const getScheduleGenerationNoticeClass = (type: ScheduleGenerationNoticeType) => {
   if (type === 'error') return 'rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700'
   if (type === 'warning') return 'rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800'
