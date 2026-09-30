@@ -57,7 +57,7 @@ describe('Sidebar', () => {
     vi.resetModules()
   })
 
-  it('does not show mock request badges in backend mode', async () => {
+  it('does not render badge counts for manager nav items', async () => {
     vi.stubEnv('VITE_USE_MOCK_API', 'false')
 
     const { Sidebar } = await import('./Sidebar')
@@ -68,25 +68,13 @@ describe('Sidebar', () => {
     )
 
     expect(html).not.toMatch(/Ngày nghỉ<\/span><span[^>]*>\d+<\/span>/)
-    expect(html).not.toMatch(/Yêu cầu đổi ca<\/span><span[^>]*>\d+<\/span>/)
-  })
-
-  it('does not show mock preference, notification, or schedule badges in backend mode', async () => {
-    vi.stubEnv('VITE_USE_MOCK_API', 'false')
-
-    const { Sidebar } = await import('./Sidebar')
-    const html = renderToStaticMarkup(
-      <MemoryRouter>
-        <Sidebar items={items} user={managerUser} isMobileOpen={false} onMobileToggle={() => undefined} onLogout={() => undefined} />
-      </MemoryRouter>,
-    )
-
     expect(html).not.toMatch(/Nguyện vọng<\/span><span[^>]*>\d+<\/span>/)
+    expect(html).not.toMatch(/Yêu cầu đổi ca<\/span><span[^>]*>\d+<\/span>/)
     expect(html).not.toMatch(/Thông báo<\/span><span[^>]*>\d+<\/span>/)
     expect(html).not.toMatch(/Quản lý lịch<\/span><span[^>]*>\d+<\/span>/)
   })
 
-  it('still hides manager schedule badges for employees in backend mode', async () => {
+  it('does not render badge counts for employee nav items', async () => {
     vi.stubEnv('VITE_USE_MOCK_API', 'false')
 
     const { Sidebar } = await import('./Sidebar')
@@ -96,29 +84,7 @@ describe('Sidebar', () => {
       </MemoryRouter>,
     )
 
+    expect(html).not.toMatch(/Thông báo<\/span><span[^>]*>\d+<\/span>/)
     expect(html).not.toMatch(/Quản lý lịch<\/span><span[^>]*>\d+<\/span>/)
-  })
-
-  it('loads backend summary counts used for badges', async () => {
-    vi.stubEnv('VITE_USE_MOCK_API', 'false')
-    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({
-      pendingLeaveRequests: 1,
-      pendingPreferences: 2,
-      pendingSwapRequests: 3,
-      unreadNotifications: 4,
-      pendingSchedules: 0,
-    }), { headers: { 'Content-Type': 'application/json' } }))
-
-    const { navigationSummaryService } = await import('@/services/navigationSummaryService')
-    const summary = await navigationSummaryService.get()
-
-    expect(fetch).toHaveBeenCalledWith('http://localhost:8080/api/me/navigation-summary', expect.any(Object))
-    expect(summary).toEqual({
-      pendingLeaveRequests: 1,
-      pendingPreferences: 2,
-      pendingSwapRequests: 3,
-      unreadNotifications: 4,
-      pendingSchedules: 0,
-    })
   })
 })

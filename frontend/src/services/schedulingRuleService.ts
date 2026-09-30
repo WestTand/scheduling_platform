@@ -1,6 +1,6 @@
 import { apiConfig } from '@/config/api'
 import { backendSchedulingRuleService } from '@/services/backendSchedulingRuleService'
-import type { SchedulingRules, SchedulingRulesFormValues } from '@/types/schedulingRule'
+import type { SchedulingRules } from '@/types/schedulingRule'
 
 const delay = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms))
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T
@@ -33,15 +33,6 @@ export const schedulingRuleService = {
       return backendSchedulingRuleService.getRules()
     }
     await delay(250)
-    return clone(mockRules)
-  },
-
-  async updateRules(values: SchedulingRulesFormValues): Promise<SchedulingRules> {
-    if (!apiConfig.useMockApi) {
-      return backendSchedulingRuleService.updateRules(values)
-    }
-    await delay(300)
-    mockRules = clone(values)
     return clone(mockRules)
   },
 

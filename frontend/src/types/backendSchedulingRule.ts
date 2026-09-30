@@ -23,5 +23,3 @@ export interface BackendSchedulingRulesResponse {
   quotas: BackendSchedulingQuotaRules
   softWeights: BackendSchedulingSoftWeights
 }
-
-export type BackendUpdateSchedulingRulesRequest = BackendSchedulingRulesResponse

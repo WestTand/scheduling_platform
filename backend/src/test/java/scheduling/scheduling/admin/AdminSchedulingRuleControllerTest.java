@@ -1,7 +1,5 @@
 package scheduling.scheduling.admin;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -73,19 +71,17 @@ class AdminSchedulingRuleControllerTest {
     }
 
     @Test
-    void adminUpdatesSchedulingRules() throws Exception {
-        CurrentAccountPrincipal admin = new CurrentAccountPrincipal(1L, "admin01", AccountRole.ADMIN);
-        givenToken("admin-token", admin);
-        when(adminSchedulingRuleService.updateRules(any())).thenReturn(response());
+    void schedulingRulesCannotBeUpdatedAnymore() throws Exception {
+        CurrentAccountPrincipal manager = new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
+        givenToken("manager-token", manager);
 
         mockMvc.perform(put("/api/admin/scheduling-rules")
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer admin-token")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer manager-token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validJson()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.hardRules.maxWorkHoursPerDay").value(12));
+                .andExpect(status().isMethodNotAllowed());
 
-        verify(adminSchedulingRuleService).updateRules(any());
+        verifyNoInteractions(adminSchedulingRuleService);
     }
 
     @Test
@@ -96,20 +92,6 @@ class AdminSchedulingRuleControllerTest {
         mockMvc.perform(get("/api/admin/scheduling-rules")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer employee-token"))
                 .andExpect(status().isForbidden());
-
-        verifyNoInteractions(adminSchedulingRuleService);
-    }
-
-    @Test
-    void invalidUpdateBodyReturnsBadRequestWithoutDelegating() throws Exception {
-        CurrentAccountPrincipal manager = new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
-        givenToken("manager-token", manager);
-
-        mockMvc.perform(put("/api/admin/scheduling-rules")
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer manager-token")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"hardRules\":{\"minRestHoursBetweenShifts\":25}}"))
-                .andExpect(status().isBadRequest());
 
         verifyNoInteractions(adminSchedulingRuleService);
     }

@@ -10,6 +10,7 @@ import { ScheduleList } from '@/components/schedule/ScheduleList'
 import { apiConfig } from '@/config/api'
 import { scheduleSeed, scheduleStatusLabels } from '@/mocks/schedules'
 import { backendScheduleService } from '@/services/backendScheduleService'
+import { canApproveSchedule } from './ScheduleDetailPage.helpers'
 import { SCHEDULES_PAGE_SIZE, getPaginatedSchedules, getTotalSchedulePages } from './SchedulesPage.helpers'
 import type { ScheduleStatus } from '@/types/schedule'
 import type { WorkSchedule } from '@/types/schedule'
@@ -64,6 +65,10 @@ export function SchedulesPage() {
   }
 
   const runScheduleAction = async (schedule: WorkSchedule, action: 'approve' | 'publish' | 'cancel') => {
+    if (action === 'approve' && !canApproveSchedule(schedule.status, schedule.optimizationStatus)) {
+      setNotice('Lịch đang bị cảnh báo (INFE) nên không thể duyệt. Hãy chạy lại AI Optimize hoặc chỉnh lịch trước khi duyệt.')
+      return
+    }
     if (apiConfig.useMockApi) {
       setNotice(`${action === 'approve' ? 'Duyệt' : action === 'publish' ? 'Công bố' : 'Hủy'} lịch yêu cầu backend mode.`)
       return

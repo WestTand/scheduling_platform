@@ -12,6 +12,7 @@ export interface BackendSchedulePeriodResponse {
   createdAt?: string | null
   publishedAt: string | null
   totalPenalty: number | null
+  optimizationStatus?: string | null
 }
 
 export interface BackendShiftAssignmentResponse {

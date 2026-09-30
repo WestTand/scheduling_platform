@@ -2,10 +2,14 @@ import { describe, expect, it, vi } from 'vitest'
 
 import {
   canRunScheduleEditOptimize,
+  canSubmitEditRequest,
   filterScheduleEditAssignments,
+  getScheduleEditDeleteDisabled,
+  getScheduleEditDialogDescription,
   getScheduleEditNoticeClass,
   getScheduleEditLockedMessage,
   getScheduleEditModeLabel,
+  getScheduleEditRowIntent,
   reloadScheduleEditDetail,
   shouldShowMockStatusActions,
 } from './ScheduleEditPage.helpers'
@@ -53,6 +57,50 @@ describe('ScheduleEditPage helpers', () => {
     expect(filterScheduleEditAssignments(assignments, 'ALL').map((assignment) => assignment.id)).toEqual(['assigned-ok', 'unassigned', 'assigned-warning'])
     expect(filterScheduleEditAssignments(assignments, 'UNASSIGNED').map((assignment) => assignment.id)).toEqual(['unassigned'])
     expect(filterScheduleEditAssignments(assignments, 'WARNING').map((assignment) => assignment.id)).toEqual(['unassigned', 'assigned-warning'])
+  })
+
+  it('treats an unassigned row as an assign action instead of an update', () => {
+    const unassigned: ScheduleAssignment = {
+      id: 'work-shift-260',
+      workShiftId: '260',
+      scheduleId: '1',
+      date: '2026-10-30',
+      shiftCode: 'THONG_TAM',
+      employeeNames: [],
+      warningCount: 1,
+    }
+    const assigned: ScheduleAssignment = {
+      id: '42',
+      workShiftId: '260',
+      employeeId: '7',
+      scheduleId: '1',
+      date: '2026-10-30',
+      shiftCode: 'THONG_TAM',
+      employeeNames: ['Nguyễn Văn An'],
+      warningCount: 0,
+    }
+
+    expect(getScheduleEditRowIntent(unassigned)).toEqual({ mode: 'assign', workShiftId: '260', assignmentId: null })
+    expect(getScheduleEditRowIntent(assigned)).toEqual({ mode: 'update', workShiftId: '260', assignmentId: '42' })
+  })
+
+  it('does not allow deleting a row that has no assignment yet', () => {
+    const unassigned: ScheduleAssignment = { id: 'work-shift-260', workShiftId: '260', scheduleId: '1', date: '2026-10-30', shiftCode: 'THONG_TAM', employeeNames: [], warningCount: 1 }
+    const assigned: ScheduleAssignment = { id: '42', workShiftId: '260', scheduleId: '1', date: '2026-10-30', shiftCode: 'THONG_TAM', employeeNames: ['Nguyễn Văn An'], warningCount: 0 }
+
+    expect(getScheduleEditDeleteDisabled(unassigned)).toBe(true)
+    expect(getScheduleEditDeleteDisabled(assigned)).toBe(false)
+  })
+
+  it('hides the submit request action in backend mode', () => {
+    expect(canSubmitEditRequest(false)).toBe(false)
+    expect(canSubmitEditRequest(true)).toBe(true)
+  })
+
+  it('does not describe the edit dialog as mock-only in backend mode', () => {
+    expect(getScheduleEditDialogDescription(false, true)).toBe('Chọn nhân viên để gán vào ca đã chọn.')
+    expect(getScheduleEditDialogDescription(false, false)).toBe('Cập nhật nhân viên được phân công cho ca này.')
+    expect(getScheduleEditDialogDescription(true, true)).toContain('mock state')
   })
 
   it('reloads detail and assignments together after backend mutations', async () => {

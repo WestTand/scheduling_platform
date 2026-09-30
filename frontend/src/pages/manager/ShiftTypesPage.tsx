@@ -120,13 +120,6 @@ export function ShiftTypesPage() {
     return ''
   }
 
-  const openCreate = () => {
-    setSelectedShift(null)
-    setFormState(emptyForm)
-    setFormError('')
-    setFormOpen(true)
-  }
-
   const openEdit = (shiftType: ShiftType) => {
     setSelectedShift(shiftType)
     setFormState({
@@ -162,8 +155,6 @@ export function ShiftTypesPage() {
     try {
       if (selectedShift) {
         await shiftTypeService.update(selectedShift.id, formState)
-      } else {
-        await shiftTypeService.add(formState)
       }
 
       setFormOpen(false)
@@ -202,7 +193,7 @@ export function ShiftTypesPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Quản lý loại ca trực" description="Quản lý các ca làm việc và quy định phân tổ lịch." onAction={openCreate} actionLabel="Thêm loại ca" />
+      <PageHeader title="Quản lý loại ca trực" description="Quản lý các ca làm việc và quy định phân tổ lịch." />
 
       <section className="grid gap-4 md:grid-cols-2">
         <StatCard label="Đang hoạt động" value={stats.active} icon={<Clock3 className="h-5 w-5" />} tone="blue" />
@@ -234,7 +225,7 @@ export function ShiftTypesPage() {
           ) : error ? (
             <ErrorState message={error} onRetry={fetchData} />
           ) : data.data.length === 0 ? (
-            <EmptyState title="Không có loại ca trực nào" description="Thử thay đổi bộ lọc hoặc thêm loại ca mới." />
+            <EmptyState title="Không có loại ca trực nào" description="Thử thay đổi bộ lọc để tìm loại ca phù hợp." />
           ) : (
             <>
               <DataTable
@@ -276,7 +267,7 @@ export function ShiftTypesPage() {
 
       <FormDialog
         open={formOpen}
-        title={selectedShift ? 'Chỉnh sửa loại ca' : 'Thêm loại ca'}
+        title="Chỉnh sửa loại ca"
         description="Hỗ trợ ca kéo dài qua ngày hôm sau và hiển thị màu trên lịch."
         onClose={() => setFormOpen(false)}
         onSubmit={handleSubmit}

@@ -20,11 +20,13 @@ import scheduling.scheduling.admin.dto.SchedulePeriodRequest;
 import scheduling.scheduling.auth.CurrentAccountPrincipal;
 import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
+import scheduling.scheduling.entity.OptimizationRun;
 import scheduling.scheduling.entity.SchedulePeriod;
 import scheduling.scheduling.entity.WorkShift;
 import scheduling.scheduling.audit.ActivityLogService;
 import scheduling.scheduling.notification.NotificationService;
 import scheduling.scheduling.repository.AccountRepository;
+import scheduling.scheduling.repository.OptimizationRunRepository;
 import scheduling.scheduling.repository.SchedulePeriodRepository;
 import scheduling.scheduling.repository.ShiftAssignmentRepository;
 import scheduling.scheduling.repository.WorkShiftRepository;
@@ -36,6 +38,9 @@ public class AdminSchedulePeriodService {
     private static final String APPROVED = "APPROVED";
     private static final String PUBLISHED = "PUBLISHED";
     private static final String CANCELLED = "CANCELLED";
+    private static final String INFEASIBLE = "INFEASIBLE";
+    private static final String INFEASIBLE_APPROVE_MESSAGE =
+            "Lịch đang có ràng buộc chưa thỏa nên không thể duyệt.";
     private static final Set<String> LISTABLE_STATUSES =
             Set.of(DRAFT, APPROVED, PUBLISHED, CANCELLED);
 
@@ -43,6 +48,7 @@ public class AdminSchedulePeriodService {
     private final AccountRepository accountRepository;
     private final WorkShiftRepository workShiftRepository;
     private final ShiftAssignmentRepository shiftAssignmentRepository;
+    private final OptimizationRunRepository optimizationRunRepository;
     private final NotificationService notificationService;
     private final ActivityLogService activityLogService;
 
@@ -51,12 +57,14 @@ public class AdminSchedulePeriodService {
             AccountRepository accountRepository,
             WorkShiftRepository workShiftRepository,
             ShiftAssignmentRepository shiftAssignmentRepository,
+            OptimizationRunRepository optimizationRunRepository,
             NotificationService notificationService,
             ActivityLogService activityLogService) {
         this.schedulePeriodRepository = schedulePeriodRepository;
         this.accountRepository = accountRepository;
         this.workShiftRepository = workShiftRepository;
         this.shiftAssignmentRepository = shiftAssignmentRepository;
+        this.optimizationRunRepository = optimizationRunRepository;
         this.notificationService = notificationService;
         this.activityLogService = activityLogService;
     }
@@ -80,7 +88,7 @@ public class AdminSchedulePeriodService {
                 .status(DRAFT)
                 .createdBy(manager)
                 .build();
-        return AdminSchedulePeriodResponse.from(savePeriod(period));
+        return toResponse(savePeriod(period));
     }
 
     @Transactional(readOnly = true)
@@ -97,7 +105,7 @@ public class AdminSchedulePeriodService {
     @Transactional(readOnly = true)
     public AdminSchedulePeriodResponse getSchedulePeriod(CurrentAccountPrincipal principal, Long periodId) {
         requireManager(principal);
-        return AdminSchedulePeriodResponse.from(findDetail(periodId));
+        return toResponse(findDetail(periodId));
     }
 
     @Transactional
@@ -120,7 +128,7 @@ public class AdminSchedulePeriodService {
         period.setStartDate(request.startDate());
         period.setEndDate(request.endDate());
         period.setVersionNo(versionNo);
-        return AdminSchedulePeriodResponse.from(savePeriod(period));
+        return toResponse(savePeriod(period));
     }
 
     @Transactional
@@ -132,11 +140,12 @@ public class AdminSchedulePeriodService {
         }
         validateStaffing(periodId);
         if (APPROVED.equals(period.getStatus())) {
-            return AdminSchedulePeriodResponse.from(period);
+            return toResponse(period);
         }
+        validateNotInfeasible(periodId);
         period.setStatus(APPROVED);
         period.setApprovedBy(manager);
-        return AdminSchedulePeriodResponse.from(savePeriod(period));
+        return toResponse(savePeriod(period));
     }
 
     @Transactional
@@ -144,7 +153,7 @@ public class AdminSchedulePeriodService {
         Account manager = requireManager(principal);
         SchedulePeriod period = findDetail(periodId);
         if (PUBLISHED.equals(period.getStatus())) {
-            return AdminSchedulePeriodResponse.from(period);
+            return toResponse(period);
         }
         if (!APPROVED.equals(period.getStatus())) {
             throw invalidRequest();
@@ -165,7 +174,7 @@ public class AdminSchedulePeriodService {
                 "id", period.getId(),
                 "periodName", period.getPeriodName(),
                 "status", period.getStatus()));
-        return AdminSchedulePeriodResponse.from(savePeriod(period));
+        return toResponse(savePeriod(period));
     }
 
     @Transactional
@@ -173,13 +182,31 @@ public class AdminSchedulePeriodService {
         requireManager(principal);
         SchedulePeriod period = findDetail(periodId);
         if (CANCELLED.equals(period.getStatus())) {
-            return AdminSchedulePeriodResponse.from(period);
+            return toResponse(period);
         }
         if (!DRAFT.equals(period.getStatus()) && !APPROVED.equals(period.getStatus())) {
             throw invalidRequest();
         }
         period.setStatus(CANCELLED);
-        return AdminSchedulePeriodResponse.from(savePeriod(period));
+        return toResponse(savePeriod(period));
+    }
+
+    private void validateNotInfeasible(Long periodId) {
+        optimizationRunRepository.findTopBySchedulePeriodIdOrderByStartedAtDescIdDesc(periodId)
+                .filter(run -> INFEASIBLE.equals(run.getStatus()))
+                .ifPresent(run -> {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, INFEASIBLE_APPROVE_MESSAGE);
+                });
+    }
+
+    private String resolveOptimizationStatus(Long periodId) {
+        return optimizationRunRepository.findTopBySchedulePeriodIdOrderByStartedAtDescIdDesc(periodId)
+                .map(OptimizationRun::getStatus)
+                .orElse(null);
+    }
+
+    private AdminSchedulePeriodResponse toResponse(SchedulePeriod period) {
+        return AdminSchedulePeriodResponse.from(period, resolveOptimizationStatus(period.getId()));
     }
 
     private void validateStaffing(Long periodId) {

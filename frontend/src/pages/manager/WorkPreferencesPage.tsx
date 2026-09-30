@@ -35,6 +35,11 @@ const preferenceTypeLabels: Record<WorkPreference['type'], string> = {
   AVOID_SHIFT: 'Tránh ca',
 }
 
+const formatDateOnly = (value: string) => {
+  const [year, month, day] = value.split('-')
+  return day && month && year ? `${day}/${month}/${year}` : value
+}
+
 export function WorkPreferencesPage() {
   const { showDialog } = useAppDialog()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -167,7 +172,7 @@ export function WorkPreferencesPage() {
                   { key: 'employeeName', label: 'Nhân viên' },
                   { key: 'type', label: 'Loại', render: (item: WorkPreference) => <span>{preferenceTypeLabels[item.type]}</span> },
                   { key: 'relatedShiftCode', label: 'Ca liên quan', render: (item: WorkPreference) => <span>{item.relatedShiftCode ? `${getShiftDefinition(item.relatedShiftCode)?.name ?? item.targetLabel ?? item.relatedShiftCode} (${item.relatedShiftCode})` : (item.targetLabel ?? 'Không có')}</span> },
-                  { key: 'submittedAt', label: 'Ngày gửi', render: (item: WorkPreference) => <span>{new Date(item.submittedAt).toLocaleDateString('vi-VN')}</span> },
+                  { key: 'preferenceDate', label: 'Ngày nguyện vọng', render: (item: WorkPreference) => <span>{formatDateOnly(item.preferenceDate ?? item.submittedAt)}</span> },
                   { key: 'status', label: 'Trạng thái', render: (item: WorkPreference) => <StatusBadge status={item.status} /> },
                   { key: 'actions', label: 'Thao tác', render: (item: WorkPreference) => (
                     <div className="flex items-center gap-2">
@@ -197,7 +202,7 @@ export function WorkPreferencesPage() {
             <div className="flex justify-between"><span>Nhân viên</span><strong>{selectedPreference.employeeName}</strong></div>
             <div className="flex justify-between"><span>Loại</span><strong>{preferenceTypeLabels[selectedPreference.type]}</strong></div>
             <div className="flex justify-between"><span>Ca liên quan</span><strong>{selectedPreference.relatedShiftCode ? `${getShiftDefinition(selectedPreference.relatedShiftCode)?.name ?? selectedPreference.targetLabel ?? selectedPreference.relatedShiftCode} (${selectedPreference.relatedShiftCode})` : (selectedPreference.targetLabel ?? 'Không có')}</strong></div>
-            <div className="flex justify-between"><span>Gửi lúc</span><strong>{new Date(selectedPreference.submittedAt).toLocaleString('vi-VN')}</strong></div>
+            <div className="flex justify-between"><span>Ngày nguyện vọng</span><strong>{formatDateOnly(selectedPreference.preferenceDate ?? selectedPreference.submittedAt)}</strong></div>
             <div className="flex justify-between"><span>Trạng thái</span><StatusBadge status={selectedPreference.status} /></div>
             <div className="flex justify-between"><span>Ghi chú</span><strong>{selectedPreference.note || 'Không có'}</strong></div>
             {selectedPreference.adminNote && <div className="flex justify-between"><span>Phản hồi quản lý</span><strong>{selectedPreference.adminNote}</strong></div>}

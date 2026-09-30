@@ -18,7 +18,8 @@ export const adaptBackendPreference = (response: BackendPreferenceResponse): Wor
   relatedShiftCode: response.shiftCode ? (response.shiftCode as ShiftCode) : undefined,
   note: response.note ?? '',
   priority: response.priority,
-  submittedAt: response.preferenceDate,
+  preferenceDate: response.preferenceDate,
+  submittedAt: '',
   status: response.status,
   targetLabel: response.shiftName ?? 'Không có ca cụ thể',
 })

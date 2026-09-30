@@ -13,13 +13,10 @@ import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 import scheduling.scheduling.admin.dto.AdminSchedulingRulesResponse;
 import scheduling.scheduling.admin.dto.SchedulingHardRulesRequest;
 import scheduling.scheduling.admin.dto.SchedulingQuotaRulesRequest;
 import scheduling.scheduling.admin.dto.SchedulingSoftWeightsRequest;
-import scheduling.scheduling.admin.dto.UpdateSchedulingRulesRequest;
 import scheduling.scheduling.entity.SchedulingRule;
 import scheduling.scheduling.repository.SchedulingRuleRepository;
 
@@ -56,46 +53,6 @@ class AdminSchedulingRuleServiceTest {
         assertThat(response.softWeights().heavyShift()).isEqualByComparingTo("8.00");
         verify(schedulingRuleRepository).findByRuleCodeIn(anyCollection());
         verify(schedulingRuleRepository, never()).saveAll(anyCollection());
-    }
-
-    @Test
-    void updateRulesPersistsAllValues() {
-        when(schedulingRuleRepository.findByRuleCodeIn(anyCollection())).thenReturn(defaultRows());
-        ArgumentCaptor<List<SchedulingRule>> rulesCaptor = ArgumentCaptor.captor();
-        when(schedulingRuleRepository.saveAll(rulesCaptor.capture())).thenAnswer(invocation -> invocation.getArgument(0));
-
-        AdminSchedulingRulesResponse response = service.updateRules(new UpdateSchedulingRulesRequest(
-                new SchedulingHardRulesRequest(10, 12, 5),
-                new SchedulingQuotaRulesRequest(1, 2, 7),
-                new SchedulingSoftWeightsRequest(
-                        new BigDecimal("11.00"),
-                        new BigDecimal("6.00"),
-                        new BigDecimal("4.00"),
-                        new BigDecimal("9.00"),
-                        new BigDecimal("12.00"))));
-
-        assertThat(response.hardRules().minRestHoursBetweenShifts()).isEqualTo(10);
-        assertThat(response.quotas().onCallEveryNDays()).isEqualTo(7);
-        assertThat(response.softWeights().workHourBalance()).isEqualByComparingTo("12.00");
-        assertThat(rulesCaptor.getValue()).hasSize(11);
-        assertThat(rulesCaptor.getValue())
-                .filteredOn(rule -> rule.getRuleCode().equals("MIN_REST_HOURS_BETWEEN_SHIFTS"))
-                .singleElement()
-                .satisfies(rule -> assertThat(rule.getRuleValueJson()).isEqualTo("{\"value\":10}"));
-    }
-
-    @Test
-    void updateRulesRejectsImpossibleRestAndWorkDayCombination() {
-        UpdateSchedulingRulesRequest invalid = new UpdateSchedulingRulesRequest(
-                new SchedulingHardRulesRequest(13, 12, 6),
-                new SchedulingQuotaRulesRequest(1, 2, 6),
-                defaultWeights());
-
-        assertThatThrownBy(() -> service.updateRules(invalid))
-                .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("Invalid scheduling rules request")
-                .satisfies(exception -> assertThat(((ResponseStatusException) exception).getStatusCode())
-                        .isEqualTo(HttpStatus.BAD_REQUEST));
     }
 
     @Test
@@ -193,15 +150,6 @@ class AdminSchedulingRuleServiceTest {
                 softRule("WEEKEND_WEIGHT", "Weekend weight", "5.00"),
                 softRule("HEAVY_SHIFT_WEIGHT", "Heavy shift weight", "8.00"),
                 softRule("WORK_HOUR_BALANCE_WEIGHT", "Work hour balance weight", "10.00"));
-    }
-
-    private static SchedulingSoftWeightsRequest defaultWeights() {
-        return new SchedulingSoftWeightsRequest(
-                new BigDecimal("10.00"),
-                new BigDecimal("5.00"),
-                new BigDecimal("5.00"),
-                new BigDecimal("8.00"),
-                new BigDecimal("10.00"));
     }
 
     private static SchedulingRule hardRule(String code, String name, String json) {

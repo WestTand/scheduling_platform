@@ -16,6 +16,7 @@ describe('preferenceAdapter', () => {
       shiftName: 'Ca sang',
       shiftCode: 'THONG_TAM',
       priority: 1,
+      preferenceDate: '2026-09-14',
       note: 'Muon lam ca sang',
       status: 'PENDING',
     }
@@ -30,7 +31,7 @@ describe('preferenceAdapter', () => {
       priority: 1,
       note: 'Muon lam ca sang',
       status: 'PENDING',
-      submittedAt: '2026-09-14',
+      submittedAt: '',
     })
   })
 
@@ -56,7 +57,8 @@ describe('preferenceAdapter', () => {
     expect(adapted.employeeName).toBe('')
     expect(adapted.relatedShiftCode).toBeUndefined()
     expect(adapted.month).toBe('2026-09')
-    expect(adapted.submittedAt).toBe('2026-09-16')
+    expect(adapted.preferenceDate).toBe('2026-09-16')
+    expect(adapted.submittedAt).toBe('')
     expect(adapted.targetLabel).toBe('Không có ca cụ thể')
     expect(adapted.note).toBe('')
   })

@@ -24,13 +24,50 @@ describe('scheduleAdapter', () => {
       startDate: '2026-09-21',
       endDate: '2026-09-27',
       createdBy: 'manager@example.com',
-      createdAt: '2026-09-21T00:00:00',
+      createdAt: '',
       employeeCount: 0,
       assignmentCount: 0,
       shiftCount: 0,
       status: ScheduleStatus.DRAFT,
       isMock: false,
+      optimizationStatus: null,
     })
+  })
+
+  test('carries the latest optimization status into the UI schedule', () => {
+    expect(adaptBackendSchedulePeriod({
+      id: 94,
+      periodName: 'Test003',
+      startDate: '2026-10-30',
+      endDate: '2026-11-06',
+      versionNo: 1,
+      status: 'DRAFT',
+      createdByAccountId: 1,
+      createdByUsername: 'manager@example.com',
+      approvedByAccountId: null,
+      approvedByUsername: null,
+      publishedAt: null,
+      totalPenalty: null,
+      optimizationStatus: 'INFEASIBLE',
+    }).optimizationStatus).toBe('INFEASIBLE')
+  })
+
+  test('does not synthesize midnight timestamp when backend has no creation time', () => {
+    expect(adaptBackendSchedulePeriod({
+      id: 10,
+      periodName: 'Kỳ không có createdAt',
+      startDate: '2026-10-01',
+      endDate: '2026-10-07',
+      versionNo: 1,
+      status: 'DRAFT',
+      createdByAccountId: 1,
+      createdByUsername: 'manager@example.com',
+      approvedByAccountId: null,
+      approvedByUsername: null,
+      createdAt: null,
+      publishedAt: null,
+      totalPenalty: null,
+    }).createdAt).toBe('')
   })
 
   test('prefers backend createdAt for display time', () => {

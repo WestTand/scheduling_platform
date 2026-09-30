@@ -409,6 +409,7 @@ class AdminSchedulePeriodControllerTest {
                 null,
                 null,
                 null,
-                null);
+                null,
+                "SUCCESS");
     }
 }

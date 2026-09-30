@@ -75,7 +75,23 @@ public class DevSampleDataSeeder implements ApplicationRunner {
                 new EmployeeDefinition("EMP001", "Nguyễn Văn An", "emp001@example.com", "0900000001"),
                 new EmployeeDefinition("EMP002", "Trần Thị Bình", "emp002@example.com", "0900000002"),
                 new EmployeeDefinition("EMP003", "Lê Minh Châu", "emp003@example.com", "0900000003"),
-                new EmployeeDefinition("EMP004", "Phạm Quốc Dũng", "emp004@example.com", "0900000004"));
+                new EmployeeDefinition("EMP004", "Phạm Quốc Dũng", "emp004@example.com", "0900000004"),
+                new EmployeeDefinition("EMP005", "Hoàng Thu Hà", "emp005@example.com", "0900000005"),
+                new EmployeeDefinition("EMP006", "Đỗ Minh Khang", "emp006@example.com", "0900000006"),
+                new EmployeeDefinition("EMP007", "Vũ Ngọc Lan", "emp007@example.com", "0900000007"),
+                new EmployeeDefinition("EMP008", "Ngô Đức Long", "emp008@example.com", "0900000008"),
+                new EmployeeDefinition("EMP009", "Bùi Khánh Linh", "emp009@example.com", "0900000009"),
+                new EmployeeDefinition("EMP010", "Đặng Quang Minh", "emp010@example.com", "0900000010"),
+                new EmployeeDefinition("EMP011", "Phan Thảo My", "emp011@example.com", "0900000011"),
+                new EmployeeDefinition("EMP012", "Tạ Hữu Nam", "emp012@example.com", "0900000012"),
+                new EmployeeDefinition("EMP013", "Lý Bảo Ngọc", "emp013@example.com", "0900000013"),
+                new EmployeeDefinition("EMP014", "Mai Hoài Phương", "emp014@example.com", "0900000014"),
+                new EmployeeDefinition("EMP015", "Cao Thanh Sơn", "emp015@example.com", "0900000015"),
+                new EmployeeDefinition("EMP016", "Trịnh Mai Trang", "emp016@example.com", "0900000016"),
+                new EmployeeDefinition("EMP017", "Hà Tuấn Tú", "emp017@example.com", "0900000017"),
+                new EmployeeDefinition("EMP018", "Lưu Gia Huy", "emp018@example.com", "0900000018"),
+                new EmployeeDefinition("EMP019", "Nguyễn Hải Yến", "emp019@example.com", "0900000019"),
+                new EmployeeDefinition("EMP020", "Chu Việt Anh", "emp020@example.com", "0900000020"));
     }
 
     private record EmployeeDefinition(String employeeCode, String fullName, String email, String phone) {

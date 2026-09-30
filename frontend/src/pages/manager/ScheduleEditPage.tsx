@@ -11,7 +11,7 @@ import { apiConfig } from '@/config/api'
 import { scheduleDetailSeed, scheduleStatusLabels } from '@/mocks/schedules'
 import { backendEmployeeService } from '@/services/backendEmployeeService'
 import { backendScheduleService } from '@/services/backendScheduleService'
-import { canRunScheduleEditOptimize, filterScheduleEditAssignments, getScheduleEditLockedMessage, getScheduleEditModeLabel, getScheduleEditNoticeClass, reloadScheduleEditDetail, shouldShowMockStatusActions, type ScheduleEditAssignmentFilter } from './ScheduleEditPage.helpers'
+import { canRunScheduleEditOptimize, canSubmitEditRequest, filterScheduleEditAssignments, getScheduleEditDeleteDisabled, getScheduleEditDialogDescription, getScheduleEditLockedMessage, getScheduleEditModeLabel, getScheduleEditNoticeClass, getScheduleEditRowIntent, reloadScheduleEditDetail, shouldShowMockStatusActions, type ScheduleEditAssignmentFilter } from './ScheduleEditPage.helpers'
 import type { ShiftCode } from '@/configs/shiftDefinitions'
 import type { Employee } from '@/types/management'
 import type { ScheduleAssignment, ScheduleDetail } from '@/types/schedule'
@@ -41,6 +41,7 @@ export function ScheduleEditPage() {
   const [employees, setEmployees] = useState<Employee[]>([])
   const [backendResult, setBackendResult] = useState<{ scheduleId: string; detail: ScheduleDetail | null; error: string } | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [targetWorkShiftId, setTargetWorkShiftId] = useState<string>('')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [notice, setNotice] = useState<ScheduleEditNotice | null>(null)
@@ -116,16 +117,19 @@ export function ScheduleEditPage() {
 
   const openCreate = () => {
     setEditingId(null)
+    setTargetWorkShiftId('')
     setFormState({ ...emptyAssignmentForm, employeeName: apiConfig.useMockApi ? emptyAssignmentForm.employeeName : employees[0]?.fullName ?? '' })
     setDialogOpen(true)
   }
 
   const openEdit = (assignment: ScheduleAssignment) => {
-    setEditingId(assignment.id)
+    const intent = getScheduleEditRowIntent(assignment)
+    setEditingId(intent.assignmentId)
+    setTargetWorkShiftId(intent.workShiftId)
     setFormState({
       date: assignment.date,
       shiftCode: assignment.shiftCode,
-      employeeName: assignment.employeeNames[0] ?? 'Trần Văn Nam',
+      employeeName: assignment.employeeNames[0] ?? (apiConfig.useMockApi ? emptyAssignmentForm.employeeName : employees[0]?.fullName ?? ''),
       note: assignment.warningCount > 0 ? 'Có cảnh báo mẫu' : '',
     })
     setDialogOpen(true)
@@ -154,6 +158,7 @@ export function ScheduleEditPage() {
         }
         setDialogOpen(false)
         setEditingId(null)
+        setTargetWorkShiftId('')
         setFormState(emptyAssignmentForm)
         return
       }
@@ -169,12 +174,12 @@ export function ScheduleEditPage() {
       if (!apiConfig.useMockApi) {
         try {
           const employeeId = findEmployeeId(formState.employeeName)
-          const workShift = await backendScheduleService.listWorkShifts(detail.id).then((items) => items.find((item) => item.workDate === formState.date && item.shiftName.trim().toLowerCase() === backendShiftNameByCode[formState.shiftCode]))
-          if (!employeeId || !workShift) {
+          const workShiftId = targetWorkShiftId || (await backendScheduleService.listWorkShifts(detail.id).then((items) => items.find((item) => item.workDate === formState.date && item.shiftName.trim().toLowerCase() === backendShiftNameByCode[formState.shiftCode])?.id))
+          if (!employeeId || !workShiftId) {
             showError('Không tìm thấy nhân viên hoặc ca làm việc backend tương ứng.')
             return
           }
-          await backendScheduleService.createAssignment(String(workShift.id), employeeId)
+          await backendScheduleService.createAssignment(String(workShiftId), employeeId)
           await refreshScheduleDetail()
           showSuccess('Đã thêm phân công trên backend.')
         } catch (saveError) {
@@ -183,6 +188,7 @@ export function ScheduleEditPage() {
         }
         setDialogOpen(false)
         setEditingId(null)
+        setTargetWorkShiftId('')
         setFormState(emptyAssignmentForm)
         return
       }
@@ -313,8 +319,10 @@ export function ScheduleEditPage() {
                   {assignment.warningCount > 0 && <p className="mt-1 inline-flex items-center gap-2 text-xs text-amber-700"><AlertTriangle className="h-3.5 w-3.5" />Có cảnh báo cần xử lý</p>}
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => openEdit(assignment)} disabled={isEditingLocked}>Sửa</Button>
-                  <Button variant="outline" size="sm" onClick={() => setDeleteId(assignment.id)} disabled={isEditingLocked} className="text-red-600"> <Trash2 className="mr-2 h-4 w-4" />Xóa</Button>
+                  <Button variant="outline" size="sm" onClick={() => openEdit(assignment)} disabled={isEditingLocked}>
+                    {getScheduleEditRowIntent(assignment).mode === 'assign' ? 'Gán nhân viên' : 'Sửa'}
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setDeleteId(assignment.id)} disabled={isEditingLocked || getScheduleEditDeleteDisabled(assignment)} className="text-red-600"> <Trash2 className="mr-2 h-4 w-4" />Xóa</Button>
                 </div>
               </div>
             ))}
@@ -334,7 +342,7 @@ export function ScheduleEditPage() {
       <ConfirmDialog
         open={dialogOpen}
         title={editingId ? 'Sửa phân công' : 'Thêm phân công'}
-        description="Chi tiết dưới đây chỉ cập nhật mock state để kiểm thử giao diện." 
+        description={getScheduleEditDialogDescription(apiConfig.useMockApi, !editingId)}
         onCancel={() => setDialogOpen(false)}
         onConfirm={handleSave}
         confirmLabel="Lưu"
@@ -371,7 +379,7 @@ export function ScheduleEditPage() {
 
       <div className="flex items-center justify-end gap-3">
         <Button variant="outline" onClick={() => navigate(`/manager/schedules/${detail.id}`)}>Hủy thay đổi</Button>
-        <Button onClick={() => handleSubmitStatus('PUBLISHED')}><UserRound className="mr-2 h-4 w-4" />Gửi duyệt</Button>
+        {canSubmitEditRequest(apiConfig.useMockApi) && <Button onClick={() => handleSubmitStatus('PUBLISHED')}><UserRound className="mr-2 h-4 w-4" />Gửi duyệt</Button>}
       </div>
     </div>
   )

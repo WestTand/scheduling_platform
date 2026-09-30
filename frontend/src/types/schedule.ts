@@ -18,6 +18,14 @@ export const ScheduleViewMode = {
 
 export type ScheduleViewMode = (typeof ScheduleViewMode)[keyof typeof ScheduleViewMode]
 
+export const ScheduleOptimizationStatus = {
+  SUCCESS: 'SUCCESS',
+  INFEASIBLE: 'INFEASIBLE',
+  FAILED: 'FAILED',
+} as const
+
+export type ScheduleOptimizationStatus = (typeof ScheduleOptimizationStatus)[keyof typeof ScheduleOptimizationStatus]
+
 export interface WorkSchedule {
   id: string
   name: string
@@ -30,6 +38,7 @@ export interface WorkSchedule {
   shiftCount: number
   status: ScheduleStatus
   isMock: boolean
+  optimizationStatus?: string | null
 }
 
 export interface ScheduleAssignment {

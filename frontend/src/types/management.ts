@@ -80,6 +80,7 @@ export interface Employee {
   status: EmployeeStatus
   joinDate: string
   note?: string
+  aiSchedulable?: boolean
 }
 
 export interface ShiftType {
@@ -124,6 +125,7 @@ export interface WorkPreference {
   relatedShiftCode?: ShiftCode
   note: string
   priority: number
+  preferenceDate?: string
   submittedAt: string
   status: PreferenceStatus
   preferenceTypeLabel?: string

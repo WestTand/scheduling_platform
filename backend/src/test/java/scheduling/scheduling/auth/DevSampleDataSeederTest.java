@@ -53,7 +53,7 @@ class DevSampleDataSeederTest {
         newSeeder().run(null);
 
         ArgumentCaptor<Account> accountCaptor = ArgumentCaptor.forClass(Account.class);
-        verify(accountRepository, org.mockito.Mockito.atLeast(4)).save(accountCaptor.capture());
+        verify(accountRepository, org.mockito.Mockito.atLeast(20)).save(accountCaptor.capture());
 
         assertThat(accountCaptor.getAllValues())
                 .filteredOn(account -> "emp001@example.com".equals(account.getUsername()))
@@ -65,6 +65,17 @@ class DevSampleDataSeederTest {
                     assertThat(account.getStatus()).isEqualTo(AccountStatus.ACTIVE);
                     assertThat(account.getEmployee()).isNotNull();
                     assertThat(account.getEmployee().getEmployeeCode()).isEqualTo("EMP001");
+                });
+        assertThat(accountCaptor.getAllValues())
+                .filteredOn(account -> "emp020@example.com".equals(account.getUsername()))
+                .singleElement()
+                .satisfies(account -> {
+                    assertThat(account.getPasswordHash()).isEqualTo("encoded-employee-password");
+                    assertThat(account.getRole()).isEqualTo(AccountRole.EMPLOYEE);
+                    assertThat(account.getIsActive()).isTrue();
+                    assertThat(account.getStatus()).isEqualTo(AccountStatus.ACTIVE);
+                    assertThat(account.getEmployee()).isNotNull();
+                    assertThat(account.getEmployee().getEmployeeCode()).isEqualTo("EMP020");
                 });
     }
 

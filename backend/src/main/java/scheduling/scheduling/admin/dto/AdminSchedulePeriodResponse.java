@@ -19,9 +19,14 @@ public record AdminSchedulePeriodResponse(
         String approvedByUsername,
         LocalDateTime createdAt,
         LocalDateTime publishedAt,
-        BigDecimal totalPenalty) {
+        BigDecimal totalPenalty,
+        String optimizationStatus) {
 
     public static AdminSchedulePeriodResponse from(SchedulePeriod period) {
+        return from(period, null);
+    }
+
+    public static AdminSchedulePeriodResponse from(SchedulePeriod period, String optimizationStatus) {
         Account createdBy = period.getCreatedBy();
         Account approvedBy = period.getApprovedBy();
         return new AdminSchedulePeriodResponse(
@@ -37,6 +42,7 @@ public record AdminSchedulePeriodResponse(
                 approvedBy == null ? null : approvedBy.getUsername(),
                 null,
                 period.getPublishedAt(),
-                period.getTotalPenalty());
+                period.getTotalPenalty(),
+                optimizationStatus);
     }
 }

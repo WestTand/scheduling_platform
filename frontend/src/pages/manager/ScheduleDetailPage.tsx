@@ -13,7 +13,7 @@ import { ScheduleWarningList } from '@/components/schedule/ScheduleWarningList'
 import { apiConfig } from '@/config/api'
 import { scheduleDetailSeed, scheduleStatusLabels } from '@/mocks/schedules'
 import { backendScheduleService } from '@/services/backendScheduleService'
-import { getScheduleDetailActions, getScheduleDetailNoticeClass, getScheduleDetailReadOnlyMessage } from './ScheduleDetailPage.helpers'
+import { canApproveSchedule, getScheduleDetailActions, getScheduleDetailNoticeClass, getScheduleDetailReadOnlyMessage } from './ScheduleDetailPage.helpers'
 import type { ScheduleDetail } from '@/types/schedule'
 import { ScheduleViewMode } from '@/types/schedule'
 import type { ScheduleDetailAction, ScheduleDetailNotice } from './ScheduleDetailPage.helpers'
@@ -84,17 +84,18 @@ export function ScheduleDetailPage() {
     return <EmptyState title="Không tìm thấy lịch" description={error || 'Không có dữ liệu lịch phù hợp.'} action={<Button onClick={() => navigate('/manager/schedules')}>Quay lại danh sách</Button>} />
   }
 
-  const readOnlyMessage = getScheduleDetailReadOnlyMessage(detail.status)
+  const readOnlyMessage = getScheduleDetailReadOnlyMessage(detail.status, detail.optimizationStatus)
   const statusActions = apiConfig.useMockApi ? [] : getScheduleDetailActions(detail.status)
+  const isInfeasible = detail.optimizationStatus === 'INFEASIBLE'
 
   return (
     <div className="space-y-6">
       <Button variant="ghost" asChild><Link to="/manager/schedules"><ArrowLeft className="mr-2 h-4 w-4" />Quay lại danh sách lịch</Link></Button>
       <PageHeader title={detail.name} description={`${detail.startDate} - ${detail.endDate} · Người tạo: ${detail.createdBy}`} />
-      <div className="flex flex-wrap items-center gap-2"><Badge>{scheduleStatusLabels[detail.status]}</Badge>{detail.isMock && <Badge variant="outline">Dữ liệu minh họa</Badge>}<span className="text-sm text-slate-500">Tạo lúc {new Date(detail.createdAt).toLocaleString('vi-VN')}</span></div>
+      <div className="flex flex-wrap items-center gap-2"><Badge>{scheduleStatusLabels[detail.status]}</Badge>{isInfeasible && <Badge variant="destructive">INFE</Badge>}{detail.isMock && <Badge variant="outline">Dữ liệu minh họa</Badge>}<span className="text-sm text-slate-500">Tạo lúc {new Date(detail.createdAt).toLocaleString('vi-VN')}</span></div>
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="outline" asChild><Link to={`/manager/schedules/${detail.id}/edit`}><Pencil className="mr-2 h-4 w-4" />Chỉnh sửa</Link></Button>
-        {statusActions.includes('approve') && <Button variant="outline" onClick={() => void runScheduleAction('approve')}><ShieldCheck className="mr-2 h-4 w-4" />Duyệt</Button>}
+        {statusActions.includes('approve') && <Button variant="outline" disabled={!canApproveSchedule(detail.status, detail.optimizationStatus)} title={isInfeasible ? 'Lịch đang bị cảnh báo (INFE) nên không thể duyệt.' : undefined} onClick={() => void runScheduleAction('approve')}><ShieldCheck className="mr-2 h-4 w-4" />Duyệt</Button>}
         {statusActions.includes('publish') && <Button variant="outline" onClick={() => void runScheduleAction('publish')}><Send className="mr-2 h-4 w-4" />Công bố</Button>}
         {statusActions.includes('cancel') && <Button variant="outline" className="text-red-600" onClick={() => void runScheduleAction('cancel')}><XCircle className="mr-2 h-4 w-4" />Hủy</Button>}
       </div>

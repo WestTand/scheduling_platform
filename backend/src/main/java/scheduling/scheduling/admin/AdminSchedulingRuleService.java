@@ -4,20 +4,16 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 import scheduling.scheduling.admin.dto.AdminSchedulingRulesResponse;
 import scheduling.scheduling.admin.dto.SchedulingHardRulesRequest;
 import scheduling.scheduling.admin.dto.SchedulingQuotaRulesRequest;
 import scheduling.scheduling.admin.dto.SchedulingSoftWeightsRequest;
-import scheduling.scheduling.admin.dto.UpdateSchedulingRulesRequest;
 import scheduling.scheduling.entity.SchedulingRule;
 import scheduling.scheduling.repository.SchedulingRuleRepository;
 
@@ -37,27 +33,6 @@ public class AdminSchedulingRuleService {
 
     public AdminSchedulingRulesResponse getRules() {
         return toResponse(loadOrCreateRules());
-    }
-
-    public AdminSchedulingRulesResponse updateRules(UpdateSchedulingRulesRequest request) {
-        validate(request);
-        Map<String, SchedulingRule> rules = loadOrCreateRules().stream()
-                .collect(Collectors.toMap(SchedulingRule::getRuleCode, Function.identity()));
-
-        updateHardRule(rules, "MIN_REST_HOURS_BETWEEN_SHIFTS", request.hardRules().minRestHoursBetweenShifts());
-        updateHardRule(rules, "MAX_WORK_HOURS_PER_DAY", request.hardRules().maxWorkHoursPerDay());
-        updateHardRule(rules, "MAX_SHIFTS_PER_WEEK", request.hardRules().maxShiftsPerWeek());
-        updateHardRule(rules, "OVERTIME_SHIFTS_PER_WEEK", request.quotas().overtimeShiftsPerWeek());
-        updateHardRule(rules, "BATHING_SHIFTS_PER_WEEK", request.quotas().bathingShiftsPerWeek());
-        updateHardRule(rules, "ON_CALL_EVERY_N_DAYS", request.quotas().onCallEveryNDays());
-        updateSoftRule(rules, "FAIRNESS_WEIGHT", request.softWeights().fairness());
-        updateSoftRule(rules, "PREFERENCE_WEIGHT", request.softWeights().preference());
-        updateSoftRule(rules, "WEEKEND_WEIGHT", request.softWeights().weekend());
-        updateSoftRule(rules, "HEAVY_SHIFT_WEIGHT", request.softWeights().heavyShift());
-        updateSoftRule(rules, "WORK_HOUR_BALANCE_WEIGHT", request.softWeights().workHourBalance());
-
-        List<SchedulingRule> saved = schedulingRuleRepository.saveAll(new ArrayList<>(rules.values()));
-        return toResponse(saved);
     }
 
     private synchronized List<SchedulingRule> loadOrCreateRules() {
@@ -97,28 +72,6 @@ public class AdminSchedulingRuleService {
                         rules.get("WEEKEND_WEIGHT").getWeight(),
                         rules.get("HEAVY_SHIFT_WEIGHT").getWeight(),
                         rules.get("WORK_HOUR_BALANCE_WEIGHT").getWeight()));
-    }
-
-    private void validate(UpdateSchedulingRulesRequest request) {
-        if (request.hardRules().minRestHoursBetweenShifts() + request.hardRules().maxWorkHoursPerDay() > 24) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid scheduling rules request");
-        }
-    }
-
-    private void updateHardRule(Map<String, SchedulingRule> rules, String code, Integer value) {
-        SchedulingRule rule = rules.get(code);
-        rule.setRuleType(HARD);
-        rule.setRuleValueJson(valueJson(value));
-        rule.setWeight(null);
-        rule.setActive(true);
-    }
-
-    private void updateSoftRule(Map<String, SchedulingRule> rules, String code, BigDecimal weight) {
-        SchedulingRule rule = rules.get(code);
-        rule.setRuleType(SOFT);
-        rule.setRuleValueJson(ENABLED_JSON);
-        rule.setWeight(weight);
-        rule.setActive(true);
     }
 
     private Integer readValue(Map<String, SchedulingRule> rules, String code) {

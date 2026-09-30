@@ -28,12 +28,14 @@ import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
 import scheduling.scheduling.entity.AccountStatus;
 import scheduling.scheduling.entity.Employee;
+import scheduling.scheduling.entity.OptimizationRun;
 import scheduling.scheduling.entity.SchedulePeriod;
 import scheduling.scheduling.entity.ShiftAssignment;
 import scheduling.scheduling.entity.WorkShift;
 import scheduling.scheduling.audit.ActivityLogService;
 import scheduling.scheduling.notification.NotificationService;
 import scheduling.scheduling.repository.AccountRepository;
+import scheduling.scheduling.repository.OptimizationRunRepository;
 import scheduling.scheduling.repository.SchedulePeriodRepository;
 import scheduling.scheduling.repository.ShiftAssignmentRepository;
 import scheduling.scheduling.repository.WorkShiftRepository;
@@ -44,6 +46,7 @@ class AdminSchedulePeriodServiceTest {
     private final AccountRepository accountRepository = mock(AccountRepository.class);
     private final WorkShiftRepository workShiftRepository = mock(WorkShiftRepository.class);
     private final ShiftAssignmentRepository shiftAssignmentRepository = mock(ShiftAssignmentRepository.class);
+    private final OptimizationRunRepository optimizationRunRepository = mock(OptimizationRunRepository.class);
     private final NotificationService notificationService = mock(NotificationService.class);
     private final ActivityLogService activityLogService = mock(ActivityLogService.class);
     private final AdminSchedulePeriodService service = new AdminSchedulePeriodService(
@@ -51,6 +54,7 @@ class AdminSchedulePeriodServiceTest {
             accountRepository,
             workShiftRepository,
             shiftAssignmentRepository,
+            optimizationRunRepository,
             notificationService,
             activityLogService);
 
@@ -590,6 +594,35 @@ class AdminSchedulePeriodServiceTest {
         assertThat(response.approvedByAccountId()).isEqualTo(1L);
         assertThat(response.approvedByUsername()).isEqualTo("manager01");
         verify(schedulePeriodRepository).saveAndFlush(period);
+    }
+
+    @Test
+    void approveSchedulePeriodRejectsInfeasibleOptimizationRun() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        Account manager = account(principal);
+        SchedulePeriod period = draftPeriod(20L, manager);
+        WorkShift shift = staffedShift(200L, 2);
+        Employee first = activeEmployee(10L, "EMP010", "Employee Ten");
+        Employee second = activeEmployee(11L, "EMP011", "Employee Eleven");
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(period));
+        when(workShiftRepository.searchForPeriod(20L, null, null)).thenReturn(List.of(shift));
+        when(shiftAssignmentRepository.listForPeriod(20L))
+                .thenReturn(List.of(shiftAssignment(300L, shift, first), shiftAssignment(301L, shift, second)));
+        when(optimizationRunRepository.findTopBySchedulePeriodIdOrderByStartedAtDescIdDesc(20L))
+                .thenReturn(Optional.of(OptimizationRun.builder()
+                        .schedulePeriod(period)
+                        .status("INFEASIBLE")
+                        .startedAt(LocalDateTime.of(2026, 9, 20, 8, 0))
+                        .build()));
+
+        assertThatThrownBy(() -> service.approveSchedulePeriod(principal, 20L))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Lịch đang có ràng buộc chưa thỏa nên không thể duyệt.")
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.CONFLICT);
+
+        verify(schedulePeriodRepository, never()).saveAndFlush(any(SchedulePeriod.class));
     }
 
     @Test

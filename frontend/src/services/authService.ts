@@ -139,6 +139,19 @@ const parseBackendAccountId = (accountId: string | number): number => {
   return parsed
 }
 
+// Login/refresh payloads only carry the account, so the employee full name used by the
+// greeting and profile header has to be resolved from /api/auth/me before storing the user.
+const resolveSignedInUser = async (fallbackUser: User, accessToken: string): Promise<User> => {
+  try {
+    sessionStorage.setItem(AUTH_STORAGE_KEYS.TOKEN, accessToken)
+    return await backendAuthService.me()
+  } catch {
+    return fallbackUser
+  } finally {
+    sessionStorage.removeItem(AUTH_STORAGE_KEYS.TOKEN)
+  }
+}
+
 export const authService = {
   async login(credentials: LoginCredentials, rememberMe: boolean): Promise<User> {
     try {
@@ -149,8 +162,9 @@ export const authService = {
       }
 
       const result = await backendAuthService.login(credentials)
-      setStoredAuth(result.user, rememberMe, result.accessToken)
-      return result.user
+      const user = await resolveSignedInUser(result.user, result.accessToken)
+      setStoredAuth(user, rememberMe, result.accessToken)
+      return user
     } catch (error) {
       clearStoredAuth()
       throw error
@@ -204,8 +218,9 @@ export const authService = {
       }
       const backendAccountId = parseBackendAccountId(accountId)
       const result = await backendAuthService.changeRequiredPassword(backendAccountId, currentPassword, newPassword)
-      setStoredAuth(result.user, rememberMe, result.accessToken)
-      return result.user
+      const user = await resolveSignedInUser(result.user, result.accessToken)
+      setStoredAuth(user, rememberMe, result.accessToken)
+      return user
     } catch (error) {
       clearStoredAuth()
       throw error

@@ -23,5 +23,3 @@ export interface SchedulingRules {
   quotas: SchedulingQuotaRules
   softWeights: SchedulingSoftWeights
 }
-
-export type SchedulingRulesFormValues = SchedulingRules

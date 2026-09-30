@@ -2,6 +2,11 @@ import type { BackendAdminEmployeeResponse } from '@/types/backendEmployee'
 import type { UserAccount } from '@/types/account'
 import type { Employee } from '@/types/management'
 
+const isAiSchedulableAccount = (employee: BackendAdminEmployeeResponse) => employee.status === 'ACTIVE'
+  && employee.account?.role === 'EMPLOYEE'
+  && employee.account.status === 'ACTIVE'
+  && employee.account.active === true
+
 export const adaptBackendEmployee = (employee: BackendAdminEmployeeResponse): Employee => ({
   id: String(employee.id),
   employeeCode: employee.employeeCode,
@@ -14,6 +19,7 @@ export const adaptBackendEmployee = (employee: BackendAdminEmployeeResponse): Em
   // Backend AdminEmployeeResponse currently has no date fields, so joinDate defaults to today.
   joinDate: new Date().toISOString().slice(0, 10),
   note: undefined,
+  aiSchedulable: isAiSchedulableAccount(employee),
 })
 
 export const adaptBackendAccount = (employee: BackendAdminEmployeeResponse): UserAccount | null => {

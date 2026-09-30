@@ -4,6 +4,31 @@ export type ScheduleEditNotice = { type: 'success' | 'error'; message: string }
 
 export type ScheduleEditAssignmentFilter = 'ALL' | 'UNASSIGNED' | 'WARNING'
 
+export type ScheduleEditRowIntent =
+  | { mode: 'assign'; workShiftId: string; assignmentId: null }
+  | { mode: 'update'; workShiftId: string; assignmentId: string }
+
+/**
+ * Unassigned rows are synthesized by the adapter with a `work-shift-<id>` placeholder id,
+ * so they must be created through the work-shift endpoint instead of the assignment one.
+ */
+export const getScheduleEditRowIntent = (assignment: ScheduleAssignment): ScheduleEditRowIntent => {
+  const workShiftId = assignment.workShiftId ?? ''
+  return assignment.employeeNames.length > 0
+    ? { mode: 'update', workShiftId, assignmentId: assignment.id }
+    : { mode: 'assign', workShiftId, assignmentId: null }
+}
+
+export const getScheduleEditDeleteDisabled = (assignment: ScheduleAssignment) =>
+  getScheduleEditRowIntent(assignment).mode === 'assign'
+
+export const canSubmitEditRequest = (useMockApi: boolean) => useMockApi
+
+export const getScheduleEditDialogDescription = (useMockApi: boolean, isAssign: boolean) => {
+  if (useMockApi) return 'Chi tiết dưới đây chỉ cập nhật mock state để kiểm thử giao diện.'
+  return isAssign ? 'Chọn nhân viên để gán vào ca đã chọn.' : 'Cập nhật nhân viên được phân công cho ca này.'
+}
+
 export const getScheduleEditModeLabel = (useMockApi: boolean) => useMockApi ? 'Chế độ chỉnh sửa mock' : 'Backend mode: chỉnh sửa phân công trực tiếp'
 
 export const shouldShowMockStatusActions = (useMockApi: boolean) => useMockApi
