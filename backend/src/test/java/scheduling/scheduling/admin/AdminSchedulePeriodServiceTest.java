@@ -957,9 +957,9 @@ class AdminSchedulePeriodServiceTest {
     void updateEmployeePoolReplacesTheDraftPool() {
         CurrentAccountPrincipal principal = managerPrincipal();
         SchedulePeriod period = draftPeriod(20L, account(principal));
-        period.setEmployeePool(new LinkedHashSet<>(List.of(activeEmployee(10L, "EMP010", "Employee Ten"))));
-        Employee first = activeEmployee(10L, "EMP010", "Employee Ten");
-        Employee second = activeEmployee(11L, "EMP011", "Employee Eleven");
+        period.setEmployeePool(new LinkedHashSet<>(List.of(schedulableEmployee(10L, "EMP010", "Employee Ten"))));
+        Employee first = schedulableEmployee(10L, "EMP010", "Employee Ten");
+        Employee second = schedulableEmployee(11L, "EMP011", "Employee Eleven");
         when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
         when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(period));
         when(employeeRepository.findAllById(any())).thenReturn(List.of(first, second));
@@ -978,7 +978,7 @@ class AdminSchedulePeriodServiceTest {
         SchedulePeriod period = draftPeriod(20L, account(principal));
         when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
         when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(period));
-        when(employeeRepository.findAllById(any())).thenReturn(List.of(activeEmployee(10L, "EMP010", "Employee Ten")));
+        when(employeeRepository.findAllById(any())).thenReturn(List.of(schedulableEmployee(10L, "EMP010", "Employee Ten")));
         when(schedulePeriodRepository.saveAndFlush(period)).thenReturn(period);
 
         service.updateEmployeePool(principal, 20L, List.of(10L, 10L));
@@ -989,7 +989,7 @@ class AdminSchedulePeriodServiceTest {
     @Test
     void updateEmployeePoolRejectsPublishedAndCancelledPeriods() {
         CurrentAccountPrincipal principal = managerPrincipal();
-        Employee existing = activeEmployee(10L, "EMP010", "Employee Ten");
+        Employee existing = schedulableEmployee(10L, "EMP010", "Employee Ten");
         SchedulePeriod published = draftPeriod(20L, account(principal));
         published.setStatus("PUBLISHED");
         published.setEmployeePool(new LinkedHashSet<>(List.of(existing)));
@@ -1019,11 +1019,11 @@ class AdminSchedulePeriodServiceTest {
     void updateEmployeePoolRejectsUnknownEmployee() {
         CurrentAccountPrincipal principal = managerPrincipal();
         SchedulePeriod period = draftPeriod(20L, account(principal));
-        period.setEmployeePool(new LinkedHashSet<>(List.of(activeEmployee(10L, "EMP010", "Employee Ten"))));
+        period.setEmployeePool(new LinkedHashSet<>(List.of(schedulableEmployee(10L, "EMP010", "Employee Ten"))));
         when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
         when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(period));
         when(employeeRepository.findAllById(any()))
-                .thenReturn(List.of(activeEmployee(10L, "EMP010", "Employee Ten")));
+                .thenReturn(List.of(schedulableEmployee(10L, "EMP010", "Employee Ten")));
 
         assertThatThrownBy(() -> service.updateEmployeePool(principal, 20L, List.of(10L, 99L)))
                 .isInstanceOf(ResponseStatusException.class)
@@ -1044,7 +1044,26 @@ class AdminSchedulePeriodServiceTest {
         when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
         when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(period));
         when(employeeRepository.findAllById(any()))
-                .thenReturn(List.of(activeEmployee(10L, "EMP010", "Employee Ten"), inactive));
+                .thenReturn(List.of(schedulableEmployee(10L, "EMP010", "Employee Ten"), inactive));
+
+        assertThatThrownBy(() -> service.updateEmployeePool(principal, 20L, List.of(10L, 11L)))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Danh sách nhân viên không hợp lệ.")
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(schedulePeriodRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void updateEmployeePoolRejectsEmployeeWithoutActiveEmployeeAccount() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        SchedulePeriod period = draftPeriod(20L, account(principal));
+        Employee valid = schedulableEmployee(10L, "EMP010", "Employee Ten");
+        Employee missingAccount = activeEmployee(11L, "EMP011", "Employee Eleven");
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(period));
+        when(employeeRepository.findAllById(any())).thenReturn(List.of(valid, missingAccount));
 
         assertThatThrownBy(() -> service.updateEmployeePool(principal, 20L, List.of(10L, 11L)))
                 .isInstanceOf(ResponseStatusException.class)
@@ -1168,6 +1187,20 @@ class AdminSchedulePeriodServiceTest {
                 .status("ACTIVE")
                 .build();
         employee.setId(id);
+        return employee;
+    }
+
+    private static Employee schedulableEmployee(Long id, String code, String name) {
+        Employee employee = activeEmployee(id, code, name);
+        Account account = Account.builder()
+                .username(code.toLowerCase() + "@example.com")
+                .passwordHash("hash")
+                .role(AccountRole.EMPLOYEE)
+                .status(AccountStatus.ACTIVE)
+                .isActive(true)
+                .build();
+        account.setId(id + 100L);
+        employee.setAccount(account);
         return employee;
     }
 

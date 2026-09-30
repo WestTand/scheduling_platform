@@ -1,4 +1,6 @@
 import type { ScheduleStaffingAdvice, ScheduleStatus } from '@/types/schedule'
+import type { Employee } from '@/types/management'
+import type { PoolCandidate } from '@/components/schedule/ScheduleEmployeePoolEditor.helpers'
 
 export type ScheduleDetailAction = 'approve' | 'publish' | 'cancel'
 export type ScheduleDetailNotice = { type: 'success' | 'error'; message: string }
@@ -26,6 +28,10 @@ export const getScheduleDetailNoticeClass = (type: ScheduleDetailNotice['type'])
   ? 'rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700'
   : 'rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800'
 
+export const getPoolEditorCandidates = (employees: Employee[]): PoolCandidate[] => employees
+  .filter((employee) => employee.aiSchedulable === true)
+  .map((employee) => ({ id: employee.id, fullName: employee.fullName, employeeCode: employee.employeeCode }))
+
 const staffingReasonLabels: Record<string, string> = {
   WEEKLY_CAPACITY: 'giới hạn số ca mỗi tuần',
   QUOTA_OVERTIME: 'hạn mức ca ngoài giờ mỗi tuần',
@@ -44,6 +50,11 @@ export const getScheduleDetailStaffingMessage = (optimizationStatus?: string | n
   const reasonClause = reasonLabel ? ` Lý do chính: ${reasonLabel}.` : ''
 
   if (advice.unreachable) return `${UNREACHABLE_STAFFING_MESSAGE}${reasonClause}`
+
+  if (advice.availableEmployees >= advice.requiredEmployees) {
+    const threshold = advice.exact ? 'mức tối thiểu' : 'mức ước tính'
+    return `Pool hiện có ${advice.availableEmployees} nhân viên, không thấp hơn ${threshold} ${advice.requiredEmployees} mà AI tính được. Lịch vẫn không xếp được, có thể do nghỉ phép, phân công khóa hoặc ràng buộc theo từng ca; hãy kiểm tra cảnh báo chi tiết.${reasonClause}`
+  }
 
   const shortage = advice.exact
     ? `Lịch này cần tối thiểu ${advice.requiredEmployees} nhân viên nhưng pool hiện chỉ có ${advice.availableEmployees}.`

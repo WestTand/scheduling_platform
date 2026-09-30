@@ -75,6 +75,7 @@ class AdminScheduleGenerationTransactionTest {
     private AdminOptimizationService optimizationService;
 
     private Long managerId;
+    private Long employeeAccountId;
     private Long employeeId;
     private Long shiftTypeId;
     private Long periodId;
@@ -96,6 +97,9 @@ class AdminScheduleGenerationTransactionTest {
             shiftTypeRepository.findById(shiftTypeId).ifPresent(shiftTypeRepository::delete);
         }
         if (employeeId != null) {
+            if (employeeAccountId != null) {
+                accountRepository.findById(employeeAccountId).ifPresent(accountRepository::delete);
+            }
             employeeRepository.findById(employeeId).ifPresent(employeeRepository::delete);
         }
         if (managerId != null) {
@@ -120,6 +124,16 @@ class AdminScheduleGenerationTransactionTest {
                 .status("ACTIVE")
                 .build());
         employeeId = employee.getId();
+        Account employeeAccount = accountRepository.save(Account.builder()
+                .username("generation-tx-employee-" + unique)
+                .passwordHash("hash")
+                .role(AccountRole.EMPLOYEE)
+                .isActive(true)
+                .status(AccountStatus.ACTIVE)
+                .employee(employee)
+                .build());
+        employeeAccountId = employeeAccount.getId();
+        employee.setAccount(employeeAccount);
         ShiftType shiftType = shiftTypeRepository.save(ShiftType.builder()
                 .shiftName("Generation TX Shift " + unique)
                 .shiftCode("GTXS" + Long.toString(unique).substring(8))
@@ -174,6 +188,16 @@ class AdminScheduleGenerationTransactionTest {
                 .status("ACTIVE")
                 .build());
         employeeId = employee.getId();
+        Account employeeAccount = accountRepository.save(Account.builder()
+                .username("generation-cancelled-employee-" + unique)
+                .passwordHash("hash")
+                .role(AccountRole.EMPLOYEE)
+                .isActive(true)
+                .status(AccountStatus.ACTIVE)
+                .employee(employee)
+                .build());
+        employeeAccountId = employeeAccount.getId();
+        employee.setAccount(employeeAccount);
         ShiftType shiftType = shiftTypeRepository.save(ShiftType.builder()
                 .shiftName("GCD Shift " + Long.toString(unique).substring(8))
                 .shiftCode("GCDS" + Long.toString(unique).substring(8))

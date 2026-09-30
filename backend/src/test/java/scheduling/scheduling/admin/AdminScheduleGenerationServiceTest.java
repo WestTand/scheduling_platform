@@ -29,6 +29,7 @@ import scheduling.scheduling.admin.dto.OptimizeScheduleResponse;
 import scheduling.scheduling.auth.CurrentAccountPrincipal;
 import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
+import scheduling.scheduling.entity.AccountStatus;
 import scheduling.scheduling.entity.Employee;
 import scheduling.scheduling.entity.SchedulePeriod;
 import scheduling.scheduling.entity.ShiftType;
@@ -218,11 +219,47 @@ class AdminScheduleGenerationServiceTest {
                 });
     }
 
+    @Test
+    void generateRejectsEmployeeWithoutActiveEmployeeAccount() {
+        Account manager = Account.builder().username("manager@example.com").role(AccountRole.MANAGER).build();
+        manager.setId(1L);
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
+        when(employeeRepository.findAllById(List.of(31L, 32L))).thenReturn(List.of(employee(31L), employeeWithoutAccount(32L)));
+
+        assertThatThrownBy(() -> service.generate(managerPrincipal(), new GenerateScheduleRequest(
+                "Lịch pool bẩn",
+                LocalDate.of(2026, 10, 10),
+                LocalDate.of(2026, 10, 10),
+                1,
+                List.of(31L, 32L),
+                List.of(11L))))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(schedulePeriodRepository, never()).saveAndFlush(any());
+        verify(shiftTypeRepository, never()).findAllById(any());
+        verify(optimizationService, never()).optimize(any(), any(), any());
+    }
+
     private static CurrentAccountPrincipal managerPrincipal() {
         return new CurrentAccountPrincipal(1L, "manager@example.com", AccountRole.MANAGER);
     }
 
     private static Employee employee(Long id) {
+        Employee employee = employeeWithoutAccount(id);
+        Account account = Account.builder()
+                .username("emp" + id + "@example.com")
+                .role(AccountRole.EMPLOYEE)
+                .status(AccountStatus.ACTIVE)
+                .isActive(true)
+                .build();
+        account.setId(id + 100L);
+        employee.setAccount(account);
+        return employee;
+    }
+
+    private static Employee employeeWithoutAccount(Long id) {
         Employee employee = Employee.builder().employeeCode("EMP" + id).fullName("Employee " + id).status("ACTIVE").build();
         employee.setId(id);
         return employee;

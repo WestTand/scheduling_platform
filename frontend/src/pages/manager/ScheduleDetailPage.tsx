@@ -15,7 +15,7 @@ import { apiConfig } from '@/config/api'
 import { scheduleDetailSeed, scheduleStatusLabels } from '@/mocks/schedules'
 import { backendEmployeeService } from '@/services/backendEmployeeService'
 import { backendScheduleService } from '@/services/backendScheduleService'
-import { canApproveSchedule, getScheduleDetailActions, getScheduleDetailNoticeClass, getScheduleDetailReadOnlyMessage, getScheduleDetailStaffingMessage } from './ScheduleDetailPage.helpers'
+import { canApproveSchedule, getPoolEditorCandidates, getScheduleDetailActions, getScheduleDetailNoticeClass, getScheduleDetailReadOnlyMessage, getScheduleDetailStaffingMessage } from './ScheduleDetailPage.helpers'
 import type { ScheduleDetail } from '@/types/schedule'
 import { ScheduleViewMode } from '@/types/schedule'
 import type { ScheduleDetailAction, ScheduleDetailNotice } from './ScheduleDetailPage.helpers'
@@ -66,7 +66,7 @@ export function ScheduleDetailPage() {
     if (apiConfig.useMockApi || !scheduleId) return
     let ignore = false
     backendEmployeeService.list({ page: 1, pageSize: 500, status: 'ACTIVE' })
-      .then((result) => { if (!ignore) setPoolCandidates(result.data.map((employee) => ({ id: employee.id, fullName: employee.fullName, employeeCode: employee.employeeCode }))) })
+      .then((result) => { if (!ignore) setPoolCandidates(getPoolEditorCandidates(result.data)) })
       .catch(() => { if (!ignore) setPoolCandidates([]) })
     return () => { ignore = true }
   }, [scheduleId])

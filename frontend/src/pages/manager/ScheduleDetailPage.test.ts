@@ -1,6 +1,6 @@
 ﻿import { describe, expect, it } from 'vitest'
 
-import { canApproveSchedule, getScheduleDetailActions, getScheduleDetailNoticeClass, getScheduleDetailReadOnlyMessage, getScheduleDetailStaffingMessage } from './ScheduleDetailPage.helpers'
+import { canApproveSchedule, getPoolEditorCandidates, getScheduleDetailActions, getScheduleDetailNoticeClass, getScheduleDetailReadOnlyMessage, getScheduleDetailStaffingMessage } from './ScheduleDetailPage.helpers'
 import type { ScheduleStaffingAdvice } from '@/types/schedule'
 
 const UNREACHABLE_STAFFING_MESSAGE = 'Không có số lượng nhân viên nào xếp được lịch này: có quy tắc khiến lịch không thể thực hiện, nên tăng pool lên bao nhiêu người cũng không giải quyết được.'
@@ -47,6 +47,14 @@ describe('ScheduleDetailPage helpers', () => {
     expect(getScheduleDetailNoticeClass('success')).toContain('border-blue-200')
     expect(getScheduleDetailNoticeClass('error')).toContain('border-red-200')
   })
+
+  it('offers only AI-schedulable employees as pool editor candidates', () => {
+    expect(getPoolEditorCandidates([
+      { id: '31', fullName: 'AI Ready', employeeCode: 'EMP031', email: '', phone: '', role: 'EMPLOYEE', status: 'ACTIVE', joinDate: '2026-09-01', aiSchedulable: true },
+      { id: '32', fullName: 'Missing Account', employeeCode: 'EMP032', email: '', phone: '', role: 'EMPLOYEE', status: 'ACTIVE', joinDate: '2026-09-01', aiSchedulable: false },
+      { id: '33', fullName: 'Unknown Flag', employeeCode: 'EMP033', email: '', phone: '', role: 'EMPLOYEE', status: 'ACTIVE', joinDate: '2026-09-01' },
+    ])).toEqual([{ id: '31', fullName: 'AI Ready', employeeCode: 'EMP031' }])
+  })
 })
 
 describe('getScheduleDetailStaffingMessage', () => {
@@ -84,6 +92,16 @@ describe('getScheduleDetailStaffingMessage', () => {
   it('labels the unproven requirement as a lower-bound estimate instead of a target', () => {
     expect(getScheduleDetailStaffingMessage('INFEASIBLE', advice({ exact: false, reasons: [] })))
       .toBe('Lịch này ước tính cần ít nhất 10 nhân viên (AI chưa chứng minh được con số chính xác) nhưng pool hiện chỉ có 1.')
+  })
+
+  it('does not describe staffing advice as a pool shortfall when the pool already meets the structural minimum', () => {
+    expect(getScheduleDetailStaffingMessage('INFEASIBLE', advice({ availableEmployees: 12, reasons: [] })))
+      .toBe('Pool hiện có 12 nhân viên, không thấp hơn mức tối thiểu 10 mà AI tính được. Lịch vẫn không xếp được, có thể do nghỉ phép, phân công khóa hoặc ràng buộc theo từng ca; hãy kiểm tra cảnh báo chi tiết.')
+  })
+
+  it('labels a non-exact structural count as an estimate when the pool already meets it', () => {
+    expect(getScheduleDetailStaffingMessage('INFEASIBLE', advice({ availableEmployees: 12, exact: false, reasons: [] })))
+      .toBe('Pool hiện có 12 nhân viên, không thấp hơn mức ước tính 10 mà AI tính được. Lịch vẫn không xếp được, có thể do nghỉ phép, phân công khóa hoặc ràng buộc theo từng ca; hãy kiểm tra cảnh báo chi tiết.')
   })
 
   it('warns that no headcount can staff the schedule when the run is unreachable', () => {
@@ -128,6 +146,6 @@ describe('getScheduleDetailStaffingMessage', () => {
 
   it('renders zero counts without crashing', () => {
     expect(getScheduleDetailStaffingMessage('INFEASIBLE', advice({ requiredEmployees: 0, availableEmployees: 0, reasons: [] })))
-      .toBe('Lịch này cần tối thiểu 0 nhân viên nhưng pool hiện chỉ có 0.')
+      .toBe('Pool hiện có 0 nhân viên, không thấp hơn mức tối thiểu 0 mà AI tính được. Lịch vẫn không xếp được, có thể do nghỉ phép, phân công khóa hoặc ràng buộc theo từng ca; hãy kiểm tra cảnh báo chi tiết.')
   })
 })

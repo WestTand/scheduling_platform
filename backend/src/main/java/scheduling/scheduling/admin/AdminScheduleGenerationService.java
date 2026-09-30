@@ -21,6 +21,7 @@ import scheduling.scheduling.admin.dto.OptimizeScheduleResponse;
 import scheduling.scheduling.auth.CurrentAccountPrincipal;
 import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
+import scheduling.scheduling.entity.AccountStatus;
 import scheduling.scheduling.entity.Employee;
 import scheduling.scheduling.entity.SchedulePeriod;
 import scheduling.scheduling.entity.ShiftType;
@@ -80,7 +81,7 @@ public class AdminScheduleGenerationService {
             throw invalidRequest();
         }
         List<Employee> employees = employeeRepository.findAllById(request.employeeIds());
-        if (employees.size() != new HashSet<>(request.employeeIds()).size() || employees.stream().anyMatch(employee -> !ACTIVE.equals(employee.getStatus()))) {
+        if (employees.size() != new HashSet<>(request.employeeIds()).size() || employees.stream().anyMatch(employee -> !isSchedulableForAi(employee))) {
             throw invalidRequest();
         }
         List<ShiftType> shiftTypes = shiftTypeRepository.findAllById(request.shiftTypeIds());
@@ -231,6 +232,15 @@ public class AdminScheduleGenerationService {
         if (startDate == null || endDate == null || startDate.isAfter(endDate)) {
             throw invalidRequest();
         }
+    }
+
+    private static boolean isSchedulableForAi(Employee employee) {
+        Account account = employee.getAccount();
+        return ACTIVE.equals(employee.getStatus())
+                && account != null
+                && AccountRole.EMPLOYEE.equals(account.getRole())
+                && AccountStatus.ACTIVE.equals(account.getStatus())
+                && Boolean.TRUE.equals(account.getIsActive());
     }
 
     private static ResponseStatusException invalidRequest() {

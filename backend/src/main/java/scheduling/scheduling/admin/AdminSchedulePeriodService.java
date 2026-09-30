@@ -22,6 +22,7 @@ import scheduling.scheduling.admin.dto.SchedulePeriodRequest;
 import scheduling.scheduling.auth.CurrentAccountPrincipal;
 import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
+import scheduling.scheduling.entity.AccountStatus;
 import scheduling.scheduling.entity.Employee;
 import scheduling.scheduling.entity.OptimizationRun;
 import scheduling.scheduling.entity.SchedulePeriod;
@@ -213,7 +214,7 @@ public class AdminSchedulePeriodService {
         Set<Long> distinctIds = new LinkedHashSet<>(employeeIds);
         List<Employee> employees = employeeRepository.findAllById(distinctIds);
         if (employees.size() != distinctIds.size()
-                || employees.stream().anyMatch(employee -> !ACTIVE.equals(employee.getStatus()))) {
+                || employees.stream().anyMatch(employee -> !isSchedulableForAi(employee))) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Danh sách nhân viên không hợp lệ.");
         }
         Map<Long, Employee> byId = employees.stream()
@@ -326,6 +327,15 @@ public class AdminSchedulePeriodService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Ngày bắt đầu lọc phải trước hoặc bằng ngày kết thúc.");
         }
+    }
+
+    private static boolean isSchedulableForAi(Employee employee) {
+        Account account = employee.getAccount();
+        return ACTIVE.equals(employee.getStatus())
+                && account != null
+                && AccountRole.EMPLOYEE.equals(account.getRole())
+                && AccountStatus.ACTIVE.equals(account.getStatus())
+                && Boolean.TRUE.equals(account.getIsActive());
     }
 
     private static ResponseStatusException invalidRequest() {
