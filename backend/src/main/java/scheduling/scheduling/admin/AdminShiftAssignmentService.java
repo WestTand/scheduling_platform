@@ -240,7 +240,7 @@ public class AdminShiftAssignmentService {
                         run.getStatus(),
                         run.getTotalPenalty(),
                         run.getPenaltyDetailsJson(),
-run.getErrorMessage(),
+                        run.getErrorMessage(),
                         parseDiagnostics(run),
                         parseStaffingAdvice(run)))
                 .orElse(null);
@@ -267,6 +267,7 @@ run.getErrorMessage(),
                     readInteger(node, "availableEmployees"),
                     readInteger(node, "totalShifts"),
                     readBoolean(node, "exact"),
+                    readBoolean(node, "unreachable"),
                     reasons);
         } catch (JsonProcessingException exception) {
             return null;

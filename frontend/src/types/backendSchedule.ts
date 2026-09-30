@@ -62,6 +62,7 @@ export interface BackendStaffingAdvice {
   availableEmployees: number
   totalShifts: number
   exact: boolean
+  unreachable?: boolean
   reasons: string[]
 }
 

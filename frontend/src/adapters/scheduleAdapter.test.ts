@@ -314,8 +314,75 @@ describe('scheduleAdapter', () => {
       availableEmployees: 1,
       totalShifts: 21,
       exact: true,
+      unreachable: false,
       reasons: ['QUOTA_OVERTIME'],
     })
+  })
+
+  test('maps the unreachable flag onto the UI detail', () => {
+    const detail = adaptBackendPeriodSchedule({
+      periodId: 13,
+      periodName: 'Lịch bất khả thi dù thêm người',
+      status: 'DRAFT',
+      startDate: '2026-09-26',
+      endDate: '2026-09-26',
+      employeePool: [],
+      latestOptimizationRun: {
+        runId: 93,
+        status: 'INFEASIBLE',
+        totalPenalty: null,
+        penaltyDetailsJson: null,
+        errorMessage: null,
+        diagnostics: [],
+        staffingAdvice: {
+          requiredEmployees: 0,
+          availableEmployees: 0,
+          totalShifts: 21,
+          exact: false,
+          unreachable: true,
+          reasons: [],
+        },
+      },
+      workShifts: [],
+    })
+
+    expect(detail.staffingAdvice).toEqual({
+      requiredEmployees: 0,
+      availableEmployees: 0,
+      totalShifts: 21,
+      exact: false,
+      unreachable: true,
+      reasons: [],
+    })
+  })
+
+  test('defaults the unreachable flag to false when the backend omits it', () => {
+    const detail = adaptBackendPeriodSchedule({
+      periodId: 14,
+      periodName: 'Lịch thiếu nhân lực',
+      status: 'DRAFT',
+      startDate: '2026-09-27',
+      endDate: '2026-09-27',
+      employeePool: [],
+      latestOptimizationRun: {
+        runId: 94,
+        status: 'INFEASIBLE',
+        totalPenalty: null,
+        penaltyDetailsJson: null,
+        errorMessage: null,
+        diagnostics: [],
+        staffingAdvice: {
+          requiredEmployees: 10,
+          availableEmployees: 1,
+          totalShifts: 21,
+          exact: true,
+          reasons: ['QUOTA_OVERTIME'],
+        },
+      },
+      workShifts: [],
+    })
+
+    expect(detail.staffingAdvice?.unreachable).toBe(false)
   })
 
   test('leaves staffing advice null when the latest run has none', () => {

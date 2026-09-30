@@ -11,3 +11,12 @@ export const getEmployeePoolSelection = (candidates: PoolCandidate[], currentPoo
 
 export const buildEmployeePoolPayload = (selectedIds: string[]) =>
   selectedIds.length ? JSON.stringify(selectedIds.map(Number)) : ''
+
+export interface EmployeePoolDialogState {
+  selectedIds: string[] | null
+  search: string
+}
+
+export const createEmployeePoolDialogState = (): EmployeePoolDialogState => ({ selectedIds: null, search: '' })
+
+export const getEmployeePoolEditorSessionKey = (open: boolean) => (open ? 'pool-editor-open' : 'pool-editor-closed')

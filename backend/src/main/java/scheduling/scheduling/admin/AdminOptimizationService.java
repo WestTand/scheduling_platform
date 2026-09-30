@@ -82,14 +82,17 @@ public class AdminOptimizationService {
         List<Long> employeeIds = request == null ? null : request.employeeIds();
         // Without an explicit selection, the period's own employee pool is the only allowed
         // candidate set. Falling back to every active employee would staff the schedule with
-        // people the manager never selected for this period.
+        // people the manager never selected for this period, so an empty pool is rejected
+        // instead of widened: the manager must set a pool first.
         List<Long> scopedEmployeeIds = employeeIds == null || employeeIds.isEmpty()
                 ? periodPoolIds(period)
                 : employeeIds;
+        if (scopedEmployeeIds.isEmpty()) {
+            throw emptyEmployeePool();
+        }
 
-        AiSchedulingPayloadBuilder.PayloadSnapshot snapshot = scopedEmployeeIds.isEmpty()
-                ? payloadBuilder.prepareSnapshot(period, options)
-                : payloadBuilder.prepareSnapshot(period, options, scopedEmployeeIds);
+        AiSchedulingPayloadBuilder.PayloadSnapshot snapshot =
+                payloadBuilder.prepareSnapshot(period, options, scopedEmployeeIds);
 
         Map<String, Object> weights = payloadBuilder.weightsSnapshotFrom(snapshot);
         OptimizationRun run = optimizationRunRecorder.start(period, manager, weights);
@@ -173,6 +176,12 @@ public class AdminOptimizationService {
                 .map(Employee::getId)
                 .filter(Objects::nonNull)
                 .toList();
+    }
+
+    private static ResponseStatusException emptyEmployeePool() {
+        return new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Kỳ lịch chưa có pool nhân viên. Vui lòng chọn nhân viên trước khi tối ưu.");
     }
 
     private static String validateProtocol(

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildEmployeePoolPayload, getEmployeePoolSelection } from './ScheduleEmployeePoolEditor.helpers'
+import { buildEmployeePoolPayload, createEmployeePoolDialogState, getEmployeePoolEditorSessionKey, getEmployeePoolSelection } from './ScheduleEmployeePoolEditor.helpers'
 
 const candidates = [
   { id: '31', fullName: 'Nguyễn Văn An', employeeCode: 'EMP001' },
@@ -37,5 +37,30 @@ describe('buildEmployeePoolPayload', () => {
 
   it('serializes multiple selected ids in the given order', () => {
     expect(buildEmployeePoolPayload(['32', '31'])).toBe('[32,31]')
+  })
+})
+
+describe('createEmployeePoolDialogState', () => {
+  it('starts a session with no selection override so the saved pool is derived from the latest props', () => {
+    expect(createEmployeePoolDialogState()).toEqual({ selectedIds: null, search: '' })
+  })
+
+  it('never resumes a selection or search keyword from a previous session', () => {
+    const abandoned: ReturnType<typeof createEmployeePoolDialogState> = { selectedIds: ['32'], search: 'cường' }
+    const reopened = createEmployeePoolDialogState()
+
+    expect(reopened.selectedIds).not.toEqual(abandoned.selectedIds)
+    expect(reopened.search).toBe('')
+  })
+})
+
+describe('getEmployeePoolEditorSessionKey', () => {
+  it('changes with the open prop so every dialog session mounts a fresh editor', () => {
+    expect(getEmployeePoolEditorSessionKey(true)).not.toBe(getEmployeePoolEditorSessionKey(false))
+  })
+
+  it('is stable for a repeated open prop so typing does not remount the editor', () => {
+    expect(getEmployeePoolEditorSessionKey(true)).toBe(getEmployeePoolEditorSessionKey(true))
+    expect(getEmployeePoolEditorSessionKey(false)).toBe(getEmployeePoolEditorSessionKey(false))
   })
 })

@@ -3,8 +3,8 @@ import { useMemo, useState } from 'react'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { Button } from '@/components/ui/button'
 import { backendEmployeePoolService } from '@/services/backendEmployeePoolService'
-import { buildEmployeePoolPayload, getEmployeePoolSelection } from './ScheduleEmployeePoolEditor.helpers'
-import type { PoolCandidate } from './ScheduleEmployeePoolEditor.helpers'
+import { buildEmployeePoolPayload, createEmployeePoolDialogState, getEmployeePoolSelection } from './ScheduleEmployeePoolEditor.helpers'
+import type { EmployeePoolDialogState, PoolCandidate } from './ScheduleEmployeePoolEditor.helpers'
 
 interface ScheduleEmployeePoolEditorProps {
   open: boolean
@@ -16,25 +16,26 @@ interface ScheduleEmployeePoolEditorProps {
 }
 
 export function ScheduleEmployeePoolEditor({ open, periodId, candidates, currentPoolIds, onCancel, onSaved }: ScheduleEmployeePoolEditorProps) {
-  const [selectedIds, setSelectedIds] = useState<string[] | null>(null)
-  const [search, setSearch] = useState('')
+  const [dialog, setDialog] = useState(createEmployeePoolDialogState)
   const [error, setError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
 
-  const selection = useMemo(() => selectedIds ?? getEmployeePoolSelection(candidates, currentPoolIds), [candidates, currentPoolIds, selectedIds])
+  const updateDialog = (patch: Partial<EmployeePoolDialogState>) => setDialog((current) => ({ ...current, ...patch }))
+
+  const selection = useMemo(() => dialog.selectedIds ?? getEmployeePoolSelection(candidates, currentPoolIds), [candidates, currentPoolIds, dialog.selectedIds])
   const visibleCandidates = useMemo(() => {
-    const keyword = search.trim().toLowerCase()
+    const keyword = dialog.search.trim().toLowerCase()
     if (!keyword) return candidates
     return candidates.filter((candidate) => [candidate.fullName, candidate.employeeCode].some((value) => value.toLowerCase().includes(keyword)))
-  }, [candidates, search])
+  }, [candidates, dialog.search])
   const allVisibleSelected = visibleCandidates.length > 0 && visibleCandidates.every((candidate) => selection.includes(candidate.id))
 
   const toggleCandidate = (id: string) => {
-    setSelectedIds(selection.includes(id) ? selection.filter((item) => item !== id) : [...selection, id])
+    updateDialog({ selectedIds: selection.includes(id) ? selection.filter((item) => item !== id) : [...selection, id] })
   }
 
   const toggleAll = () => {
-    setSelectedIds(allVisibleSelected ? selection.filter((id) => !visibleCandidates.some((candidate) => candidate.id === id)) : [...new Set([...selection, ...visibleCandidates.map((candidate) => candidate.id)])])
+    updateDialog({ selectedIds: allVisibleSelected ? selection.filter((id) => !visibleCandidates.some((candidate) => candidate.id === id)) : [...new Set([...selection, ...visibleCandidates.map((candidate) => candidate.id)])] })
   }
 
   const handleConfirm = async () => {
@@ -48,8 +49,7 @@ export function ScheduleEmployeePoolEditor({ open, periodId, candidates, current
     try {
       const employeeIds = selection.map(Number)
       await backendEmployeePoolService.update(periodId, employeeIds)
-      setSelectedIds(null)
-      setSearch('')
+      setDialog(createEmployeePoolDialogState())
       onSaved(employeeIds)
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Không thể cập nhật pool nhân viên.')
@@ -70,8 +70,8 @@ export function ScheduleEmployeePoolEditor({ open, periodId, candidates, current
     >
       <div className="mt-4 space-y-3">
         <input
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
+          value={dialog.search}
+          onChange={(event) => updateDialog({ search: event.target.value })}
           placeholder="Tìm theo tên hoặc mã nhân viên"
           className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none"
         />

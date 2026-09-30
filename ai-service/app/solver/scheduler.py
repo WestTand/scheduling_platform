@@ -259,7 +259,6 @@ def _infeasible_diagnostics(request: SchedulingRequest) -> list[DiagnosticOutput
 
 def solve_schedule(request: SchedulingRequest) -> SchedulingResponse:
     _validate_request(request)
-    staffing_advice = estimate_required_employees(request)
     employees = [item.employee_id for item in request.employees]
     model, assigned = build_model(request, employees)
     shifts = request.work_shifts
@@ -411,7 +410,6 @@ def solve_schedule(request: SchedulingRequest) -> SchedulingResponse:
             total_penalty=total_penalty,
             penalty_details=details,
             warnings=warnings,
-            staffing_advice=staffing_advice,
             statistics=statistics,
         )
 
@@ -424,7 +422,7 @@ def solve_schedule(request: SchedulingRequest) -> SchedulingResponse:
             solver_status=solver_status,
             error_message="No feasible schedule found",
             diagnostics=diagnostics,
-            staffing_advice=staffing_advice,
+            staffing_advice=estimate_required_employees(request),
             statistics=statistics,
         )
 
@@ -439,6 +437,6 @@ def solve_schedule(request: SchedulingRequest) -> SchedulingResponse:
         status="FAILED",
         solver_status=solver_status,
         error_message=error_message,
-        staffing_advice=staffing_advice,
+        staffing_advice=estimate_required_employees(request),
         statistics=statistics,
     )

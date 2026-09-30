@@ -34,13 +34,20 @@ const staffingReasonLabels: Record<string, string> = {
   SAME_DAY_REST: 'thời gian nghỉ tối thiểu giữa các ca',
 }
 
+const UNREACHABLE_STAFFING_MESSAGE =
+  'Không có số lượng nhân viên nào xếp được lịch này: có quy tắc khiến lịch không thể thực hiện, nên tăng pool lên bao nhiêu người cũng không giải quyết được.'
+
 export const getScheduleDetailStaffingMessage = (optimizationStatus?: string | null, advice?: ScheduleStaffingAdvice | null) => {
   if (optimizationStatus !== 'INFEASIBLE' || !advice) return ''
 
+  const reasonLabel = advice.reasons?.map((reason) => staffingReasonLabels[reason]).find((label) => Boolean(label))
+  const reasonClause = reasonLabel ? ` Lý do chính: ${reasonLabel}.` : ''
+
+  if (advice.unreachable) return `${UNREACHABLE_STAFFING_MESSAGE}${reasonClause}`
+
   const shortage = advice.exact
     ? `Lịch này cần tối thiểu ${advice.requiredEmployees} nhân viên nhưng pool hiện chỉ có ${advice.availableEmployees}.`
-    : `Lịch này cần tối thiểu ước tính ${advice.requiredEmployees} nhân viên (AI chưa xác định chính xác) nhưng pool hiện chỉ có ${advice.availableEmployees}.`
-  const reasonLabel = advice.reasons?.map((reason) => staffingReasonLabels[reason]).find((label) => Boolean(label))
+    : `Lịch này ước tính cần ít nhất ${advice.requiredEmployees} nhân viên (AI chưa chứng minh được con số chính xác) nhưng pool hiện chỉ có ${advice.availableEmployees}.`
 
-  return reasonLabel ? `${shortage} Lý do chính: ${reasonLabel}.` : shortage
+  return `${shortage}${reasonClause}`
 }

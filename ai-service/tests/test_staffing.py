@@ -180,7 +180,7 @@ def _full_week() -> list[dict]:
     return shifts
 
 
-def _full_weeks(count: int) -> list[dict]:
+def _full_weeks(count: int, required_staff: int = 1) -> list[dict]:
     shifts = []
     shift_id = 1
     for week in range(count):
@@ -188,7 +188,7 @@ def _full_weeks(count: int) -> list[dict]:
             day = MONDAY + timedelta(days=week * 7 + offset)
             codes = WEEKDAY_TYPES if day.weekday() < 5 else WEEKEND_TYPES
             for code in codes:
-                shifts.append(_shift(shift_id, day, code))
+                shifts.append(_shift(shift_id, day, code, requiredStaff=required_staff))
                 shift_id += 1
     return shifts
 
@@ -196,6 +196,14 @@ def _full_weeks(count: int) -> list[dict]:
 def _reasons_by_code(request: SchedulingRequest) -> tuple[int, dict[str, int]]:
     bound, reasons = _closed_form_bound(request)
     return bound, {reason.code: reason.required_employees for reason in reasons}
+
+
+def _rules_with_hard(**overrides) -> dict:
+    return {**DEFAULT_RULES, "hardRules": {**DEFAULT_RULES["hardRules"], **overrides}}
+
+
+def _rules_with_quotas(**overrides) -> dict:
+    return {**DEFAULT_RULES, "quotas": {**DEFAULT_RULES["quotas"], **overrides}}
 
 
 def _on_call_streak(count: int) -> list[dict]:
@@ -214,7 +222,6 @@ def test_exact_minimum_for_three_shift_weekday_week():
     assert advice.available_employees == 12
     assert advice.required_employees == 10
     assert advice.exact is True
-    assert "QUOTA_OVERTIME" in {reason.code for reason in advice.reasons}
 
 
 def test_exact_minimum_for_full_week_with_every_shift_type():
@@ -379,3 +386,114 @@ def test_exact_minimum_for_two_full_weeks():
     assert advice.total_shifts == 42
     assert advice.required_employees == 10
     assert advice.exact is True
+
+
+def test_reason_is_dropped_when_the_climb_exceeds_the_closed_form_bound():
+    request = _request(_weekday_only_week(), list(range(1, 13)))
+
+    advice = estimate_required_employees(request)
+
+    bound, reasons_by_code = _reasons_by_code(request)
+    assert reasons_by_code["QUOTA_OVERTIME"] == 5
+    assert advice.required_employees == 10
+    assert bound == 5
+    assert advice.reasons == []
+
+
+def test_no_returned_reason_ever_contradicts_the_reported_minimum():
+    requests = [
+        _request(_weekday_only_week(), list(range(1, 13))),
+        _request(_full_week(), list(range(1, 13))),
+        _request(_on_call_streak(14), list(range(1, 13))),
+        _request(_full_weeks(2), list(range(1, 13))),
+        _request(_full_weeks(2, required_staff=3), list(range(1, 6))),
+        _request(_full_week(), list(range(1, 13)), _rules_with_hard(maxShiftsPerWeek=0)),
+        _request(_full_week(), list(range(1, 13)), _rules_with_quotas(overtimeShiftsPerWeek=0)),
+    ]
+
+    for request in requests:
+        advice = estimate_required_employees(request)
+
+        assert advice.reasons == [] or all(
+            reason.required_employees == advice.required_employees
+            for reason in advice.reasons
+        ), advice
+
+
+def test_reasons_are_kept_when_the_climb_confirms_the_closed_form_bound():
+    shifts = [
+        _shift(
+            index,
+            MONDAY + timedelta(days=index - 1),
+            "TRUC_SANG",
+            quotaCategory=None,
+        )
+        for index in range(1, 8)
+    ]
+    request = _request(shifts, [1, 2, 3])
+
+    advice = estimate_required_employees(request)
+
+    assert advice.required_employees == 2
+    assert [reason.code for reason in advice.reasons] == ["WEEKLY_CAPACITY"]
+    assert advice.reasons[0].required_employees == advice.required_employees
+
+
+def test_zero_weekly_cap_is_unreachable_at_every_headcount():
+    request = _request(_full_week(), list(range(1, 13)), _rules_with_hard(maxShiftsPerWeek=0))
+
+    advice = estimate_required_employees(request)
+
+    assert advice.unreachable is True
+    assert advice.exact is False
+    assert "WEEKLY_CAPACITY" in {reason.code for reason in advice.reasons}
+
+
+def test_zero_overtime_quota_is_unreachable_at_every_headcount():
+    request = _request(
+        _full_week(), list(range(1, 13)), _rules_with_quotas(overtimeShiftsPerWeek=0)
+    )
+
+    advice = estimate_required_employees(request)
+
+    assert advice.unreachable is True
+    assert advice.exact is False
+    assert "QUOTA_OVERTIME" in {reason.code for reason in advice.reasons}
+
+
+def test_zero_bathing_quota_without_bathing_shifts_stays_reachable():
+    shifts = [
+        _shift(
+            index,
+            MONDAY + timedelta(days=index - 1),
+            "TRUC_SANG",
+            quotaCategory=None,
+        )
+        for index in range(1, 8)
+    ]
+    request = _request(shifts, [1, 2, 3], _rules_with_quotas(bathingShiftsPerWeek=0))
+
+    advice = estimate_required_employees(request)
+
+    assert advice.unreachable is False
+    assert advice.required_employees == 2
+
+
+def test_exhausted_candidate_budget_reports_unreachable_instead_of_a_target():
+    request = _request(_full_weeks(4, required_staff=3), list(range(1, 6)))
+
+    advice = estimate_required_employees(request)
+
+    assert advice.total_shifts == 84
+    assert advice.available_employees == 5
+    assert advice.unreachable is True
+    assert advice.exact is False
+    assert advice.required_employees > 0
+
+
+def test_reachable_schedule_is_not_flagged_unreachable():
+    request = _request(_weekday_only_week(), list(range(1, 13)))
+
+    advice = estimate_required_employees(request)
+
+    assert advice.unreachable is False

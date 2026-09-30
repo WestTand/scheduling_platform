@@ -184,6 +184,7 @@ class StaffingAdvice(ApiModel):
     available_employees: int
     total_shifts: int
     exact: bool = True
+    unreachable: bool = False
     reasons: list[StaffingReason] = Field(default_factory=list)
 
 

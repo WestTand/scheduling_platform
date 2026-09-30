@@ -134,6 +134,7 @@ export const adaptBackendPeriodSchedule = (schedule: BackendPeriodScheduleRespon
         availableEmployees: schedule.latestOptimizationRun.staffingAdvice.availableEmployees,
         totalShifts: schedule.latestOptimizationRun.staffingAdvice.totalShifts,
         exact: schedule.latestOptimizationRun.staffingAdvice.exact,
+        unreachable: schedule.latestOptimizationRun.staffingAdvice.unreachable ?? false,
         reasons: schedule.latestOptimizationRun.staffingAdvice.reasons ?? [],
       }
       : null,

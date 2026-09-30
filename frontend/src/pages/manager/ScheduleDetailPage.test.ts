@@ -1,13 +1,16 @@
-import { describe, expect, it } from 'vitest'
+﻿import { describe, expect, it } from 'vitest'
 
 import { canApproveSchedule, getScheduleDetailActions, getScheduleDetailNoticeClass, getScheduleDetailReadOnlyMessage, getScheduleDetailStaffingMessage } from './ScheduleDetailPage.helpers'
 import type { ScheduleStaffingAdvice } from '@/types/schedule'
+
+const UNREACHABLE_STAFFING_MESSAGE = 'Không có số lượng nhân viên nào xếp được lịch này: có quy tắc khiến lịch không thể thực hiện, nên tăng pool lên bao nhiêu người cũng không giải quyết được.'
 
 const advice = (overrides: Partial<ScheduleStaffingAdvice> = {}): ScheduleStaffingAdvice => ({
   requiredEmployees: 10,
   availableEmployees: 1,
   totalShifts: 21,
   exact: true,
+  unreachable: false,
   reasons: ['QUOTA_OVERTIME'],
   ...overrides,
 })
@@ -76,6 +79,46 @@ describe('getScheduleDetailStaffingMessage', () => {
     expect(message).toContain('10')
     expect(message).toContain('1')
     expect(message).not.toBe('Lịch này cần tối thiểu 10 nhân viên nhưng pool hiện chỉ có 1. Lý do chính: hạn mức ca ngoài giờ mỗi tuần.')
+  })
+
+  it('labels the unproven requirement as a lower-bound estimate instead of a target', () => {
+    expect(getScheduleDetailStaffingMessage('INFEASIBLE', advice({ exact: false, reasons: [] })))
+      .toBe('Lịch này ước tính cần ít nhất 10 nhân viên (AI chưa chứng minh được con số chính xác) nhưng pool hiện chỉ có 1.')
+  })
+
+  it('warns that no headcount can staff the schedule when the run is unreachable', () => {
+    expect(getScheduleDetailStaffingMessage('INFEASIBLE', advice({ unreachable: true, reasons: [] })))
+      .toBe(UNREACHABLE_STAFFING_MESSAGE)
+  })
+
+  it('does not quote a headcount target or tell the manager to add people when the run is unreachable', () => {
+    const message = getScheduleDetailStaffingMessage('INFEASIBLE', advice({ unreachable: true, requiredEmployees: 99, availableEmployees: 1, reasons: [] }))
+
+    expect(message).not.toContain('99')
+    expect(message).not.toMatch(/cần (tối thiểu|ít nhất)/)
+    expect(message).not.toMatch(/(hãy|nên) thêm (người|nhân viên) vào pool/i)
+  })
+
+  it('points at the reason codes that make the schedule unschedulable', () => {
+    expect(getScheduleDetailStaffingMessage('INFEASIBLE', advice({ unreachable: true, reasons: ['SAME_DAY_REST'] })))
+      .toBe(`${UNREACHABLE_STAFFING_MESSAGE} Lý do chính: thời gian nghỉ tối thiểu giữa các ca.`)
+  })
+
+  it('omits the main-reason clause for unreachable advice with unrecognised reason codes', () => {
+    expect(getScheduleDetailStaffingMessage('INFEASIBLE', advice({ unreachable: true, reasons: ['SOMETHING_NEW'] })))
+      .toBe(UNREACHABLE_STAFFING_MESSAGE)
+    expect(getScheduleDetailStaffingMessage('INFEASIBLE', advice({ unreachable: true, reasons: [] })))
+      .toBe(UNREACHABLE_STAFFING_MESSAGE)
+  })
+
+  it('prefers the unreachable wording over the exact wording', () => {
+    expect(getScheduleDetailStaffingMessage('INFEASIBLE', advice({ unreachable: true, exact: true, reasons: [] })))
+      .toBe(UNREACHABLE_STAFFING_MESSAGE)
+  })
+
+  it('prefers the unreachable wording over the estimate wording', () => {
+    expect(getScheduleDetailStaffingMessage('INFEASIBLE', advice({ unreachable: true, exact: false, reasons: [] })))
+      .toBe(UNREACHABLE_STAFFING_MESSAGE)
   })
 
   it('uses the first recognised reason code when several are reported', () => {

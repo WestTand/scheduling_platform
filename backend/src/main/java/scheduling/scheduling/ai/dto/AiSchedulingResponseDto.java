@@ -43,6 +43,7 @@ public record AiSchedulingResponseDto(
             Integer availableEmployees,
             Integer totalShifts,
             Boolean exact,
+            Boolean unreachable,
             List<StaffingReasonDto> reasons) {}
 
     /** The AI service sends each reason as an object; only {@code code} is surfaced to the UI for translation. */

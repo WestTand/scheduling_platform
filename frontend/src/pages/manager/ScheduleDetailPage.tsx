@@ -20,6 +20,7 @@ import type { ScheduleDetail } from '@/types/schedule'
 import { ScheduleViewMode } from '@/types/schedule'
 import type { ScheduleDetailAction, ScheduleDetailNotice } from './ScheduleDetailPage.helpers'
 import type { PoolCandidate } from '@/components/schedule/ScheduleEmployeePoolEditor.helpers'
+import { getEmployeePoolEditorSessionKey } from '@/components/schedule/ScheduleEmployeePoolEditor.helpers'
 
 export function ScheduleDetailPage() {
   const { scheduleId } = useParams()
@@ -137,6 +138,9 @@ export function ScheduleDetailPage() {
         <div>
           <Button variant="outline" onClick={() => setIsPoolEditorOpen(true)}><UserCog className="mr-2 h-4 w-4" />Chỉnh sửa pool nhân viên</Button>
           <ScheduleEmployeePoolEditor
+            // ConfirmDialog returns null when closed, so the editor itself stays mounted and would keep an
+            // abandoned selection; keying it on the open prop forces a fresh instance for every dialog session.
+            key={getEmployeePoolEditorSessionKey(isPoolEditorOpen)}
             open={isPoolEditorOpen}
             periodId={detail.id}
             candidates={poolCandidates}

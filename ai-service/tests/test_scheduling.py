@@ -82,6 +82,31 @@ def test_optimize_returns_feasible_assignment() -> None:
     assert body["assignments"][0]["workShiftId"] == 1000
 
 
+def test_success_response_omits_staffing_advice() -> None:
+    response = client.post("/api/v1/scheduling/optimize", json=base_request())
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "SUCCESS"
+    assert response.json()["staffingAdvice"] is None
+
+
+def test_infeasible_response_still_carries_staffing_advice() -> None:
+    request = base_request()
+    request["employees"] = [{"employeeId": 1}]
+    request["approvedLeaves"] = [
+        {"leaveRequestId": 1, "employeeId": 1, "startDate": "2026-09-14", "endDate": "2026-09-14"}
+    ]
+
+    response = client.post("/api/v1/scheduling/optimize", json=request)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "INFEASIBLE"
+    assert body["staffingAdvice"]["availableEmployees"] == 1
+    assert body["staffingAdvice"]["totalShifts"] == 1
+    assert body["staffingAdvice"]["unreachable"] is False
+
+
 def test_approved_leave_can_make_schedule_infeasible() -> None:
     request = base_request()
     request["approvedLeaves"] = [

@@ -36,7 +36,7 @@ class OptimizationRunRecorderTest {
         recorder.finishSuccess(42L, response(
                 "SUCCESS",
                 new AiSchedulingResponseDto.StaffingAdviceDto(
-                        10, 4, 21, true,
+                        10, 4, 21, true, false,
                         List.of(new AiSchedulingResponseDto.StaffingReasonDto("QUOTA_OVERTIME", 5, "need 5")))));
 
         assertThat(run.getStaffingAdviceJson()).contains("\"requiredEmployees\":10");
@@ -59,7 +59,7 @@ class OptimizationRunRecorderTest {
         recorder.finishFailure(42L, "INFEASIBLE", "No feasible schedule", response(
                 "INFEASIBLE",
                 new AiSchedulingResponseDto.StaffingAdviceDto(
-                        10, 4, 21, true,
+                        10, 4, 21, true, false,
                         List.of(new AiSchedulingResponseDto.StaffingReasonDto("QUOTA_OVERTIME", 5, "need 5")))));
 
         assertThat(run.getStaffingAdviceJson()).contains("\"requiredEmployees\":10");
@@ -87,6 +87,33 @@ class OptimizationRunRecorderTest {
 
         assertThat(response.staffingAdvice().requiredEmployees()).isEqualTo(10);
         assertThat(response.staffingAdvice().reasons()).hasSize(1);
+    }
+
+    @Test
+    void unreachableAiResponseWithReasonObjectsDeserializesAndRoundTrips() throws Exception {
+        String payload = """
+                {"schemaVersion":"1.0","runId":42,"periodId":20,"status":"INFEASIBLE","solverStatus":"INFEASIBLE",
+                 "assignments":[],"totalPenalty":null,"penaltyDetails":{},"warnings":[],"diagnostics":[],
+                 "staffingAdvice":{"requiredEmployees":5,"availableEmployees":5,"totalShifts":84,"exact":false,
+                  "unreachable":true,
+                  "reasons":[{"code":"QUOTA_OVERTIME","requiredEmployees":5,"detail":"need 5"}]},
+                 "errorMessage":"No feasible schedule found",
+                 "statistics":{"wallTimeSeconds":0.1,"conflicts":0,"branches":0}}""";
+
+        AiSchedulingResponseDto response = new ObjectMapper().readValue(payload, AiSchedulingResponseDto.class);
+
+        assertThat(response.staffingAdvice().requiredEmployees()).isEqualTo(5);
+        assertThat(response.staffingAdvice().availableEmployees()).isEqualTo(5);
+        assertThat(response.staffingAdvice().totalShifts()).isEqualTo(84);
+        assertThat(response.staffingAdvice().exact()).isFalse();
+        assertThat(response.staffingAdvice().unreachable()).isTrue();
+        assertThat(response.staffingAdvice().reasons()).hasSize(1);
+        assertThat(response.staffingAdvice().reasons().get(0).code()).isEqualTo("QUOTA_OVERTIME");
+        assertThat(response.staffingAdvice().reasons().get(0).requiredEmployees()).isEqualTo(5);
+        assertThat(new ObjectMapper().writeValueAsString(response))
+                .contains("\"unreachable\":true")
+                .contains("\"requiredEmployees\":5")
+                .contains("QUOTA_OVERTIME");
     }
 
     private OptimizationRun runningRun() {
