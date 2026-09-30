@@ -80,7 +80,7 @@ class AdminSwapRequestServiceTest {
     }
 
     private static ShiftAssignment assignment(Long id, Employee employee, String periodStatus) {
-        return assignmentOnShift(id, id, employee, periodStatus, "ASSIGNED");
+        return assignmentOnShift(id, id + 1000L, employee, periodStatus, "ASSIGNED");
     }
 
     private static ShiftAssignment assignmentOnShift(
@@ -104,6 +104,15 @@ class AdminSwapRequestServiceTest {
 
     private static ShiftAssignment draftAssignment(Long id, Employee employee) {
         return assignment(id, employee, "DRAFT");
+    }
+
+    /**
+     * Replica of the row a locked read would return, distinct from the instance reachable through
+     * the swap request graph so a test can tell which one the service actually mutates.
+     */
+    private static ShiftAssignment detachedCopyOf(ShiftAssignment source) {
+        return assignmentOnShift(source.getId(), source.getWorkShift().getId(), source.getEmployee(),
+                source.getWorkShift().getSchedulePeriod().getStatus(), source.getAssignmentStatus());
     }
 
     private static SwapRequest pendingApprovalSwapRequest(
@@ -135,6 +144,18 @@ class AdminSwapRequestServiceTest {
                 .thenReturn(List.of(
                         swapRequest.getRequesterAssignment(),
                         swapRequest.getTargetAssignment()));
+    }
+
+    /**
+     * Stubs the locked read with instances that are NOT the ones reachable from the request graph,
+     * and returns them so the test can assert on what the service actually mutated.
+     */
+    private List<ShiftAssignment> stubLockedCopiesOf(SwapRequest swapRequest) {
+        ShiftAssignment lockedRequester = detachedCopyOf(swapRequest.getRequesterAssignment());
+        ShiftAssignment lockedTarget = detachedCopyOf(swapRequest.getTargetAssignment());
+        when(shiftAssignmentRepository.findAllByIdInForUpdate(anyList()))
+                .thenReturn(List.of(lockedRequester, lockedTarget));
+        return List.of(lockedRequester, lockedTarget);
     }
 
     @Test
@@ -362,7 +383,7 @@ class AdminSwapRequestServiceTest {
     }
 
     @Test
-    void approveSwapRequestExchangesTheTwoAssignments() {
+    void approveSwapRequestExchangesTheTwoLockedAssignments() {
         CurrentAccountPrincipal principal = managerPrincipal();
         Employee requester = employee(10L, "ACTIVE");
         Employee target = employee(20L, "ACTIVE");
@@ -375,19 +396,25 @@ class AdminSwapRequestServiceTest {
         when(swapRequestRepository.findDetailByIdForUpdate(5L)).thenReturn(Optional.of(swapRequest));
         when(swapRequestRepository.save(any(SwapRequest.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
-        stubLockedAssignments(swapRequest);
+        List<ShiftAssignment> locked = stubLockedCopiesOf(swapRequest);
+        ShiftAssignment lockedRequester = locked.get(0);
+        ShiftAssignment lockedTarget = locked.get(1);
 
         service.approveSwapRequest(principal, 5L);
 
-        assertThat(requesterAssignment.getEmployee()).isSameAs(target);
-        assertThat(targetAssignment.getEmployee()).isSameAs(requester);
-        assertThat(requesterAssignment.getAssignmentStatus()).isEqualTo("SWAPPED");
-        assertThat(targetAssignment.getAssignmentStatus()).isEqualTo("SWAPPED");
-        verify(shiftAssignmentRepository).saveAllAndFlush(List.of(requesterAssignment, targetAssignment));
+        assertThat(lockedRequester.getEmployee()).isSameAs(target);
+        assertThat(lockedTarget.getEmployee()).isSameAs(requester);
+        assertThat(lockedRequester.getAssignmentStatus()).isEqualTo("SWAPPED");
+        assertThat(lockedTarget.getAssignmentStatus()).isEqualTo("SWAPPED");
+        verify(shiftAssignmentRepository).saveAllAndFlush(List.of(lockedRequester, lockedTarget));
+        assertThat(requesterAssignment.getEmployee()).isSameAs(requester);
+        assertThat(targetAssignment.getEmployee()).isSameAs(target);
+        assertThat(requesterAssignment.getAssignmentStatus()).isEqualTo("ASSIGNED");
+        assertThat(targetAssignment.getAssignmentStatus()).isEqualTo("ASSIGNED");
     }
 
     @Test
-    void approveSwapRequestLocksBothAssignmentsOrderedById() {
+    void approveSwapRequestLocksBothRequestedAssignmentIds() {
         CurrentAccountPrincipal principal = managerPrincipal();
         ShiftAssignment requesterAssignment = publishedAssignment(100L, employee(10L, "ACTIVE"));
         ShiftAssignment targetAssignment = publishedAssignment(200L, employee(20L, "ACTIVE"));
@@ -443,7 +470,7 @@ class AdminSwapRequestServiceTest {
 
         assertThatThrownBy(() -> service.approveSwapRequest(principal, 5L))
                 .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("đã cùng có ca ở hai ca cần hoán đổi")
+                .hasMessageContaining("đều đã có ca ở ca của người kia")
                 .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
                 .isEqualTo(HttpStatus.CONFLICT);
 
@@ -497,6 +524,31 @@ class AdminSwapRequestServiceTest {
     }
 
     @Test
+    void approveSwapRequestRejectsWhenRequesterPeriodIsNotPublished() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        Employee requester = employee(10L, "ACTIVE");
+        Employee target = employee(20L, "ACTIVE");
+        ShiftAssignment draftRequesterAssignment = draftAssignment(100L, requester);
+        ShiftAssignment targetAssignment = publishedAssignment(200L, target);
+        SwapRequest swapRequest = pendingApprovalSwapRequest(
+                5L, draftRequesterAssignment, target, targetAssignment);
+        when(accountRepository.findById(1L))
+                .thenReturn(Optional.of(managerAccount(principal)));
+        when(swapRequestRepository.findDetailByIdForUpdate(5L)).thenReturn(Optional.of(swapRequest));
+        stubLockedAssignments(swapRequest);
+
+        assertThatThrownBy(() -> service.approveSwapRequest(principal, 5L))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("kỳ lịch đã công bố")
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.CONFLICT);
+
+        verify(shiftAssignmentRepository, never()).saveAllAndFlush(anyList());
+        assertThat(draftRequesterAssignment.getEmployee()).isSameAs(requester);
+        assertThat(draftRequesterAssignment.getAssignmentStatus()).isEqualTo("ASSIGNED");
+    }
+
+    @Test
     void approveSwapRequestRejectsTargetAssignmentOwnedByOtherEmployee() {
         CurrentAccountPrincipal principal = managerPrincipal();
         Employee requester = employee(10L, "ACTIVE");
@@ -520,7 +572,7 @@ class AdminSwapRequestServiceTest {
     }
 
     @Test
-    void approveSwapRequestRejectsWhenRequesterAlreadyHoldsTargetShift() {
+    void approveSwapRequestRejectsWhenTargetAlreadyHoldsRequesterShift() {
         CurrentAccountPrincipal principal = managerPrincipal();
         Employee requester = employee(10L, "ACTIVE");
         Employee target = employee(20L, "ACTIVE");
@@ -532,11 +584,11 @@ class AdminSwapRequestServiceTest {
                 .thenReturn(Optional.of(managerAccount(principal)));
         when(swapRequestRepository.findDetailByIdForUpdate(5L)).thenReturn(Optional.of(swapRequest));
         stubLockedAssignments(swapRequest);
-        when(shiftAssignmentRepository.existsByWorkShiftIdAndEmployeeId(100L, 20L)).thenReturn(true);
+        when(shiftAssignmentRepository.existsByWorkShiftIdAndEmployeeId(1100L, 20L)).thenReturn(true);
 
         assertThatThrownBy(() -> service.approveSwapRequest(principal, 5L))
                 .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("đã cùng có ca ở hai ca cần hoán đổi")
+                .hasMessageContaining("đều đã có ca ở ca của người kia")
                 .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
                 .isEqualTo(HttpStatus.CONFLICT);
 
@@ -544,7 +596,7 @@ class AdminSwapRequestServiceTest {
     }
 
     @Test
-    void approveSwapRequestLeavesAssignmentsUntouchedWhenTargetAlreadyHoldsRequesterShift() {
+    void approveSwapRequestLeavesAssignmentsUntouchedWhenRequesterAlreadyHoldsTargetShift() {
         CurrentAccountPrincipal principal = managerPrincipal();
         Employee requester = employee(10L, "ACTIVE");
         Employee target = employee(20L, "ACTIVE");
@@ -556,11 +608,11 @@ class AdminSwapRequestServiceTest {
                 .thenReturn(Optional.of(managerAccount(principal)));
         when(swapRequestRepository.findDetailByIdForUpdate(5L)).thenReturn(Optional.of(swapRequest));
         stubLockedAssignments(swapRequest);
-        when(shiftAssignmentRepository.existsByWorkShiftIdAndEmployeeId(200L, 10L)).thenReturn(true);
+        when(shiftAssignmentRepository.existsByWorkShiftIdAndEmployeeId(1200L, 10L)).thenReturn(true);
 
         assertThatThrownBy(() -> service.approveSwapRequest(principal, 5L))
                 .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("đã cùng có ca ở hai ca cần hoán đổi")
+                .hasMessageContaining("đều đã có ca ở ca của người kia")
                 .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
                 .isEqualTo(HttpStatus.CONFLICT);
 
@@ -615,13 +667,66 @@ class AdminSwapRequestServiceTest {
 
         assertThatThrownBy(() -> service.approveSwapRequest(principal, 5L))
                 .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("đã được đổi bởi một yêu cầu khác")
+                .hasMessageContaining("Ca của người gửi đã được đổi bởi một yêu cầu khác")
                 .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
                 .isEqualTo(HttpStatus.CONFLICT);
 
         verify(shiftAssignmentRepository, never()).saveAllAndFlush(anyList());
         assertThat(requesterAssignment.getEmployee()).isSameAs(requester);
         assertThat(targetAssignment.getEmployee()).isSameAs(target);
+    }
+
+    @Test
+    void approveSwapRequestRejectsWhenTargetAssignmentWasAlreadySwapped() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        Employee requester = employee(10L, "ACTIVE");
+        Employee target = employee(20L, "ACTIVE");
+        ShiftAssignment requesterAssignment = publishedAssignment(100L, requester);
+        ShiftAssignment targetAssignment =
+                assignmentOnShift(200L, 1200L, target, "PUBLISHED", "SWAPPED");
+        SwapRequest swapRequest = pendingApprovalSwapRequest(
+                5L, requesterAssignment, target, targetAssignment);
+        when(accountRepository.findById(1L))
+                .thenReturn(Optional.of(managerAccount(principal)));
+        when(swapRequestRepository.findDetailByIdForUpdate(5L)).thenReturn(Optional.of(swapRequest));
+        stubLockedAssignments(swapRequest);
+
+        assertThatThrownBy(() -> service.approveSwapRequest(principal, 5L))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Ca đối ứng đã được đổi bởi một yêu cầu khác")
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.CONFLICT);
+
+        verify(shiftAssignmentRepository, never()).saveAllAndFlush(anyList());
+        assertThat(requesterAssignment.getEmployee()).isSameAs(requester);
+        assertThat(targetAssignment.getEmployee()).isSameAs(target);
+        assertThat(requesterAssignment.getAssignmentStatus()).isEqualTo("ASSIGNED");
+        assertThat(targetAssignment.getAssignmentStatus()).isEqualTo("SWAPPED");
+    }
+
+    @Test
+    void approveSwapRequestReportsSameWorkShiftBeforeAlreadySwapped() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        Employee requester = employee(10L, "ACTIVE");
+        Employee target = employee(20L, "ACTIVE");
+        ShiftAssignment requesterAssignment =
+                assignmentOnShift(100L, 300L, requester, "PUBLISHED", "SWAPPED");
+        ShiftAssignment targetAssignment =
+                assignmentOnShift(200L, 300L, target, "PUBLISHED", "SWAPPED");
+        SwapRequest swapRequest = pendingApprovalSwapRequest(
+                5L, requesterAssignment, target, targetAssignment);
+        when(accountRepository.findById(1L))
+                .thenReturn(Optional.of(managerAccount(principal)));
+        when(swapRequestRepository.findDetailByIdForUpdate(5L)).thenReturn(Optional.of(swapRequest));
+        stubLockedAssignments(swapRequest);
+
+        assertThatThrownBy(() -> service.approveSwapRequest(principal, 5L))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Hai ca cần hoán đổi là cùng một ca")
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.CONFLICT);
+
+        verify(shiftAssignmentRepository, never()).saveAllAndFlush(anyList());
     }
 
     @Test

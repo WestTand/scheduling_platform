@@ -52,8 +52,10 @@ public class AdminSwapRequestService {
             "Hai ca cần hoán đổi là cùng một ca nên không thể hoán đổi.";
     private static final String REQUESTER_ASSIGNMENT_ALREADY_SWAPPED =
             "Ca của người gửi đã được đổi bởi một yêu cầu khác nên không thể duyệt yêu cầu này.";
+    private static final String TARGET_ASSIGNMENT_ALREADY_SWAPPED =
+            "Ca đối ứng đã được đổi bởi một yêu cầu khác nên không thể duyệt yêu cầu này.";
     private static final String CROSS_SHIFT_COLLISION =
-            "Hai nhân viên đã cùng có ca ở hai ca cần hoán đổi nên không thể đổi chéo.";
+            "Hai nhân viên đều đã có ca ở ca của người kia nên không thể hoán đổi.";
 
     private final SwapRequestRepository swapRequestRepository;
     private final AccountRepository accountRepository;
@@ -111,10 +113,10 @@ public class AdminSwapRequestService {
         requirePublishedPeriod(requesterAssignment);
         requirePublishedPeriod(targetAssignment);
         Employee target = requireTargetOwner(swapRequest, targetAssignment);
-        requireNotAlreadySwapped(requesterAssignment);
         requireDifferentWorkShifts(requesterAssignment, targetAssignment);
-        requireNoCrossShiftCollision(requesterAssignment, targetAssignment, target);
+        requireNotAlreadySwapped(requesterAssignment, targetAssignment);
         Employee requester = requesterAssignment.getEmployee();
+        requireNoCrossShiftCollision(requesterAssignment, targetAssignment, requester, target);
         // Must be resolved before the exchange: the assignment references are mutated in place below.
         List<Account> parties = swapParties(requester, target);
         requesterAssignment.setEmployee(target);
@@ -202,9 +204,13 @@ public class AdminSwapRequestService {
         return declaredTarget;
     }
 
-    private static void requireNotAlreadySwapped(ShiftAssignment requesterAssignment) {
+    private static void requireNotAlreadySwapped(
+            ShiftAssignment requesterAssignment, ShiftAssignment targetAssignment) {
         if (SWAPPED.equals(requesterAssignment.getAssignmentStatus())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, REQUESTER_ASSIGNMENT_ALREADY_SWAPPED);
+        }
+        if (SWAPPED.equals(targetAssignment.getAssignmentStatus())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, TARGET_ASSIGNMENT_ALREADY_SWAPPED);
         }
     }
 
@@ -216,12 +222,13 @@ public class AdminSwapRequestService {
     }
 
     private void requireNoCrossShiftCollision(
-            ShiftAssignment requesterAssignment, ShiftAssignment targetAssignment, Employee target) {
+            ShiftAssignment requesterAssignment, ShiftAssignment targetAssignment,
+            Employee requester, Employee target) {
         Long requesterShiftId = requesterAssignment.getWorkShift().getId();
         Long targetShiftId = targetAssignment.getWorkShift().getId();
         if (shiftAssignmentRepository.existsByWorkShiftIdAndEmployeeId(requesterShiftId, target.getId())
                 || shiftAssignmentRepository.existsByWorkShiftIdAndEmployeeId(
-                        targetShiftId, requesterAssignment.getEmployee().getId())) {
+                        targetShiftId, requester.getId())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, CROSS_SHIFT_COLLISION);
         }
     }
