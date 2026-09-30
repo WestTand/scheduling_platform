@@ -136,6 +136,10 @@ public class EmployeeSwapRequestService {
                     HttpStatus.BAD_REQUEST, "Swap request is not pending target response");
         }
         boolean accepted = Boolean.TRUE.equals(request.accept());
+        if (accepted) {
+            swapRequest.setTargetAssignment(requireSelectableTargetAssignment(
+                    request.targetAssignmentId(), employee, swapRequest.getRequesterAssignment()));
+        }
         swapRequest.setStatus(accepted ? PENDING_APPROVAL : REJECTED);
         SwapRequest saved = swapRequestRepository.save(swapRequest);
         if (accepted) {
@@ -174,6 +178,31 @@ public class EmployeeSwapRequestService {
             throw invalidRequest();
         }
         return normalized;
+    }
+
+    private ShiftAssignment requireSelectableTargetAssignment(
+            Long targetAssignmentId, Employee employee, ShiftAssignment requesterAssignment) {
+        if (targetAssignmentId == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Vui lòng chọn ca của bạn để đổi trước khi xác nhận.");
+        }
+        ShiftAssignment targetAssignment =
+                loadSelectableTargetAssignment(targetAssignmentId, employee, requesterAssignment);
+        requirePublished(targetAssignment);
+        return targetAssignment;
+    }
+
+    private ShiftAssignment loadSelectableTargetAssignment(
+            Long targetAssignmentId, Employee employee, ShiftAssignment requesterAssignment) {
+        ShiftAssignment targetAssignment = shiftAssignmentRepository.findDetailById(targetAssignmentId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Ca được chọn không tồn tại"));
+        if (!employee.getId().equals(targetAssignment.getEmployee().getId())
+                || requesterAssignment.getId().equals(targetAssignment.getId())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Ca được chọn không thuộc về bạn.");
+        }
+        return targetAssignment;
     }
 
     private static void requirePublished(ShiftAssignment assignment) {
