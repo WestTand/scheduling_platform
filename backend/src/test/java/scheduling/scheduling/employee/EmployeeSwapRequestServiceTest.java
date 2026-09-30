@@ -633,8 +633,9 @@ class EmployeeSwapRequestServiceTest {
         when(accountRepository.findById(ACCOUNT_ID))
                 .thenReturn(Optional.of(account(principal, me)));
         when(swapRequestRepository.findDetailByIdForUpdate(50L)).thenReturn(Optional.of(swapRequest));
+        ShiftAssignment myAssignment = assignment(300L, me, "PUBLISHED");
         when(shiftAssignmentRepository.findDetailById(300L))
-                .thenReturn(Optional.of(assignment(300L, me, "PUBLISHED")));
+                .thenReturn(Optional.of(myAssignment));
         when(swapRequestRepository.save(any(SwapRequest.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         SwapRequestResponse response = service.respondSwapRequest(
@@ -642,6 +643,7 @@ class EmployeeSwapRequestServiceTest {
 
         assertThat(response.status()).isEqualTo("PENDING_APPROVAL");
         assertThat(response.targetAssignmentId()).isEqualTo(300L);
+        assertThat(swapRequest.getTargetAssignment()).isSameAs(myAssignment);
     }
 
     @Test
@@ -695,8 +697,10 @@ class EmployeeSwapRequestServiceTest {
         when(accountRepository.findById(ACCOUNT_ID))
                 .thenReturn(Optional.of(account(principal, me)));
         when(swapRequestRepository.findDetailByIdForUpdate(50L)).thenReturn(Optional.of(swapRequest));
+        // The chosen shift is owned by the responder, so only the "equals the requester's
+        // assignment id" branch can reject it. Ownership alone would let it through.
         when(shiftAssignmentRepository.findDetailById(100L))
-                .thenReturn(Optional.of(assignment(100L, employee(7L, "ACTIVE"), "PUBLISHED")));
+                .thenReturn(Optional.of(assignment(100L, me, "PUBLISHED")));
 
         assertThatThrownBy(() -> service.respondSwapRequest(
                 principal, 50L, new RespondSwapRequestRequest(true, 100L)))
