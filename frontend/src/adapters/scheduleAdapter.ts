@@ -125,8 +125,18 @@ export const adaptBackendPeriodSchedule = (schedule: BackendPeriodScheduleRespon
     isMock: false,
     optimizationStatus: schedule.latestOptimizationRun?.status ?? null,
     employeePool,
+    employeePoolIds: (schedule.employeePool ?? []).map((employee) => String(employee.id)),
     assignments,
     warnings: [...buildStaffingWarnings(schedule), ...buildDiagnosticWarnings(schedule)],
+    staffingAdvice: schedule.latestOptimizationRun?.staffingAdvice
+      ? {
+        requiredEmployees: schedule.latestOptimizationRun.staffingAdvice.requiredEmployees,
+        availableEmployees: schedule.latestOptimizationRun.staffingAdvice.availableEmployees,
+        totalShifts: schedule.latestOptimizationRun.staffingAdvice.totalShifts,
+        exact: schedule.latestOptimizationRun.staffingAdvice.exact,
+        reasons: schedule.latestOptimizationRun.staffingAdvice.reasons ?? [],
+      }
+      : null,
   }
 }
 

@@ -57,6 +57,14 @@ export interface BackendOptimizationDiagnostic {
   workShiftId: number | null
 }
 
+export interface BackendStaffingAdvice {
+  requiredEmployees: number
+  availableEmployees: number
+  totalShifts: number
+  exact: boolean
+  reasons: string[]
+}
+
 export interface BackendLatestOptimizationRun {
   runId: number
   status: string
@@ -64,6 +72,7 @@ export interface BackendLatestOptimizationRun {
   penaltyDetailsJson: string | null
   errorMessage: string | null
   diagnostics: BackendOptimizationDiagnostic[]
+  staffingAdvice?: BackendStaffingAdvice | null
 }
 
 export interface BackendPeriodScheduleResponse {

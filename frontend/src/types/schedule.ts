@@ -41,6 +41,14 @@ export interface WorkSchedule {
   optimizationStatus?: string | null
 }
 
+export interface ScheduleStaffingAdvice {
+  requiredEmployees: number
+  availableEmployees: number
+  totalShifts: number
+  exact: boolean
+  reasons: string[]
+}
+
 export interface ScheduleAssignment {
   id: string
   scheduleId: string
@@ -66,6 +74,8 @@ export interface ScheduleWarning {
 
 export interface ScheduleDetail extends WorkSchedule {
   employeePool: string[]
+  employeePoolIds: string[]
   assignments: ScheduleAssignment[]
   warnings: ScheduleWarning[]
+  staffingAdvice?: ScheduleStaffingAdvice | null
 }

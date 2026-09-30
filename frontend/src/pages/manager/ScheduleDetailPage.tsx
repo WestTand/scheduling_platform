@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowLeft, ClipboardCheck, Clock3, Pencil, Send, ShieldCheck, Users, XCircle } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, ClipboardCheck, Clock3, Pencil, Send, ShieldCheck, Users, UserCog, XCircle } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
@@ -8,15 +8,18 @@ import { Card, CardContent } from '@/components/ui/card'
 import { EmptyState } from '@/components/common/EmptyState'
 import { PageHeader } from '@/components/common/PageHeader'
 import { ScheduleCalendar } from '@/components/schedule/ScheduleCalendar'
+import { ScheduleEmployeePoolEditor } from '@/components/schedule/ScheduleEmployeePoolEditor'
 import { ScheduleSummaryCard } from '@/components/schedule/ScheduleSummaryCard'
 import { ScheduleWarningList } from '@/components/schedule/ScheduleWarningList'
 import { apiConfig } from '@/config/api'
 import { scheduleDetailSeed, scheduleStatusLabels } from '@/mocks/schedules'
+import { backendEmployeeService } from '@/services/backendEmployeeService'
 import { backendScheduleService } from '@/services/backendScheduleService'
-import { canApproveSchedule, getScheduleDetailActions, getScheduleDetailNoticeClass, getScheduleDetailReadOnlyMessage } from './ScheduleDetailPage.helpers'
+import { canApproveSchedule, getScheduleDetailActions, getScheduleDetailNoticeClass, getScheduleDetailReadOnlyMessage, getScheduleDetailStaffingMessage } from './ScheduleDetailPage.helpers'
 import type { ScheduleDetail } from '@/types/schedule'
 import { ScheduleViewMode } from '@/types/schedule'
 import type { ScheduleDetailAction, ScheduleDetailNotice } from './ScheduleDetailPage.helpers'
+import type { PoolCandidate } from '@/components/schedule/ScheduleEmployeePoolEditor.helpers'
 
 export function ScheduleDetailPage() {
   const { scheduleId } = useParams()
@@ -33,6 +36,8 @@ export function ScheduleDetailPage() {
   const [warningOnly, setWarningOnly] = useState(false)
   const [backendResult, setBackendResult] = useState<{ scheduleId: string; detail: ScheduleDetail | null; error: string } | null>(null)
   const [notice, setNotice] = useState<ScheduleDetailNotice | null>(null)
+  const [poolCandidates, setPoolCandidates] = useState<PoolCandidate[]>([])
+  const [isPoolEditorOpen, setIsPoolEditorOpen] = useState(false)
   const mockDetail = scheduleId === scheduleDetailSeed.id ? scheduleDetailSeed : null
   const detail = apiConfig.useMockApi ? mockDetail : backendResult && scheduleId === backendResult.scheduleId ? backendResult.detail : null
 
@@ -53,6 +58,15 @@ export function ScheduleDetailPage() {
           setNotice({ type: 'error', message })
         }
       })
+    return () => { ignore = true }
+  }, [scheduleId])
+
+  useEffect(() => {
+    if (apiConfig.useMockApi || !scheduleId) return
+    let ignore = false
+    backendEmployeeService.list({ page: 1, pageSize: 500, status: 'ACTIVE' })
+      .then((result) => { if (!ignore) setPoolCandidates(result.data.map((employee) => ({ id: employee.id, fullName: employee.fullName, employeeCode: employee.employeeCode }))) })
+      .catch(() => { if (!ignore) setPoolCandidates([]) })
     return () => { ignore = true }
   }, [scheduleId])
 
@@ -85,8 +99,25 @@ export function ScheduleDetailPage() {
   }
 
   const readOnlyMessage = getScheduleDetailReadOnlyMessage(detail.status, detail.optimizationStatus)
+  const staffingMessage = getScheduleDetailStaffingMessage(detail.optimizationStatus, detail.staffingAdvice)
+  const canEditEmployeePool = detail.status === 'DRAFT'
   const statusActions = apiConfig.useMockApi ? [] : getScheduleDetailActions(detail.status)
   const isInfeasible = detail.optimizationStatus === 'INFEASIBLE'
+
+  const reloadDetail = async () => {
+    const refreshed = await loadBackendDetail(detail.id)
+    setBackendResult({ scheduleId: detail.id, detail: refreshed, error: '' })
+  }
+
+  const handlePoolSaved = async () => {
+    setIsPoolEditorOpen(false)
+    try {
+      await reloadDetail()
+      setNotice({ type: 'success', message: 'Đã cập nhật pool nhân viên.' })
+    } catch (reloadError) {
+      setNotice({ type: 'error', message: reloadError instanceof Error ? reloadError.message : 'Không thể tải lại chi tiết lịch.' })
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -101,6 +132,20 @@ export function ScheduleDetailPage() {
       </div>
       {notice && <div className={getScheduleDetailNoticeClass(notice.type)}>{notice.message}</div>}
       {readOnlyMessage && <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{readOnlyMessage}</div>}
+      {staffingMessage && <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{staffingMessage}</div>}
+      {canEditEmployeePool && !apiConfig.useMockApi && (
+        <div>
+          <Button variant="outline" onClick={() => setIsPoolEditorOpen(true)}><UserCog className="mr-2 h-4 w-4" />Chỉnh sửa pool nhân viên</Button>
+          <ScheduleEmployeePoolEditor
+            open={isPoolEditorOpen}
+            periodId={detail.id}
+            candidates={poolCandidates}
+            currentPoolIds={detail.employeePoolIds ?? []}
+            onCancel={() => setIsPoolEditorOpen(false)}
+            onSaved={() => void handlePoolSaved()}
+          />
+        </div>
+      )}
 
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <ScheduleSummaryCard label="Tổng nhân viên" value={detail.employeeCount} icon={<Users className="h-5 w-5" />} tone="blue" />
