@@ -3,11 +3,13 @@ package scheduling.scheduling.admin;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -20,12 +22,14 @@ import scheduling.scheduling.admin.dto.SchedulePeriodRequest;
 import scheduling.scheduling.auth.CurrentAccountPrincipal;
 import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
+import scheduling.scheduling.entity.Employee;
 import scheduling.scheduling.entity.OptimizationRun;
 import scheduling.scheduling.entity.SchedulePeriod;
 import scheduling.scheduling.entity.WorkShift;
 import scheduling.scheduling.audit.ActivityLogService;
 import scheduling.scheduling.notification.NotificationService;
 import scheduling.scheduling.repository.AccountRepository;
+import scheduling.scheduling.repository.EmployeeRepository;
 import scheduling.scheduling.repository.OptimizationRunRepository;
 import scheduling.scheduling.repository.SchedulePeriodRepository;
 import scheduling.scheduling.repository.ShiftAssignmentRepository;
@@ -39,6 +43,7 @@ public class AdminSchedulePeriodService {
     private static final String PUBLISHED = "PUBLISHED";
     private static final String CANCELLED = "CANCELLED";
     private static final String INFEASIBLE = "INFEASIBLE";
+    private static final String ACTIVE = "ACTIVE";
     private static final String INFEASIBLE_APPROVE_MESSAGE =
             "Lịch đang có ràng buộc chưa thỏa nên không thể duyệt.";
     private static final Set<String> LISTABLE_STATUSES =
@@ -51,6 +56,7 @@ public class AdminSchedulePeriodService {
     private final OptimizationRunRepository optimizationRunRepository;
     private final NotificationService notificationService;
     private final ActivityLogService activityLogService;
+    private final EmployeeRepository employeeRepository;
 
     public AdminSchedulePeriodService(
             SchedulePeriodRepository schedulePeriodRepository,
@@ -59,7 +65,8 @@ public class AdminSchedulePeriodService {
             ShiftAssignmentRepository shiftAssignmentRepository,
             OptimizationRunRepository optimizationRunRepository,
             NotificationService notificationService,
-            ActivityLogService activityLogService) {
+            ActivityLogService activityLogService,
+            EmployeeRepository employeeRepository) {
         this.schedulePeriodRepository = schedulePeriodRepository;
         this.accountRepository = accountRepository;
         this.workShiftRepository = workShiftRepository;
@@ -67,6 +74,7 @@ public class AdminSchedulePeriodService {
         this.optimizationRunRepository = optimizationRunRepository;
         this.notificationService = notificationService;
         this.activityLogService = activityLogService;
+        this.employeeRepository = employeeRepository;
     }
 
     @Transactional
@@ -188,6 +196,31 @@ public class AdminSchedulePeriodService {
             throw invalidRequest();
         }
         period.setStatus(CANCELLED);
+        return toResponse(savePeriod(period));
+    }
+
+    @Transactional
+    public AdminSchedulePeriodResponse updateEmployeePool(
+            CurrentAccountPrincipal principal, Long periodId, List<Long> employeeIds) {
+        requireManager(principal);
+        SchedulePeriod period = findDetail(periodId);
+        if (!DRAFT.equals(period.getStatus())) {
+            throw invalidRequest();
+        }
+        if (employeeIds == null || employeeIds.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Danh sách nhân viên không được để trống.");
+        }
+        Set<Long> distinctIds = new LinkedHashSet<>(employeeIds);
+        List<Employee> employees = employeeRepository.findAllById(distinctIds);
+        if (employees.size() != distinctIds.size()
+                || employees.stream().anyMatch(employee -> !ACTIVE.equals(employee.getStatus()))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Danh sách nhân viên không hợp lệ.");
+        }
+        Map<Long, Employee> byId = employees.stream()
+                .collect(Collectors.toMap(Employee::getId, Function.identity()));
+        period.setEmployeePool(distinctIds.stream()
+                .map(byId::get)
+                .collect(Collectors.toCollection(LinkedHashSet::new)));
         return toResponse(savePeriod(period));
     }
 

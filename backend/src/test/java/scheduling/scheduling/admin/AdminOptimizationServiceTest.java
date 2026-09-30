@@ -21,6 +21,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -45,6 +46,7 @@ import scheduling.scheduling.auth.CurrentAccountPrincipal;
 import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
 import scheduling.scheduling.entity.AccountStatus;
+import scheduling.scheduling.entity.Employee;
 import scheduling.scheduling.entity.OptimizationRun;
 import scheduling.scheduling.entity.SchedulePeriod;
 import scheduling.scheduling.repository.AccountRepository;
@@ -875,6 +877,48 @@ class AdminOptimizationServiceTest {
     }
 
     @Test
+    void optimizeWithoutEmployeeIdsUsesThePeriodEmployeePool() {
+        CurrentAccountPrincipal principal = new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
+        Account manager = managerAccount(principal);
+        SchedulePeriod period = draftPeriod(5L, manager);
+        period.setEmployeePool(new LinkedHashSet<>(List.of(employee(31L), employee(32L))));
+
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
+        when(schedulePeriodRepository.findDetailById(5L)).thenReturn(Optional.of(period));
+        when(payloadBuilder.prepareSnapshot(eq(period), eq(null), eq(List.of(31L, 32L))))
+                .thenThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "stop here"));
+
+        assertThatThrownBy(() -> service.optimize(principal, 5L, new OptimizeScheduleRequest(null, null)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(payloadBuilder).prepareSnapshot(eq(period), eq(null), eq(List.of(31L, 32L)));
+        verify(payloadBuilder, never()).prepareSnapshot(any(), any());
+    }
+
+    @Test
+    void optimizeWithoutEmployeeIdsFallsBackToAllEmployeesWhenPoolIsEmpty() {
+        CurrentAccountPrincipal principal = new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
+        Account manager = managerAccount(principal);
+        SchedulePeriod period = draftPeriod(5L, manager);
+        period.setEmployeePool(new LinkedHashSet<>());
+
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
+        when(schedulePeriodRepository.findDetailById(5L)).thenReturn(Optional.of(period));
+        when(payloadBuilder.prepareSnapshot(eq(period), eq(null)))
+                .thenThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "stop here"));
+
+        assertThatThrownBy(() -> service.optimize(principal, 5L, new OptimizeScheduleRequest(null, null)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(payloadBuilder).prepareSnapshot(eq(period), eq(null));
+        verify(payloadBuilder, never()).prepareSnapshot(any(), any(), any());
+    }
+
+    @Test
     void optimizeRejectsNonDraftPeriodBeforeCreatingRun() {
         CurrentAccountPrincipal principal = new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
         Account manager = managerAccount(principal);
@@ -1275,6 +1319,16 @@ class AdminOptimizationServiceTest {
                 .build();
         account.setId(principal.accountId());
         return account;
+    }
+
+    private static Employee employee(Long id) {
+        Employee employee = Employee.builder()
+                .employeeCode("EMP" + id)
+                .fullName("Employee " + id)
+                .status("ACTIVE")
+                .build();
+        employee.setId(id);
+        return employee;
     }
 
     private static SchedulePeriod draftPeriod(Long id, Account manager) {

@@ -783,6 +783,56 @@ class AdminShiftAssignmentServiceTest {
     }
 
     @Test
+    void scheduleViewExposesLatestOptimizationStaffingAdvice() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        OptimizationRun run = OptimizationRun.builder()
+                .status("INFEASIBLE")
+                .errorMessage("[NO_FEASIBLE_SCHEDULE] No schedule satisfies all hard constraints")
+                .staffingAdviceJson("{\"requiredEmployees\":10,\"availableEmployees\":4,\"totalShifts\":21,"
+                        + "\"exact\":true,\"reasons\":[{\"code\":\"QUOTA_OVERTIME\",\"requiredEmployees\":5,"
+                        + "\"detail\":\"need 5\"},{\"code\":\"MIN_REST\",\"requiredEmployees\":5,\"detail\":\"x\"}]}")
+                .build();
+        run.setId(99L);
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(draftPeriod()));
+        when(workShiftRepository.searchForPeriod(20L, null, null)).thenReturn(List.of(workShift()));
+        when(shiftAssignmentRepository.listForPeriod(20L)).thenReturn(List.of());
+        when(optimizationRunRepository.findTopBySchedulePeriodIdOrderByStartedAtDescIdDesc(20L))
+                .thenReturn(Optional.of(run));
+
+        AdminPeriodScheduleResponse.StaffingAdvice advice =
+                service.getSchedule(principal, 20L).latestOptimizationRun().staffingAdvice();
+
+        assertThat(advice).isNotNull();
+        assertThat(advice.requiredEmployees()).isEqualTo(10);
+        assertThat(advice.availableEmployees()).isEqualTo(4);
+        assertThat(advice.totalShifts()).isEqualTo(21);
+        assertThat(advice.exact()).isTrue();
+        assertThat(advice.reasons()).containsExactly("QUOTA_OVERTIME", "MIN_REST");
+    }
+
+    @Test
+    void scheduleViewToleratesMalformedStaffingAdviceJson() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        OptimizationRun run = OptimizationRun.builder()
+                .status("SUCCESS")
+                .staffingAdviceJson("{not-json")
+                .build();
+        run.setId(99L);
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(draftPeriod()));
+        when(workShiftRepository.searchForPeriod(20L, null, null)).thenReturn(List.of(workShift()));
+        when(shiftAssignmentRepository.listForPeriod(20L)).thenReturn(List.of());
+        when(optimizationRunRepository.findTopBySchedulePeriodIdOrderByStartedAtDescIdDesc(20L))
+                .thenReturn(Optional.of(run));
+
+        AdminPeriodScheduleResponse response = service.getSchedule(principal, 20L);
+
+        assertThat(response.latestOptimizationRun()).isNotNull();
+        assertThat(response.latestOptimizationRun().staffingAdvice()).isNull();
+    }
+
+    @Test
     void scheduleViewRejectsMissingPeriod() {
         when(accountRepository.findById(1L)).thenReturn(Optional.of(account(managerPrincipal())));
         when(schedulePeriodRepository.findDetailById(999L)).thenReturn(Optional.empty());

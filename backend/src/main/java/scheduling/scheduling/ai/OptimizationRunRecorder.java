@@ -59,6 +59,7 @@ public class OptimizationRunRecorder {
         run.setTotalPenalty(response.totalPenalty());
         run.getSchedulePeriod().setTotalPenalty(response.totalPenalty());
         run.setPenaltyDetailsJson(writeValue(response.penaltyDetails()));
+        run.setStaffingAdviceJson(response.staffingAdvice() == null ? null : writeValue(response.staffingAdvice()));
         return optimizationRunRepository.save(run);
     }
 
@@ -70,6 +71,9 @@ public class OptimizationRunRecorder {
         run.setFinishedAt(LocalDateTime.now(clock));
         run.setErrorMessage(truncate(errorMessage));
         run.setPenaltyDetailsJson(response == null ? null : writeValue(response.penaltyDetails()));
+        run.setStaffingAdviceJson(response == null || response.staffingAdvice() == null
+                ? null
+                : writeValue(response.staffingAdvice()));
         return optimizationRunRepository.save(run);
     }
 
