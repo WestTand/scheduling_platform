@@ -173,6 +173,20 @@ class SolverStatistics(ApiModel):
     branches: int
 
 
+class StaffingReason(ApiModel):
+    code: str
+    required_employees: int
+    detail: str
+
+
+class StaffingAdvice(ApiModel):
+    required_employees: int
+    available_employees: int
+    total_shifts: int
+    exact: bool = True
+    reasons: list[StaffingReason] = Field(default_factory=list)
+
+
 class SchedulingResponse(ApiModel):
     schema_version: Literal["1.0"] = "1.0"
     run_id: int
@@ -186,5 +200,7 @@ class SchedulingResponse(ApiModel):
     penalty_details: dict[str, float] = Field(default_factory=dict)
     warnings: list[str] = Field(default_factory=list)
     diagnostics: list[DiagnosticOutput] = Field(default_factory=list)
+    staffing_advice: StaffingAdvice | None = None
     error_message: str | None = None
     statistics: SolverStatistics
+
