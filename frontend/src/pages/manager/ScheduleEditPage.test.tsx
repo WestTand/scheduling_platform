@@ -125,6 +125,7 @@ describe('ScheduleEditPage helpers', () => {
       status: 'DRAFT',
       isMock: false,
       employeePool: ['Nguyễn Văn An'],
+      employeePoolIds: ['31'],
       assignments: refreshedAssignments,
       warnings: [],
     } satisfies ScheduleDetail

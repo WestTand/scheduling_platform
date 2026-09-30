@@ -27,6 +27,7 @@ const managerUser: User = {
   name: 'Test Manager',
   email: 'manager@example.com',
   role: Role.MANAGER,
+  department: 'Management',
 }
 
 const employeeUser: User = {
@@ -34,6 +35,7 @@ const employeeUser: User = {
   name: 'Test Employee',
   email: 'employee@example.com',
   role: Role.EMPLOYEE,
+  department: 'Operations',
 }
 
 const items = [
