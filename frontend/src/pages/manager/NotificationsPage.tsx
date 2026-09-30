@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { DataTable } from '@/components/common/DataTable'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
+import { useAppDialog } from '@/components/common/AppDialogContext'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
 import { LoadingState } from '@/components/common/LoadingState'
@@ -26,6 +27,7 @@ const typeOptions = [
 ]
 
 export function NotificationsPage() {
+  const { showDialog } = useAppDialog()
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [type, setType] = useState('ALL')
@@ -91,7 +93,7 @@ export function NotificationsPage() {
       setSuccess('Thông báo đã được đánh dấu là đã đọc.')
       await fetchData()
     } catch (errorMessage) {
-      window.alert(errorMessage instanceof Error ? errorMessage.message : 'Không thể đánh dấu đã đọc.')
+      showDialog({ variant: 'error', description: errorMessage instanceof Error ? errorMessage.message : 'Không thể đánh dấu đã đọc.' })
     }
   }
 

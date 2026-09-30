@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
+import { useAppDialog } from '@/components/common/AppDialogContext'
 import { DataTable } from '@/components/common/DataTable'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
@@ -28,6 +29,7 @@ const statusBadgeLabels: Record<string, string> = {
 }
 
 export function EmployeeSwapRequestsPage() {
+  const { showDialog } = useAppDialog()
   const [searchParams, setSearchParams] = useSearchParams()
   const [showForm, setShowForm] = useState(() => searchParams.get('action') === 'create')
   const [selected, setSelected] = useState<SwapRequest | null>(null)
@@ -182,18 +184,18 @@ export function EmployeeSwapRequestsPage() {
 
   const handleSubmit = async () => {
     if (!form.requesterAssignmentId || !form.targetEmployeeId || !form.reason.trim()) {
-      window.alert('Phải chọn ca của bạn, nhân viên muốn đổi cùng và nhập lý do.')
+      showDialog({ variant: 'warning', description: 'Phải chọn ca của bạn, nhân viên muốn đổi cùng và nhập lý do.' })
       return
     }
 
     if (optionsError) {
-      window.alert(optionsError)
+      showDialog({ variant: 'error', description: optionsError })
       return
     }
 
     const selectedAssignment = assignments.find((assignment) => assignment.id === form.requesterAssignmentId)
     if (selectedAssignment && selectedAssignment.periodStatus !== 'PUBLISHED') {
-      window.alert('Chỉ có thể tạo yêu cầu đổi ca khi kỳ công đã được xuất bản (PUBLISHED).')
+      showDialog({ variant: 'warning', description: 'Chỉ có thể tạo yêu cầu đổi ca khi kỳ công đã được xuất bản (PUBLISHED).' })
       return
     }
 
@@ -206,9 +208,9 @@ export function EmployeeSwapRequestsPage() {
       setShowForm(false)
       setForm({ requesterAssignmentId: '', targetEmployeeId: '', reason: '' })
       await loadData()
-      window.alert('Yêu cầu đổi ca đã được tạo và đang chờ quản lý phê duyệt.')
+      showDialog({ variant: 'success', description: 'Yêu cầu đổi ca đã được tạo và đang chờ quản lý phê duyệt.' })
     } catch (submitError) {
-      window.alert(submitError instanceof Error ? submitError.message : 'Không thể tạo yêu cầu đổi ca.')
+      showDialog({ variant: 'error', description: submitError instanceof Error ? submitError.message : 'Không thể tạo yêu cầu đổi ca.' })
     }
   }
 
@@ -217,7 +219,7 @@ export function EmployeeSwapRequestsPage() {
       await swapRequestService.cancelMine(id)
       await loadData()
     } catch (cancelError) {
-      window.alert(cancelError instanceof Error ? cancelError.message : 'Không thể hủy yêu cầu.')
+      showDialog({ variant: 'error', description: cancelError instanceof Error ? cancelError.message : 'Không thể hủy yêu cầu.' })
     }
   }
 
@@ -226,7 +228,7 @@ export function EmployeeSwapRequestsPage() {
       await swapRequestService.respondMine(id, accept)
       await loadData()
     } catch (respondError) {
-      window.alert(respondError instanceof Error ? respondError.message : 'Không thể phản hồi yêu cầu.')
+      showDialog({ variant: 'error', description: respondError instanceof Error ? respondError.message : 'Không thể phản hồi yêu cầu.' })
     }
   }
 

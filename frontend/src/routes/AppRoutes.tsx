@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 
 import { MainLayout } from '@/components/layout/MainLayout'
 import { AuthProvider } from '@/contexts/AuthContext'
+import { AppDialogProvider } from '@/components/common/AppDialogProvider'
 import { useAuth } from '@/contexts/useAuth'
 import { Role, type User } from '@/types/auth'
 import { AccountActivationPage } from '@/pages/auth/AccountActivationPage'
@@ -296,7 +297,9 @@ function AppShell() {
 export function AppRoutes() {
   return (
     <AuthProvider>
-      <AppShell />
+      <AppDialogProvider>
+        <AppShell />
+      </AppDialogProvider>
     </AuthProvider>
   )
 }

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
+import { useAppDialog } from '@/components/common/AppDialogContext'
 import { DataTable } from '@/components/common/DataTable'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
@@ -13,10 +14,12 @@ import { SearchInput } from '@/components/common/SearchInput'
 import { StatusBadge } from '@/components/common/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { getLeaveSubmitErrorDialogMessage } from '@/pages/employee/EmployeeLeaveRequestsPage.helpers'
 import { leaveRequestService } from '@/services/leaveRequestService'
 import type { LeaveRequest, PaginatedResult } from '@/types/management'
 
 export function EmployeeLeaveRequestsPage() {
+  const { showDialog } = useAppDialog()
   const [searchParams, setSearchParams] = useSearchParams()
   const [showForm, setShowForm] = useState(() => searchParams.get('action') === 'create')
   const [selected, setSelected] = useState<LeaveRequest | null>(null)
@@ -102,9 +105,12 @@ export function EmployeeLeaveRequestsPage() {
       setError('')
       setPage(1)
       await fetchData()
-      window.alert('Đã tạo yêu cầu nghỉ thành công. Yêu cầu đang chờ quản lý duyệt.')
+      showDialog({ variant: 'success', description: 'Đã tạo yêu cầu nghỉ thành công. Yêu cầu đang chờ quản lý duyệt.' })
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : 'Không thể tạo yêu cầu nghỉ.')
+      const message = submitError instanceof Error ? submitError.message : ''
+      const dialogMessage = getLeaveSubmitErrorDialogMessage(message)
+      setError(dialogMessage)
+      showDialog({ title: 'Không thể tạo ngày nghỉ', variant: 'error', description: dialogMessage })
     }
   }
 
@@ -113,7 +119,7 @@ export function EmployeeLeaveRequestsPage() {
       await leaveRequestService.cancelMine(id)
       await fetchData()
     } catch (cancelError) {
-      window.alert(cancelError instanceof Error ? cancelError.message : 'Không thể hủy yêu cầu.')
+      showDialog({ variant: 'error', description: cancelError instanceof Error ? cancelError.message : 'Không thể hủy yêu cầu.' })
     }
   }
 

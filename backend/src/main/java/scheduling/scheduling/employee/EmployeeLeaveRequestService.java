@@ -46,7 +46,7 @@ public class EmployeeLeaveRequestService {
         Employee employee = employeeAccess.requireActiveEmployeeForUpdate(principal);
         validateDateRange(request.startDate(), request.endDate());
         if (leaveRequestRepository.existsOverlappingActiveRequest(employee.getId(), request.startDate(), request.endDate())) {
-            throw invalidRequest();
+            throw duplicateLeaveRequest();
         }
         LeaveRequest leaveRequest = LeaveRequest.builder()
                 .employee(employee)
@@ -96,5 +96,11 @@ public class EmployeeLeaveRequestService {
 
     private static ResponseStatusException invalidRequest() {
         return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid leave request");
+    }
+
+    private static ResponseStatusException duplicateLeaveRequest() {
+        return new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Đã có yêu cầu nghỉ chờ duyệt hoặc đã duyệt trong khoảng ngày này.");
     }
 }

@@ -24,6 +24,8 @@ interface RefreshResponse {
   accessToken?: unknown
 }
 
+let refreshInFlight: Promise<string | null> | null = null
+
 const buildUrl = (path: string) => {
   if (path.startsWith('http://') || path.startsWith('https://')) {
     throw new ApiError(DEFAULT_ERROR_MESSAGE, 0, 'INVALID_API_PATH')
@@ -58,6 +60,13 @@ const errorMessage = (body: unknown) => {
     }
   }
 
+  if (body && typeof body === 'object' && 'detail' in body) {
+    const detail = (body as { detail?: unknown }).detail
+    if (typeof detail === 'string' && detail.trim()) {
+      return detail
+    }
+  }
+
   return DEFAULT_ERROR_MESSAGE
 }
 
@@ -84,6 +93,16 @@ const refreshAccessToken = async () => {
   return typeof body?.accessToken === 'string' && body.accessToken.trim() ? body.accessToken : null
 }
 
+const getFreshAccessToken = () => {
+  if (!refreshInFlight) {
+    refreshInFlight = refreshAccessToken().finally(() => {
+      refreshInFlight = null
+    })
+  }
+
+  return refreshInFlight
+}
+
 const sendRequest = async (path: string, options: RequestOptions, accessToken: string | null) => {
   const headers = new Headers(options.headers)
   const hasBody = options.body !== undefined
@@ -108,7 +127,7 @@ const fetchWithAuthRetry = async (path: string, options: RequestOptions): Promis
   let response = await sendRequest(path, options, options.auth === false ? null : getStoredToken())
 
   if (!response.ok && response.status === 401 && options.auth !== false) {
-    const refreshedToken = await refreshAccessToken()
+    const refreshedToken = await getFreshAccessToken()
 
     if (refreshedToken) {
       updateStoredToken(refreshedToken)

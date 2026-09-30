@@ -195,8 +195,12 @@ class AdminLeaveRequestServiceTest {
 
         assertThatThrownBy(() -> service.approveLeaveRequest(principal, 10L, new ReviewLeaveRequestRequest(null)))
                 .isInstanceOf(ResponseStatusException.class)
-                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
-                .isEqualTo(HttpStatus.BAD_REQUEST);
+                .satisfies(ex -> {
+                    ResponseStatusException responseException = (ResponseStatusException) ex;
+                    assertThat(responseException.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(responseException.getReason()).isEqualTo(
+                            "Nhân viên đã có ngày nghỉ đã duyệt trùng với khoảng ngày này.");
+                });
 
         verify(leaveRequestRepository, never()).save(any());
     }

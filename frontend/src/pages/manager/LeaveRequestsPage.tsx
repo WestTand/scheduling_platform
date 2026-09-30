@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
+import { useAppDialog } from '@/components/common/AppDialogContext'
 import { DataTable } from '@/components/common/DataTable'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
@@ -26,6 +27,7 @@ const statusOptions = [
 ]
 
 export function LeaveRequestsPage() {
+  const { showDialog } = useAppDialog()
   const [searchParams, setSearchParams] = useSearchParams()
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
@@ -97,7 +99,7 @@ export function LeaveRequestsPage() {
     }
 
     if (decisionDialog.type === 'REJECTED' && !decisionState.managerNote.trim()) {
-      window.alert('Vui lòng nhập lý do từ chối.')
+      showDialog({ variant: 'warning', description: 'Vui lòng nhập lý do từ chối.' })
       return
     }
 
@@ -111,7 +113,7 @@ export function LeaveRequestsPage() {
       setSelectedRequest(null)
       await fetchData()
     } catch (decisionError) {
-      window.alert(decisionError instanceof Error ? decisionError.message : 'Không thể cập nhật trạng thái.')
+      showDialog({ variant: 'error', description: decisionError instanceof Error ? decisionError.message : 'Không thể cập nhật trạng thái.' })
     }
   }
 

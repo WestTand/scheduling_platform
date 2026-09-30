@@ -126,8 +126,12 @@ class EmployeeLeaveRequestServiceTest {
 
         assertThatThrownBy(() -> service.createLeaveRequest(principal, request))
                 .isInstanceOf(ResponseStatusException.class)
-                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
-                .isEqualTo(HttpStatus.BAD_REQUEST);
+                .satisfies(ex -> {
+                    ResponseStatusException responseException = (ResponseStatusException) ex;
+                    assertThat(responseException.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(responseException.getReason()).isEqualTo(
+                            "Đã có yêu cầu nghỉ chờ duyệt hoặc đã duyệt trong khoảng ngày này.");
+                });
     }
 
     @Test

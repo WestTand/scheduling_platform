@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { AccountStatusBadge } from '@/components/account/AccountStatusBadge'
 import { CreateAccountDialog } from '@/components/account/CreateAccountDialog'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
+import { useAppDialog } from '@/components/common/AppDialogContext'
 import { DataTable } from '@/components/common/DataTable'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
@@ -47,6 +48,7 @@ const getAccountStatus = (employeeId: string, accounts: UserAccount[]) => {
 
 export function EmployeesPage() {
   const { user } = useAuth()
+  const { showDialog } = useAppDialog()
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('ALL')
@@ -199,7 +201,7 @@ export function EmployeesPage() {
 
   const toggleStatus = async (employee: Employee) => {
     if (user?.id === employee.id) {
-      window.alert('Bạn không thể tạm ngưng hoặc xóa tài khoản đang đăng nhập.')
+      showDialog({ variant: 'warning', description: 'Bạn không thể tạm ngưng hoặc xóa tài khoản đang đăng nhập.' })
       return
     }
 
@@ -207,7 +209,7 @@ export function EmployeesPage() {
       await employeeService.toggleStatus(employee.id, user?.id)
       await fetchEmployees()
     } catch (toggleError) {
-      window.alert(toggleError instanceof Error ? toggleError.message : 'Không thể thay đổi trạng thái.')
+      showDialog({ variant: 'error', description: toggleError instanceof Error ? toggleError.message : 'Không thể thay đổi trạng thái.' })
     }
   }
 
@@ -217,7 +219,7 @@ export function EmployeesPage() {
     }
 
     if (user?.id === deleteTarget.id) {
-      window.alert('Bạn không thể xóa tài khoản đang đăng nhập.')
+      showDialog({ variant: 'warning', description: 'Bạn không thể xóa tài khoản đang đăng nhập.' })
       return
     }
 
@@ -227,7 +229,7 @@ export function EmployeesPage() {
       setPage(1)
       await fetchEmployees()
     } catch (deleteError) {
-      window.alert(deleteError instanceof Error ? deleteError.message : 'Không thể xóa nhân viên.')
+      showDialog({ variant: 'error', description: deleteError instanceof Error ? deleteError.message : 'Không thể xóa nhân viên.' })
     }
   }
 
@@ -253,13 +255,14 @@ export function EmployeesPage() {
       await accountService.resendActivationOtp(resendTarget.id)
       setResendTarget(null)
       await fetchEmployees()
-      window.alert(
-        apiConfig.useMockApi
+      showDialog({
+        variant: 'success',
+        description: apiConfig.useMockApi
           ? 'Mã OTP mới đã được gửi tới email nhân viên. OTP mock đang sử dụng: 123456.'
           : 'Mã OTP mới đã được gửi tới email nhân viên.',
-      )
+      })
     } catch (errorMessage) {
-      window.alert(errorMessage instanceof Error ? errorMessage.message : 'Không thể gửi lại mã OTP.')
+      showDialog({ variant: 'error', description: errorMessage instanceof Error ? errorMessage.message : 'Không thể gửi lại mã OTP.' })
     }
   }
 

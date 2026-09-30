@@ -112,6 +112,13 @@ describe('requestJson', () => {
     expect(localStorage.getItem(AUTH_STORAGE_KEYS.TOKEN)).toBe('valid-token')
   })
 
+  test('uses problem detail text for backend validation errors', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ detail: 'Đã có yêu cầu nghỉ chờ duyệt hoặc đã duyệt trong khoảng ngày này.' }, { status: 400 }))
+
+    await expect(requestJson('/api/employee/leave-requests', { method: 'POST', body: {} }))
+      .rejects.toThrow('Đã có yêu cầu nghỉ chờ duyệt hoặc đã duyệt trong khoảng ngày này.')
+  })
+
   test('stores refreshed token in session storage when the active user is session scoped', async () => {
     sessionStorage.setItem(AUTH_STORAGE_KEYS.USER, JSON.stringify({ id: '1' }))
     const fetchMock = vi.mocked(fetch)
@@ -124,6 +131,29 @@ describe('requestJson', () => {
 
     expect(sessionStorage.getItem(AUTH_STORAGE_KEYS.TOKEN)).toBe('fresh-session-token')
     expect(localStorage.getItem(AUTH_STORAGE_KEYS.TOKEN)).toBeNull()
+  })
+
+  test('shares one token refresh across concurrent authenticated 401 responses', async () => {
+    sessionStorage.setItem(AUTH_STORAGE_KEYS.TOKEN, 'expired-token')
+    const fetchMock = vi.mocked(fetch)
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ message: 'Unauthorized' }, { status: 401 }))
+      .mockResolvedValueOnce(jsonResponse({ message: 'Unauthorized' }, { status: 401 }))
+      .mockResolvedValueOnce(jsonResponse({ accessToken: 'fresh-token', account: {} }))
+      .mockResolvedValueOnce(jsonResponse({ value: 'first' }))
+      .mockResolvedValueOnce(jsonResponse({ value: 'second' }))
+
+    const [first, second] = await Promise.all([
+      requestJson<{ value: string }>('/api/admin/dashboard'),
+      requestJson<{ value: string }>('/api/admin/notifications'),
+    ])
+
+    expect(first).toEqual({ value: 'first' })
+    expect(second).toEqual({ value: 'second' })
+    expect(fetchMock.mock.calls.filter(([url]) => url === 'http://localhost:8080/api/auth/refresh')).toHaveLength(1)
+    expect((fetchMock.mock.calls[3]?.[1]?.headers as Headers).get('Authorization')).toBe('Bearer fresh-token')
+    expect((fetchMock.mock.calls[4]?.[1]?.headers as Headers).get('Authorization')).toBe('Bearer fresh-token')
+    expect(sessionStorage.getItem(AUTH_STORAGE_KEYS.TOKEN)).toBe('fresh-token')
   })
 })
 

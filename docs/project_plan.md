@@ -412,13 +412,13 @@ Ket qua mong doi: manager co the tao lich, gan nhan vien, kiem tra xung dot, duy
 - [x] API cong bo lich (da xong: publish APPROVED -> PUBLISHED; cancel DRAFT/APPROVED -> CANCELLED)
   - Dung de chuyen lich sang trang thai nhan vien co the xem.
   - Co the kich hoat notification o Phase 7.
-- [ ] Test tao ky lap lich
+- [x] Test tao ky lap lich
   - Kiem tra tao period va validate range ngay.
   - Dam bao lich co container hop le.
-- [ ] Test phan cong thu cong
+- [x] Test phan cong thu cong
   - Kiem tra assignment, update, lock/unlock va conflict validation.
   - Dam bao manual scheduling tin cay.
-- [ ] Test duyet/cong bo lich
+- [x] Test duyet/cong bo lich
   - Kiem tra state transition cua schedule period.
   - Dam bao lich chi cong bo khi hop le.
 
@@ -604,13 +604,13 @@ Ket qua mong doi: manager co nut export va cac bao cao co filter ro rang.
 - [ ] Export bao cao penalty/optimization result
   - Dung de giai thich chat luong lich AI.
   - Cho biet lich co vi pham soft constraint nao nhieu.
-- [ ] UI nut export Excel/PDF
+- [x] UI nut export Excel/PDF
   - Dung de manager thao tac export tu frontend.
   - Khong can goi API thu cong.
 - [x] Test export Excel
   - Kiem tra file tao duoc, co sheet/cot/data dung.
   - Dam bao export khong bi hong format.
-- [ ] Test export du lieu dung filter
+- [x] Test export du lieu dung filter
   - Kiem tra export theo period/employee/status dung.
   - Tranh xuat nham du lieu ngoai filter.
 
@@ -635,7 +635,7 @@ Frontend backend-contract alignment notes:
 - [x] Tao backend auth DTO types va adapter functions trong frontend
   - Dinh nghia type raw theo backend auth DTO cho login, `/me`, refresh va pending login states.
   - Adapter map backend account/employee auth response sang UI `User` hien tai.
-- [ ] Tao backend DTO types va adapter functions cho cac trang nghiep vu trong frontend
+- [x] Tao backend DTO types va adapter functions cho cac trang nghiep vu trong frontend
   - Dinh nghia type raw theo backend DTO cho employee, shift type, scheduling rules, schedule period, work shift, assignment.
   - Adapter map raw DTO sang UI model hien tai de component it bi thay doi.
   - Khong de page/component map response raw truc tiep.
@@ -643,49 +643,49 @@ Frontend backend-contract alignment notes:
   - Mock nen mo phong response backend DTO, khong tao shape rieng qua xa backend.
   - Mock va backend cung di qua adapter layer.
   - Giam rui ro UI chay mock duoc nhung fail khi doi sang backend.
-- [ ] Align giao dien quan ly nhan vien voi backend API
+- [x] Align giao dien quan ly nhan vien voi backend API
   - Endpoint chinh: `/api/admin/employees`.
   - Xu ly khac biet `id` backend numeric va UI string neu can.
   - Hien/luu dung status, employee code, contact va account summary backend tra ve.
-- [ ] Align giao dien quan ly loai ca voi backend API
+- [x] Align giao dien quan ly loai ca voi backend API
   - Endpoint chinh: `/api/admin/shift-types`.
   - Hien va submit dung `shiftCode`, `shiftName`, `startTime`, `endTime`, `durationHours`, `overnight`, `heavy`, `minStaff`, `maxStaff`, `quotaCategory`, `applicableWeekdays`, `appliesOnHolidays`, `penaltyWeightMultiplier`, `status`.
   - Map label tieng Viet cho quota category: `REGULAR`, `OVERTIME`, `BATHING`, `ON_CALL`.
   - Khong dung `shiftDefinitions` lam source chinh khi backend da co shift type data.
-- [ ] Them/cap nhat giao dien quy dinh xep lich
+- [x] Them/cap nhat giao dien quy dinh xep lich
   - Endpoint chinh: `/api/admin/scheduling-rules`.
   - Chia UI thanh hard rules, quotas va soft weights.
   - Label quota dung nghia ngay/tuan: ngay ngoai gio toi da, ngay thong tam toi da, khoang cach ngay truc.
-- [ ] Align giao dien ky lich va work shifts
+- [x] Align giao dien ky lich va work shifts
   - Endpoints chinh: `/api/admin/schedule-periods`, `/api/admin/schedule-periods/{periodId}/work-shifts`, `/api/admin/work-shifts/{workShiftId}`.
   - Calendar/table hien theo `workDate`, detail/tooltip hien `startsAt`, `endsAt`, `workMinutes`.
   - Hien badge ca qua ngay khi `isTransitionShift = true`.
-- [ ] Align giao dien assignment va dieu chinh lich thu cong
+- [x] Align giao dien assignment va dieu chinh lich thu cong
   - Endpoints chinh: tao assignment theo work shift, xem schedule theo period/employee, delete assignment, lock/unlock assignment.
   - Hien locked assignment bang badge/icon ro rang.
   - Group assignment theo work shift de lich nhieu nhan vien cung ca khong bi roi.
-- [ ] Cap nhat giao dien tao lich tu dong
+- [x] Cap nhat giao dien tao lich tu dong
   - Truoc khi chay, hien checklist input: period, work shifts, active employees, active shift types, scheduling rules, locked assignments.
   - Sau khi chay, hien `SUCCESS`, `INFEASIBLE`, `FAILED`, total penalty va diagnostics neu co.
   - Khong hien thong bao thanh cong/that bai chung chung khi backend/AI co ly do cu the.
 - [ ] Cap nhat giao dien ngay nghi va nguyen vong
   - Ngay nghi approved phai ghi ro AI se khong xep ca trong khoang ngay nay.
   - Nguyen vong phai ghi ro la soft constraint, khong dam bao luon duoc dap ung.
-- [ ] Them frontend contract/adapter tests toi thieu
+- [x] Them frontend contract/adapter tests toi thieu
   - Test sample backend DTO map dung sang UI model cho employee, shift type, work shift va scheduling rules.
   - Test service chon mock/backend theo config.
   - Chay `npm run build` de bat loi type khi contract doi.
 
-- [ ] Setup routing
+- [x] Setup routing
   - Dung de chia trang login, dashboard, admin, employee.
   - La nen cho route guard va role guard.
-- [ ] Tao layout chung
+- [x] Tao layout chung
   - Dung de co header/sidebar/container nhat quan.
   - Giam duplicate UI tren cac trang.
-- [ ] Tao trang login
+- [x] Tao trang login
   - Dung de user nhap username/password va nhan access token.
   - Dieu huong theo lifecycle: OTP, change password, dashboard.
-- [ ] Bo trang register public cho nhan vien
+- [x] Bo trang register public cho nhan vien
   - Dung de UI khong mo self-registration.
   - Dong bo voi backend chi manager tao account.
 - [x] Tao trang nhap OTP kich hoat tai khoan
@@ -700,88 +700,88 @@ Frontend backend-contract alignment notes:
 - [ ] Tao trang thong bao quen mat khau: lien he quan ly de cap lai
   - Dung vi he thong khong co self-service forgot password public.
   - Giam nham lan cho nhan vien.
-- [ ] Luu access token phia frontend
+- [x] Luu access token phia frontend
   - Dung de attach Bearer token vao API protected.
   - Can quan ly memory/local storage theo quy uoc bao mat.
-- [ ] Goi refresh token bang cookie
+- [x] Goi refresh token bang cookie
   - Dung de cap access token moi khi het han.
   - Refresh token nam trong HttpOnly cookie nen JS khong doc truc tiep.
-- [ ] Axios interceptor attach Bearer token
+- [x] Axios interceptor attach Bearer token
   - Dung de moi request protected tu dong co Authorization header.
   - Giam code lap lai o tung API call.
-- [ ] Axios interceptor tu refresh khi access token expired
+- [x] Axios interceptor tu refresh khi access token expired
   - Dung de user khong bi logout moi lan access token het han.
   - Neu refresh fail thi quay ve login.
-- [ ] Route guard cho protected pages
+- [x] Route guard cho protected pages
   - Dung de chan user chua login truy cap dashboard/admin.
   - Tang an toan va UX.
-- [ ] Role guard cho manager pages
+- [x] Role guard cho manager pages
   - Dung de nhan vien khong vao trang quan ly.
   - Dong bo voi backend role guard.
-- [ ] Trang dashboard quan ly
+- [x] Trang dashboard quan ly
   - Dung de manager xem tong quan: nhan vien, lich, task can xu ly.
   - La landing page sau login manager/admin.
-- [ ] Trang quan ly nhan vien
+- [x] Trang quan ly nhan vien
   - Dung de list/search/detail/update/lock/unlock nhan vien.
   - Ket noi Phase 3 employee APIs.
-- [ ] Form quan ly tao nhan vien kem email/account
+- [x] Form quan ly tao nhan vien kem email/account
   - Dung de manager tao nhan vien moi va gui OTP.
   - Ket noi endpoint create account.
 - [ ] Form quan ly reset mat khau tam cho nhan vien
   - Dung de manager reset khi nhan vien quen password.
   - Sau reset, nhan vien phai doi password.
-- [ ] Nut quan ly gui lai OTP kich hoat
+- [x] Nut quan ly gui lai OTP kich hoat
   - Dung de resend OTP cho account pending activation.
   - Ho tro xu ly van de email/OTP het han.
 - [ ] Nut quan ly khoa/mo khoa account
   - Dung de vo hieu hoa hoac kich hoat lai account nhan vien.
   - Ket noi admin account APIs.
-- [ ] Trang quan ly loai ca
+- [x] Trang quan ly loai ca
   - Dung de xem/them/sua/khoa loai ca.
   - La cau hinh dau vao cho scheduling.
-- [ ] Trang quan ly ngay nghi
+- [x] Trang quan ly ngay nghi
   - Dung de manager xem/duyet leave requests.
   - Anh huong truc tiep den scheduling.
-- [ ] Trang quan ly nguyen vong
+- [x] Trang quan ly nguyen vong
   - Dung de xem preference cua nhan vien.
   - Ho tro giai thich input cho AI.
-- [ ] Trang tao lich tu dong
+- [x] Trang tao lich tu dong
   - Dung de manager chon period va chay AI scheduling.
   - Hien ket qua/toi uu/infeasible reason.
-- [ ] Trang xem lich dang calendar/table
+- [x] Trang xem lich dang calendar/table
   - Dung de xem lich theo ky/nhan vien.
   - La man hinh chinh sau khi co assignments.
-- [ ] Trang dieu chinh lich thu cong
+- [x] Trang dieu chinh lich thu cong
   - Dung de manager sua assignment, lock/unlock ca.
   - Ho tro override AI/manual scheduling.
-- [ ] Trang duyet va cong bo lich
+- [x] Trang duyet va cong bo lich
   - Dung de chot lich truoc khi nhan vien thay.
   - Kich hoat notification o Phase 7.
-- [ ] Trang xu ly doi ca
+- [x] Trang xu ly doi ca
   - Dung de manager/nhan vien xem va xu ly swap requests.
   - Ho tro workflow doi ca co phe duyet.
-- [ ] Trang thong bao
+- [x] Trang thong bao
   - Dung de user xem notification va mark read.
   - Giam phu thuoc email/chat ngoai he thong.
-- [ ] Trang activity logs
+- [x] Trang activity logs
   - Dung de manager/admin xem audit trail.
   - Huu ich cho demo va debug van hanh.
-- [ ] Trang nhan vien xem lich
+- [x] Trang nhan vien xem lich
   - Dung de employee xem ca cua minh.
   - Chuc nang cot loi cho nguoi dung employee.
-- [ ] Trang nhan vien dang ky nghi
+- [x] Trang nhan vien dang ky nghi
   - Dung de employee gui leave request.
   - Input quan trong cho scheduling.
-- [ ] Trang nhan vien dang ky nguyen vong
+- [x] Trang nhan vien dang ky nguyen vong
   - Dung de employee gui preference.
   - Input cho soft constraints AI.
-- [ ] Trang nhan vien gui doi ca
+- [x] Trang nhan vien gui doi ca
   - Dung de employee tao swap request khi khong the lam ca.
   - Giam viec doi ca ngoai he thong.
 - [ ] Responsive desktop/mobile
   - Dung de UI dung duoc tren laptop va dien thoai.
   - Nhan vien co the xem lich/thao tac nhanh tren mobile.
-- [ ] Test frontend build
+- [x] Test frontend build
   - Kiem tra TypeScript/build khong loi.
   - La dieu kien truoc khi demo/deploy.
 
@@ -791,13 +791,13 @@ Muc dich: tao du lieu demo, test flow end-to-end, va chuan bi tai lieu/hinh anh 
 
 Ket qua mong doi: Docker compose chay sach, co account/nhan vien/ca/rules mau, cac luong chinh duoc test, va co huong dan demo.
 
-- [ ] Viet seed data demo
+- [x] Viet seed data demo
   - Dung de co du lieu mau nhanh khi demo.
   - Giam thoi gian nhap tay moi lan reset DB.
-- [ ] Seed manager account
+- [x] Seed manager account
   - Dung de co user quan ly dang nhap ngay sau khi setup.
   - Can cho demo/admin workflows.
-- [ ] Seed danh sach nhan vien mau
+- [x] Seed danh sach nhan vien mau
   - Dung de co du nhan vien lap lich.
   - Giup demo fairness/AI co y nghia.
 - [ ] Seed account nhan vien chua kich hoat
@@ -806,10 +806,10 @@ Ket qua mong doi: Docker compose chay sach, co account/nhan vien/ca/rules mau, c
 - [ ] Seed account nhan vien can doi mat khau
   - Dung de demo force password change sau reset/OTP.
   - Xac nhan UI/backend dieu huong dung.
-- [ ] Seed loai ca mau: ngoai gio, thong tam, truc
+- [x] Seed loai ca mau: ngoai gio, thong tam, truc
   - Dung de co cau hinh shift type thuc te.
   - La input cho manual/AI scheduling.
-- [ ] Seed scheduling rules mau
+- [x] Seed scheduling rules mau
   - Dung de AI co hard/soft constraints mac dinh.
   - Giam setup truoc khi demo AI.
 - [ ] Test flow quan ly tao account nhan vien

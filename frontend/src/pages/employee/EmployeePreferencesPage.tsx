@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
+import { useAppDialog } from '@/components/common/AppDialogContext'
 import { DataTable } from '@/components/common/DataTable'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
@@ -38,6 +39,7 @@ const resolveShiftTypeId = (code: string): number | null => {
 }
 
 export function EmployeePreferencesPage() {
+  const { showDialog } = useAppDialog()
   const [searchParams, setSearchParams] = useSearchParams()
   const [showForm, setShowForm] = useState(() => searchParams.get('action') === 'create')
   const [selected, setSelected] = useState<WorkPreference | null>(null)
@@ -130,7 +132,7 @@ export function EmployeePreferencesPage() {
 
   const handleSubmit = async () => {
     if (!form.note.trim()) {
-      window.alert('Nội dung ghi chú không được bỏ trống.')
+      showDialog({ variant: 'warning', description: 'Nội dung ghi chú không được bỏ trống.' })
       return
     }
 
@@ -157,9 +159,9 @@ export function EmployeePreferencesPage() {
       setEditing(null)
       setForm({ month: '2026-10', type: 'PREFERRED', relatedShiftCode: 'THONG_TAM', priority: '1', note: '' })
       await loadData()
-      window.alert('Nguyện vọng đã được gửi và đang chờ xem xét.')
+      showDialog({ variant: 'success', description: 'Nguyện vọng đã được gửi và đang chờ xem xét.' })
     } catch (submitError) {
-      window.alert(submitError instanceof Error ? submitError.message : 'Không thể gửi nguyện vọng.')
+      showDialog({ variant: 'error', description: submitError instanceof Error ? submitError.message : 'Không thể gửi nguyện vọng.' })
     }
   }
 
@@ -168,7 +170,7 @@ export function EmployeePreferencesPage() {
       await preferenceService.cancelMine(id)
       await loadData()
     } catch (deleteError) {
-      window.alert(deleteError instanceof Error ? deleteError.message : 'Không thể hủy nguyện vọng.')
+      showDialog({ variant: 'error', description: deleteError instanceof Error ? deleteError.message : 'Không thể hủy nguyện vọng.' })
     }
   }
 

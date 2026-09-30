@@ -2,6 +2,7 @@ import { Clock3, Edit3, Eye, Palette, Search, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
+import { useAppDialog } from '@/components/common/AppDialogContext'
 import { DataTable } from '@/components/common/DataTable'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
@@ -44,6 +45,7 @@ const statusOptions = [
 ]
 
 export function ShiftTypesPage() {
+  const { showDialog } = useAppDialog()
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('ALL')
@@ -179,7 +181,7 @@ export function ShiftTypesPage() {
       await shiftTypeService.toggleStatus(shiftType.id)
       await fetchData()
     } catch (toggleError) {
-      window.alert(toggleError instanceof Error ? toggleError.message : 'Không thể thay đổi trạng thái ca.')
+      showDialog({ variant: 'error', description: toggleError instanceof Error ? toggleError.message : 'Không thể thay đổi trạng thái ca.' })
     }
   }
 
@@ -194,7 +196,7 @@ export function ShiftTypesPage() {
       setPage(1)
       await fetchData()
     } catch (deleteError) {
-      window.alert(deleteError instanceof Error ? deleteError.message : 'Không thể tạm ngưng loại ca.')
+      showDialog({ variant: 'error', description: deleteError instanceof Error ? deleteError.message : 'Không thể tạm ngưng loại ca.' })
     }
   }
 

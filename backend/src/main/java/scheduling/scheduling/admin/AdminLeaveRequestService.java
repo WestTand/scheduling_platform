@@ -75,7 +75,7 @@ public class AdminLeaveRequestService {
         serializeEmployeeReview(leaveRequest.getEmployee());
         if (leaveRequestRepository.existsApprovedOverlapExcludingId(
                 employeeId, leaveRequest.getStartDate(), leaveRequest.getEndDate(), leaveRequest.getId())) {
-            throw invalidRequest();
+            throw duplicateApprovedLeaveRequest();
         }
         applyReview(leaveRequest, manager, APPROVED, request.reviewNote());
         recordLeaveReview(manager, leaveRequest, "APPROVE");
@@ -165,5 +165,11 @@ public class AdminLeaveRequestService {
 
     private static ResponseStatusException invalidRequest() {
         return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid leave review request");
+    }
+
+    private static ResponseStatusException duplicateApprovedLeaveRequest() {
+        return new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Nhân viên đã có ngày nghỉ đã duyệt trùng với khoảng ngày này.");
     }
 }
