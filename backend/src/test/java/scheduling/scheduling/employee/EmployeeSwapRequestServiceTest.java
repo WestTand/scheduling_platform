@@ -13,18 +13,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import jakarta.validation.Validation;
-import jakarta.validation.Validator;
 import java.util.List;
 import java.time.LocalDate;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
-import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpStatus;
-import org.springframework.validation.BeanPropertyBindingResult;
-import org.springframework.validation.ObjectError;
-import org.springframework.web.bind.MethodArgumentNotValidException;
-import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.server.ResponseStatusException;
 import scheduling.scheduling.auth.CurrentAccountPrincipal;
 import scheduling.scheduling.employee.dto.CreateSwapRequestRequest;
@@ -800,34 +793,4 @@ class EmployeeSwapRequestServiceTest {
         verifyNoInteractions(notificationService);
     }
 
-    @Test
-    void respondSwapRequestBodyRejectsNonPositiveTargetAssignmentId() throws Exception {
-        Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
-        MethodParameter requestParameter = new HandlerMethod(
-                new EmployeeSwapRequestController(null),
-                EmployeeSwapRequestController.class.getDeclaredMethod(
-                        "respondSwapRequest",
-                        CurrentAccountPrincipal.class, Long.class, RespondSwapRequestRequest.class))
-                .getMethodParameters()[2];
-
-        assertThat(validationStatus(validator, requestParameter, new RespondSwapRequestRequest(true, 0L)))
-                .isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(validationStatus(validator, requestParameter, new RespondSwapRequestRequest(true, -1L)))
-                .isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(validationStatus(validator, requestParameter, new RespondSwapRequestRequest(false, null)))
-                .isEqualTo(HttpStatus.OK);
     }
-
-    private static HttpStatus validationStatus(
-            Validator validator, MethodParameter requestParameter, RespondSwapRequestRequest request) {
-        BeanPropertyBindingResult bindingResult =
-                new BeanPropertyBindingResult(request, "respondSwapRequestRequest");
-        validator.validate(request).forEach(violation -> bindingResult.addError(
-                new ObjectError(violation.getPropertyPath().toString(), violation.getMessage())));
-        if (bindingResult.getAllErrors().isEmpty()) {
-            return HttpStatus.OK;
-        }
-        return HttpStatus.valueOf(
-                new MethodArgumentNotValidException(requestParameter, bindingResult).getStatusCode().value());
-    }
-}

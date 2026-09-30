@@ -27,6 +27,7 @@ public class EmployeeSwapRequestService {
     private static final String APPROVED = "APPROVED";
     private static final String REJECTED = "REJECTED";
     private static final String CANCELLED = "CANCELLED";
+    private static final String TARGET_ASSIGNMENT_NOT_FOUND = "Ca được chọn không tồn tại";
 
     private final EmployeeAccess employeeAccess;
     private final SwapRequestRepository swapRequestRepository;
@@ -175,21 +176,16 @@ public class EmployeeSwapRequestService {
         }
         ShiftAssignment targetAssignment = shiftAssignmentRepository.findDetailById(targetAssignmentId)
                 .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Ca được chọn không tồn tại"));
+                        HttpStatus.NOT_FOUND, TARGET_ASSIGNMENT_NOT_FOUND));
         if (!employee.getId().equals(targetAssignment.getEmployee().getId())) {
-            throw new ResponseStatusException(
-                    HttpStatus.NOT_FOUND, "Ca được chọn không tồn tại");
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, TARGET_ASSIGNMENT_NOT_FOUND);
         }
         if (requesterAssignment.getId().equals(targetAssignment.getId())) {
-            // Defence in depth: unreachable via the normal create path because self-targeting
-            // is forbidden there, so do not remove this guard.
+            // Defence in depth: the create path forbids self-targeting, so this cannot be reached.
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST, "Bạn không thể chọn ca của người gửi yêu cầu.");
         }
-        if (!PUBLISHED.equals(targetAssignment.getWorkShift().getSchedulePeriod().getStatus())) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST, "Ca đã chọn không thuộc lịch đã công bố.");
-        }
+        requirePublished(targetAssignment, "Ca đã chọn không thuộc lịch đã công bố.");
         return targetAssignment;
     }
 
@@ -207,9 +203,12 @@ public class EmployeeSwapRequestService {
     }
 
     private static void requirePublished(ShiftAssignment assignment) {
+        requirePublished(assignment, "Assignment is not in a published schedule");
+    }
+
+    private static void requirePublished(ShiftAssignment assignment, String reason) {
         if (!PUBLISHED.equals(assignment.getWorkShift().getSchedulePeriod().getStatus())) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST, "Assignment is not in a published schedule");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, reason);
         }
     }
 
