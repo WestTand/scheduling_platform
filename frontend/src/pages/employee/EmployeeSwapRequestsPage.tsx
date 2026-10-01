@@ -2,6 +2,7 @@ import { CalendarClock, Check, Eye, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
+import { formatSwapAssignmentOptionLabel, getRespondBlockedMessage, resolvePublishedAssignmentId, SWAP_CONFIRM_BLOCKED_MESSAGE } from './EmployeeSwapRequestsPage.helpers'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { useAppDialog } from '@/components/common/AppDialogContext'
 import { DataTable } from '@/components/common/DataTable'
@@ -43,6 +44,7 @@ export function EmployeeSwapRequestsPage() {
   const [optionsLoading, setOptionsLoading] = useState(false)
   const [optionsError, setOptionsError] = useState('')
   const [form, setForm] = useState({ requesterAssignmentId: '', targetEmployeeId: '', reason: '' })
+  const [respondDialog, setRespondDialog] = useState<{ requestId: string; options: SwapAssignmentOption[]; selectedId: string; loading: boolean; error: string } | null>(null)
 
   const { user } = useAuth()
   const [authoritativeEmployeeId, setAuthoritativeEmployeeId] = useState<string | null>(null)
@@ -223,14 +225,79 @@ export function EmployeeSwapRequestsPage() {
     }
   }
 
-  const handleRespond = async (id: string, accept: boolean) => {
+const respondRequestId = respondDialog?.requestId ?? ''
+
+  useEffect(() => {
+    if (!respondRequestId) {
+      return
+    }
+
+    let mounted = true
+
+    const loadRespondOptions = async () => {
+      try {
+        const assignmentOptions = await swapRequestService.listMyAssignments()
+        if (mounted) {
+          setRespondDialog((current) => (current && current.requestId === respondRequestId ? { ...current, options: assignmentOptions, loading: false, error: '' } : current))
+        }
+      } catch (optionsErr) {
+        if (mounted) {
+          setRespondDialog((current) => (current && current.requestId === respondRequestId ? { ...current, loading: false, error: optionsErr instanceof Error ? optionsErr.message : 'Không thể tải ca làm của bạn.' } : current))
+        }
+      }
+    }
+
+    void loadRespondOptions()
+
+    return () => {
+      mounted = false
+    }
+  }, [respondRequestId])
+
+  const openRespondDialog = (request: SwapRequest) => {
+    setRespondDialog({ requestId: request.id, options: [], selectedId: '', loading: true, error: '' })
+  }
+
+  const closeRespondDialog = () => {
+    setRespondDialog(null)
+  }
+
+  const handleConfirmRespond = async () => {
+    if (!respondDialog) {
+      return
+    }
+
+    const blockedMessage = getRespondBlockedMessage(respondDialog.options, respondDialog.selectedId, true, respondDialog.loading)
+    if (blockedMessage) {
+      showDialog({ variant: 'warning', description: blockedMessage })
+      return
+    }
+
+    if (respondDialog.error) {
+      showDialog({ variant: 'error', description: respondDialog.error })
+      return
+    }
+
+    const targetAssignmentId = resolvePublishedAssignmentId(respondDialog.options, respondDialog.selectedId)
+    if (!targetAssignmentId) {
+      showDialog({ variant: 'warning', description: SWAP_CONFIRM_BLOCKED_MESSAGE })
+      return
+    }
+
+    const { requestId } = respondDialog
+    closeRespondDialog()
+    await handleRespond(requestId, true, Number(targetAssignmentId))
+  }
+
+  const handleRespond = async (id: string, accept: boolean, targetAssignmentId?: number) => {
     try {
-      await swapRequestService.respondMine(id, accept)
+      await swapRequestService.respondMine(id, accept, targetAssignmentId)
       await loadData()
     } catch (respondError) {
       showDialog({ variant: 'error', description: respondError instanceof Error ? respondError.message : 'Không thể phản hồi yêu cầu.' })
     }
   }
+
 
   return (
     <div className="space-y-6">
@@ -279,7 +346,7 @@ export function EmployeeSwapRequestsPage() {
                           {canCancel && <Button variant="ghost" size="icon" onClick={() => handleCancel(item.id)} aria-label="Hủy yêu cầu"><X className="h-4 w-4" /></Button>}
                           {canRespond && (
                             <>
-                              <Button variant="ghost" size="icon" onClick={() => handleRespond(item.id, true)} aria-label="Đồng ý đổi ca"><Check className="h-4 w-4" /></Button>
+                              <Button variant="ghost" size="icon" onClick={() => openRespondDialog(item)} aria-label="Đồng ý đổi ca"><Check className="h-4 w-4" /></Button>
                               <Button variant="ghost" size="icon" onClick={() => handleRespond(item.id, false)} aria-label="Từ chối đổi ca"><X className="h-4 w-4" /></Button>
                             </>
                           )}
@@ -309,7 +376,7 @@ export function EmployeeSwapRequestsPage() {
             <select value={form.requesterAssignmentId} disabled={optionsLoading || Boolean(optionsError)} onChange={(event) => setForm((current) => ({ ...current, requesterAssignmentId: event.target.value }))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-50">
               <option value="">{optionsLoading ? 'Đang tải ca làm...' : 'Chọn ca của bạn'}</option>
               {assignments.map((assignment) => (
-                <option key={assignment.id} value={assignment.id}>{`${assignment.workDate} • ${assignment.shiftName} ${assignment.shiftStartTime}-${assignment.shiftEndTime} • ${assignment.periodName} (${assignment.periodStatus})`}</option>
+                <option key={assignment.id} value={assignment.id}>{formatSwapAssignmentOptionLabel(assignment)}</option>
               ))}
             </select>
           </div>
@@ -326,9 +393,37 @@ export function EmployeeSwapRequestsPage() {
             <label className="text-sm text-slate-700">Lý do</label>
             <textarea value={form.reason} onChange={(event) => setForm((current) => ({ ...current, reason: event.target.value }))} rows={3} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
           </div>
-          <p className="text-xs text-slate-500">Không cần chọn ca của nhân viên đối ứng trong giai đoạn này (targetAssignment không bắt buộc).</p>
           {optionsError && <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{optionsError}</div>}
         </div>
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={Boolean(respondDialog)}
+        title="Xác nhận đổi ca"
+        description="Chọn ca của bạn để đổi với yêu cầu này. Yêu cầu sẽ được gửi để quản lý xem xét."
+        onCancel={closeRespondDialog}
+        onConfirm={() => { void handleConfirmRespond() }}
+        confirmLabel="Xác nhận đổi ca"
+      >
+        {respondDialog && (
+          <div className="mt-4 grid gap-4">
+            <div className="space-y-1">
+              <label className="text-sm text-slate-700">Ca của bạn muốn đổi</label>
+              <select
+                value={respondDialog.selectedId}
+                disabled={respondDialog.loading || Boolean(respondDialog.error)}
+                onChange={(event) => setRespondDialog((current) => (current ? { ...current, selectedId: event.target.value } : current))}
+                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <option value="">{respondDialog.loading ? 'Đang tải ca làm...' : 'Chọn ca của bạn'}</option>
+                {respondDialog.options.filter((assignment) => assignment.periodStatus === 'PUBLISHED').map((assignment) => (
+                  <option key={assignment.id} value={assignment.id}>{formatSwapAssignmentOptionLabel(assignment)}</option>
+                ))}
+              </select>
+            </div>
+            {respondDialog.error && <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{respondDialog.error}</div>}
+          </div>
+        )}
       </ConfirmDialog>
 
       <ConfirmDialog
