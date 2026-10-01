@@ -13,8 +13,7 @@ import org.springframework.stereotype.Component;
 public class ScheduleExcelWriter {
 
     private static final String[] HEADERS = {
-        "Date", "Day", "Shift code", "Shift name", "Start", "End", "Employee code", "Employee name", "Status",
-        "Source", "Locked"
+        "Date", "Day", "Shift code", "Shift name", "Start", "End", "Employee code", "Employee name", "Status"
     };
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
 
@@ -72,8 +71,6 @@ public class ScheduleExcelWriter {
             row.createCell(6).setCellValue(blank(exportRow.employeeCode()));
             row.createCell(7).setCellValue(blank(exportRow.employeeName()));
             row.createCell(8).setCellValue(blank(exportRow.assignmentStatus()));
-            row.createCell(9).setCellValue(blank(exportRow.assignedSource()));
-            row.createCell(10).setCellValue(Boolean.TRUE.equals(exportRow.locked()) ? "Yes" : "No");
         }
     }
 

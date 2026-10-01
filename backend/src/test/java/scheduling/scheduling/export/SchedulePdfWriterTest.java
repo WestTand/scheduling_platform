@@ -2,8 +2,13 @@ package scheduling.scheduling.export;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.lowagie.text.Document;
+import com.lowagie.text.PageSize;
+import com.lowagie.text.Paragraph;
 import com.lowagie.text.pdf.PdfReader;
+import com.lowagie.text.pdf.PdfWriter;
 import com.lowagie.text.pdf.parser.PdfTextExtractor;
+import java.io.ByteArrayOutputStream;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -74,6 +79,109 @@ class SchedulePdfWriterTest {
             assertThat(text).contains("Week 39");
             assertThat(text).contains("An Nguyen");
             assertThat(text).containsOnlyOnce("Unassigned");
+            assertThat(text).contains("Shift code");
+            assertThat(text).contains("Employee code");
+            assertThat(text).contains("E001");
+        }
+    }
+
+    @Test
+    void writePrintsShiftCodeInItsOwnColumn() throws Exception {
+        ScheduleExportData data = new ScheduleExportData(
+                50L,
+                "Week 39",
+                LocalDate.of(2026, 9, 21),
+                LocalDate.of(2026, 9, 27),
+                3,
+                "PUBLISHED",
+                LocalDateTime.of(2026, 9, 20, 8, 30),
+                List.of(new ScheduleExportData.Row(
+                        LocalDate.of(2026, 9, 21),
+                        "MONDAY",
+                        100L,
+                        "CA_DAY",
+                        "Day Shift",
+                        LocalTime.of(8, 0),
+                        LocalTime.of(16, 0),
+                        "E001",
+                        "An Nguyen",
+                        "ASSIGNED",
+                        "MANUAL",
+                        true)));
+
+        byte[] bytes = writer.write(data);
+
+        try (PdfReader reader = new PdfReader(bytes)) {
+            String text = new PdfTextExtractor(reader).getTextFromPage(1);
+            assertThat(text).contains("Shift code");
+            assertThat(text).contains("CA_DAY");
+            assertThat(text).contains("Employee code");
+            assertThat(text).contains("E001");
+        }
+    }
+
+    @Test
+    void writeKeepsVietnameseDiacriticsInEmployeeNames() throws Exception {
+        ScheduleExportData data = new ScheduleExportData(
+                50L,
+                "Week 39",
+                LocalDate.of(2026, 9, 21),
+                LocalDate.of(2026, 9, 27),
+                3,
+                "PUBLISHED",
+                LocalDateTime.of(2026, 9, 20, 8, 30),
+                List.of(
+                        new ScheduleExportData.Row(
+                                LocalDate.of(2026, 9, 21),
+                                "MONDAY",
+                                100L,
+                                "DAY",
+                                "Day Shift",
+                                LocalTime.of(8, 0),
+                                LocalTime.of(16, 0),
+                                "E001",
+                                "Nguyễn Văn An",
+                                "ASSIGNED",
+                                "MANUAL",
+                                true),
+                        new ScheduleExportData.Row(
+                                LocalDate.of(2026, 9, 22),
+                                "TUESDAY",
+                                101L,
+                                "NIGHT",
+                                "Night Shift",
+                                LocalTime.of(22, 0),
+                                LocalTime.of(6, 0),
+                                "E002",
+                                "Trần Thị Bình",
+                                "ASSIGNED",
+                                "AI",
+                                false)));
+
+        byte[] bytes = writer.write(data);
+
+        try (PdfReader reader = new PdfReader(bytes)) {
+            String text = new PdfTextExtractor(reader).getTextFromPage(1);
+            assertThat(text).contains("Nguyễn Văn An");
+            assertThat(text).contains("Trần Thị Bình");
+        }
+    }
+
+    @Test
+    void boldFontKeepsVietnameseDiacritics() throws Exception {
+        try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            Document document = new Document(PageSize.A4, 36, 36, 36, 36);
+            PdfWriter.getInstance(document, output);
+            document.open();
+            document.add(new Paragraph("Nguyễn Văn An", PdfExportFonts.bold(16)));
+            document.add(new Paragraph("Trần Thị Bình", PdfExportFonts.bold(16)));
+            document.close();
+
+            try (PdfReader reader = new PdfReader(output.toByteArray())) {
+                String text = new PdfTextExtractor(reader).getTextFromPage(1);
+                assertThat(text).contains("Nguyễn Văn An");
+                assertThat(text).contains("Trần Thị Bình");
+            }
         }
     }
 }

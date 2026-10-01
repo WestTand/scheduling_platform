@@ -4,7 +4,6 @@ import com.lowagie.text.Document;
 import com.lowagie.text.DocumentException;
 import com.lowagie.text.Element;
 import com.lowagie.text.Font;
-import com.lowagie.text.FontFactory;
 import com.lowagie.text.PageSize;
 import com.lowagie.text.Paragraph;
 import com.lowagie.text.Phrase;
@@ -19,7 +18,9 @@ import org.springframework.stereotype.Component;
 @Component
 public class SchedulePdfWriter {
 
-    private static final String[] HEADERS = {"Date", "Shift", "Time", "Code", "Employee", "Status"};
+    private static final String[] HEADERS = {
+        "Date", "Shift", "Shift code", "Time", "Employee code", "Employee", "Status"
+    };
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ISO_LOCAL_DATE;
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
 
@@ -38,8 +39,8 @@ public class SchedulePdfWriter {
     }
 
     private static void writeMetadata(Document document, ScheduleExportData data) throws DocumentException {
-        Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 16);
-        Font metadataFont = FontFactory.getFont(FontFactory.HELVETICA, 10);
+        Font titleFont = PdfExportFonts.bold(16);
+        Font metadataFont = PdfExportFonts.regular(10);
 
         document.add(new Paragraph("Schedule Export", titleFont));
         document.add(new Paragraph("Period: "
@@ -62,10 +63,10 @@ public class SchedulePdfWriter {
     private static void writeTable(Document document, ScheduleExportData data) throws DocumentException {
         PdfPTable table = new PdfPTable(HEADERS.length);
         table.setWidthPercentage(100);
-        table.setWidths(new float[] {1.2F, 1.6F, 1.2F, 1.0F, 1.8F, 1.2F});
+        table.setWidths(new float[] {1.2F, 1.6F, 1.0F, 1.2F, 1.2F, 1.8F, 1.2F});
 
-        Font headerFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9);
-        Font cellFont = FontFactory.getFont(FontFactory.HELVETICA, 9);
+        Font headerFont = PdfExportFonts.bold(9);
+        Font cellFont = PdfExportFonts.regular(9);
         for (String header : HEADERS) {
             PdfPCell cell = new PdfPCell(new Phrase(header, headerFont));
             cell.setHorizontalAlignment(Element.ALIGN_CENTER);
@@ -75,8 +76,9 @@ public class SchedulePdfWriter {
         for (ScheduleExportData.Row row : data.rows()) {
             table.addCell(new Phrase(row.workDate() == null ? "" : row.workDate().format(DATE_FORMAT), cellFont));
             table.addCell(new Phrase(blank(row.shiftName()), cellFont));
-            table.addCell(new Phrase(formatTimeRange(row), cellFont));
             table.addCell(new Phrase(blank(row.shiftCode()), cellFont));
+            table.addCell(new Phrase(formatTimeRange(row), cellFont));
+            table.addCell(new Phrase(blank(row.employeeCode()), cellFont));
             table.addCell(new Phrase(employeeName(row), cellFont));
             table.addCell(new Phrase(blank(row.assignmentStatus()), cellFont));
         }
