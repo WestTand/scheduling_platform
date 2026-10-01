@@ -124,6 +124,12 @@ describe('getShiftCodeWarning', () => {
   it('warns when nothing is selected', () => {
     expect(getShiftCodeWarning('2026-09-14', '')).not.toBe('')
   })
+
+  it('omits the empty code from the warning when nothing is selected', () => {
+    const warning = getShiftCodeWarning('2026-09-14', '')
+    expect(warning).not.toContain('()')
+    expect(warning).toContain('Loại ca đang chọn không áp dụng cho ngày này.')
+  })
 })
 
 describe('normalizePriority', () => {

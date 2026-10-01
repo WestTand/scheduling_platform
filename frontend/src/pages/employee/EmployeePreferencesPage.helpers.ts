@@ -40,7 +40,8 @@ export const getShiftCodeWarning = (preferenceDate: string, currentCode: string)
     return ''
   }
 
-  return `Loại ca đang chọn (${currentCode}) không áp dụng cho ngày này. Nguyện vọng đã lưu sẽ không bị thay đổi, vui lòng chọn lại loại ca phù hợp trước khi gửi.`
+  const subject = currentCode ? `Loại ca đang chọn (${currentCode})` : 'Loại ca đang chọn'
+  return `${subject} không áp dụng cho ngày này. Nguyện vọng đã lưu sẽ không bị thay đổi, vui lòng chọn lại loại ca phù hợp trước khi gửi.`
 }
 
 export const resolveSelectedShiftCode = (preferenceDate: string, currentCode: string): string => {

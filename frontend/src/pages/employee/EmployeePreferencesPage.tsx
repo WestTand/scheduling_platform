@@ -17,7 +17,7 @@ import { getShiftDefinition, shiftDefinitions } from '@/configs/shiftDefinitions
 import { formatDateOnly } from '@/lib/dateFormat'
 import { preferenceService } from '@/services/preferenceService'
 import type { PreferenceType, WorkPreference } from '@/types/management'
-import { getSelectableShiftCodes, getShiftCodeOptions, getShiftCodeWarning, getTodayDateInputValue, isDateRangeInverted, isPreferenceDateInRange, normalizePriority, resolveSelectedShiftCode, validatePreferenceForm } from './EmployeePreferencesPage.helpers'
+import { getShiftCodeOptions, getShiftCodeWarning, getTodayDateInputValue, isDateRangeInverted, isPreferenceDateInRange, isShiftCodeApplicableToDate, normalizePriority, resolveSelectedShiftCode, validatePreferenceForm } from './EmployeePreferencesPage.helpers'
 
 interface PreferenceFormState {
   preferenceDate: string
@@ -155,7 +155,7 @@ export function EmployeePreferencesPage() {
     setShowForm(true)
   }
 
-const handleSubmit = async () => {
+  const handleSubmit = async () => {
     const validationMessage = validatePreferenceForm(form)
     if (validationMessage) {
       showDialog({ variant: 'warning', description: validationMessage })
@@ -275,7 +275,7 @@ const handleSubmit = async () => {
           <div className="space-y-1">
             <label className="text-sm text-slate-700">Loại ca liên quan</label>
             <select value={form.relatedShiftCode} onChange={(event) => setForm((current) => ({ ...current, relatedShiftCode: event.target.value }))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm">
-              {selectableShiftCodes.map((code) => <option key={code} value={code}>{getShiftDefinition(code)?.name ?? code}{code === form.relatedShiftCode && !getSelectableShiftCodes(form.preferenceDate).includes(code) ? ' (không áp dụng cho ngày này)' : ''}</option>)}
+              {selectableShiftCodes.map((code) => <option key={code} value={code}>{getShiftDefinition(code)?.name ?? code}{code === form.relatedShiftCode && !isShiftCodeApplicableToDate(form.preferenceDate, code) ? ' (không áp dụng cho ngày này)' : ''}</option>)}
             </select>
             {shiftCodeWarning && <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">{shiftCodeWarning}</div>}
           </div>
