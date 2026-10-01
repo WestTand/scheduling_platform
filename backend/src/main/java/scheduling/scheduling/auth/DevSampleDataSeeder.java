@@ -4,6 +4,7 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -18,6 +19,7 @@ import scheduling.scheduling.repository.EmployeeRepository;
 
 @Component
 @Profile("dev")
+@ConditionalOnProperty(name = "app.seed.legacy-runners.enabled", havingValue = "true")
 @Order(30)
 public class DevSampleDataSeeder implements ApplicationRunner {
 

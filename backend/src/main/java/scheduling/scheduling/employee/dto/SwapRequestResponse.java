@@ -24,8 +24,11 @@ public record SwapRequestResponse(
     }
 
     public static SwapRequestResponse from(SwapRequest swapRequest) {
+        return from(swapRequest, swapRequest.getRequesterAssignment().getEmployee());
+    }
+
+    public static SwapRequestResponse from(SwapRequest swapRequest, Employee requester) {
         ShiftAssignment requesterAssignment = swapRequest.getRequesterAssignment();
-        Employee requester = requesterAssignment.getEmployee();
         Employee target = swapRequest.getTargetEmployee();
         Account reviewedBy = swapRequest.getReviewedBy();
         return new SwapRequestResponse(

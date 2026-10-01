@@ -313,6 +313,76 @@ class AdminSchedulePeriodControllerTest {
     }
 
     @Test
+    void managerUpdatesEmployeePool() throws Exception {
+        givenToken("manager-token", manager());
+        when(adminSchedulePeriodService.updateEmployeePool(
+                any(CurrentAccountPrincipal.class), eq(20L), any()))
+                .thenReturn(response());
+
+        mockMvc.perform(put("/api/admin/schedule-periods/20/employee-pool")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer manager-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "employeeIds": [10, 11]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(20));
+
+        verify(adminSchedulePeriodService).updateEmployeePool(
+                any(CurrentAccountPrincipal.class), eq(20L), eq(List.of(10L, 11L)));
+    }
+
+    @Test
+    void managerCannotUpdateEmployeePoolWithEmptyEmployeeIds() throws Exception {
+        givenToken("manager-token", manager());
+
+        mockMvc.perform(put("/api/admin/schedule-periods/20/employee-pool")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer manager-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "employeeIds": []
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(adminSchedulePeriodService);
+    }
+
+    @Test
+    void nonManagerCannotUpdateEmployeePool() throws Exception {
+        givenToken("employee-token", employee());
+
+        mockMvc.perform(put("/api/admin/schedule-periods/20/employee-pool")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer employee-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "employeeIds": [10, 11]
+                                }
+                                """))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(adminSchedulePeriodService);
+    }
+
+    @Test
+    void anonymousCannotUpdateEmployeePool() throws Exception {
+        mockMvc.perform(put("/api/admin/schedule-periods/20/employee-pool")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "employeeIds": [10, 11]
+                                }
+                                """))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(adminSchedulePeriodService);
+    }
+
+    @Test
     void nonManagerCannotCancelSchedulePeriod() throws Exception {
         givenToken("employee-token", employee());
 

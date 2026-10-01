@@ -27,6 +27,7 @@ public class EmployeeSwapRequestService {
     private static final String APPROVED = "APPROVED";
     private static final String REJECTED = "REJECTED";
     private static final String CANCELLED = "CANCELLED";
+    private static final String TARGET_ASSIGNMENT_NOT_FOUND = "Ca được chọn không tồn tại";
 
     private final EmployeeAccess employeeAccess;
     private final SwapRequestRepository swapRequestRepository;
@@ -136,6 +137,10 @@ public class EmployeeSwapRequestService {
                     HttpStatus.BAD_REQUEST, "Swap request is not pending target response");
         }
         boolean accepted = Boolean.TRUE.equals(request.accept());
+        if (accepted) {
+            swapRequest.setTargetAssignment(resolveOwnedSelectableTargetAssignment(
+                    request.targetAssignmentId(), employee, swapRequest.getRequesterAssignment()));
+        }
         swapRequest.setStatus(accepted ? PENDING_APPROVAL : REJECTED);
         SwapRequest saved = swapRequestRepository.save(swapRequest);
         if (accepted) {
@@ -163,6 +168,27 @@ public class EmployeeSwapRequestService {
         return swapRequest;
     }
 
+    private ShiftAssignment resolveOwnedSelectableTargetAssignment(
+            Long targetAssignmentId, Employee employee, ShiftAssignment requesterAssignment) {
+        if (targetAssignmentId == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Vui lòng chọn ca của bạn để đổi trước khi xác nhận.");
+        }
+        ShiftAssignment targetAssignment = shiftAssignmentRepository.findDetailById(targetAssignmentId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, TARGET_ASSIGNMENT_NOT_FOUND));
+        if (!employee.getId().equals(targetAssignment.getEmployee().getId())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, TARGET_ASSIGNMENT_NOT_FOUND);
+        }
+        if (requesterAssignment.getId().equals(targetAssignment.getId())) {
+            // Defence in depth: the create path forbids self-targeting, so this cannot be reached.
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Bạn không thể chọn ca của người gửi yêu cầu.");
+        }
+        requirePublished(targetAssignment, "Ca đã chọn không thuộc lịch đã công bố.");
+        return targetAssignment;
+    }
+
     private static String normalizeStatus(String status) {
         if (!StringUtils.hasText(status)) {
             return null;
@@ -177,9 +203,12 @@ public class EmployeeSwapRequestService {
     }
 
     private static void requirePublished(ShiftAssignment assignment) {
+        requirePublished(assignment, "Assignment is not in a published schedule");
+    }
+
+    private static void requirePublished(ShiftAssignment assignment, String reason) {
         if (!PUBLISHED.equals(assignment.getWorkShift().getSchedulePeriod().getStatus())) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST, "Assignment is not in a published schedule");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, reason);
         }
     }
 

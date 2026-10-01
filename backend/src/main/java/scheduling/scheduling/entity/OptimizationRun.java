@@ -55,6 +55,11 @@ public class OptimizationRun extends BaseEntity {
     @Column(name = "penalty_details_json", columnDefinition = "JSONB")
     private String penaltyDetailsJson;
 
+    /** JSON snapshot of the AI staffing lower bound, used to explain INFEASIBLE results. */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "staffing_advice_json", columnDefinition = "JSONB")
+    private String staffingAdviceJson;
+
     @Column(name = "total_penalty", precision = 10, scale = 2)
     private BigDecimal totalPenalty;
 

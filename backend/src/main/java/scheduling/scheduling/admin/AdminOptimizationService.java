@@ -5,6 +5,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,6 +28,7 @@ import scheduling.scheduling.audit.ActivityLogService;
 import scheduling.scheduling.auth.CurrentAccountPrincipal;
 import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
+import scheduling.scheduling.entity.Employee;
 import scheduling.scheduling.entity.OptimizationRun;
 import scheduling.scheduling.entity.SchedulePeriod;
 import scheduling.scheduling.repository.AccountRepository;
@@ -78,10 +80,19 @@ public class AdminOptimizationService {
         AiSchedulingRequestDto.SolverOptionsDto options =
                 request == null || request.solverOptions() == null ? null : request.solverOptions();
         List<Long> employeeIds = request == null ? null : request.employeeIds();
+        // Without an explicit selection, the period's own employee pool is the only allowed
+        // candidate set. Falling back to every active employee would staff the schedule with
+        // people the manager never selected for this period, so an empty pool is rejected
+        // instead of widened: the manager must set a pool first.
+        List<Long> scopedEmployeeIds = employeeIds == null || employeeIds.isEmpty()
+                ? periodPoolIds(period)
+                : employeeIds;
+        if (scopedEmployeeIds.isEmpty()) {
+            throw emptyEmployeePool();
+        }
 
-        AiSchedulingPayloadBuilder.PayloadSnapshot snapshot = employeeIds == null || employeeIds.isEmpty()
-                ? payloadBuilder.prepareSnapshot(period, options)
-                : payloadBuilder.prepareSnapshot(period, options, employeeIds);
+        AiSchedulingPayloadBuilder.PayloadSnapshot snapshot =
+                payloadBuilder.prepareSnapshot(period, options, scopedEmployeeIds);
 
         Map<String, Object> weights = payloadBuilder.weightsSnapshotFrom(snapshot);
         OptimizationRun run = optimizationRunRecorder.start(period, manager, weights);
@@ -155,6 +166,22 @@ public class AdminOptimizationService {
             }
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "AI service unavailable", ex);
         }
+    }
+
+    private static List<Long> periodPoolIds(SchedulePeriod period) {
+        if (period.getEmployeePool() == null) {
+            return List.of();
+        }
+        return period.getEmployeePool().stream()
+                .map(Employee::getId)
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    private static ResponseStatusException emptyEmployeePool() {
+        return new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Kỳ lịch chưa có pool nhân viên. Vui lòng chọn nhân viên trước khi tối ưu.");
     }
 
     private static String validateProtocol(

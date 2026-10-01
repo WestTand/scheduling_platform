@@ -46,8 +46,10 @@ export const backendSwapRequestService = {
     return adaptBackendSwapRequest(response)
   },
 
-  async respondForEmployee(id: string, accept: boolean): Promise<SwapRequest> {
-    const body: BackendRespondSwapRequestRequest = { accept }
+  async respondForEmployee(id: string, accept: boolean, targetAssignmentId?: number): Promise<SwapRequest> {
+    const body: BackendRespondSwapRequestRequest = accept
+      ? { accept: true, targetAssignmentId }
+      : { accept: false }
     const response = await requestJson<BackendSwapRequestResponse>(`/api/employee/swap-requests/${encodeURIComponent(id)}/respond`, { method: 'POST', body })
     return adaptBackendSwapRequest(response)
   },

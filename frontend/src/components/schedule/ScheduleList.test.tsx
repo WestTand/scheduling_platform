@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { ScheduleList } from '@/components/schedule/ScheduleList'
 import { ScheduleStatus, type WorkSchedule } from '@/types/schedule'
 
-const schedule = (status: WorkSchedule['status']): WorkSchedule => ({
+const schedule = (status: WorkSchedule['status'], optimizationStatus?: string | null): WorkSchedule => ({
   id: `schedule-${status}`,
   name: `Lịch ${status}`,
   startDate: '2026-09-21',
@@ -17,6 +17,7 @@ const schedule = (status: WorkSchedule['status']): WorkSchedule => ({
   shiftCount: 3,
   status,
   isMock: false,
+  optimizationStatus,
 })
 
 describe('ScheduleList', () => {
@@ -38,5 +39,21 @@ describe('ScheduleList', () => {
     expect(html).toContain('Công bố')
     expect(html).toContain('Hủy')
     expect(html).not.toContain('Mở lịch')
+  })
+
+  it('disables approve action for infeasible schedules from the list response', () => {
+    const html = renderToStaticMarkup(
+      <MemoryRouter>
+        <ScheduleList
+          schedules={[schedule(ScheduleStatus.DRAFT, 'INFE')]}
+          onApprove={() => undefined}
+          onPublish={() => undefined}
+          onCancel={() => undefined}
+        />
+      </MemoryRouter>,
+    )
+
+    expect(html).toContain('disabled=""')
+    expect(html).toContain('Lịch đang bị cảnh báo (INFE) nên không thể duyệt.')
   })
 })

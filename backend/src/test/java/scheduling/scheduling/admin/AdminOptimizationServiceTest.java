@@ -21,6 +21,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -45,6 +46,7 @@ import scheduling.scheduling.auth.CurrentAccountPrincipal;
 import scheduling.scheduling.entity.Account;
 import scheduling.scheduling.entity.AccountRole;
 import scheduling.scheduling.entity.AccountStatus;
+import scheduling.scheduling.entity.Employee;
 import scheduling.scheduling.entity.OptimizationRun;
 import scheduling.scheduling.entity.SchedulePeriod;
 import scheduling.scheduling.repository.AccountRepository;
@@ -97,7 +99,7 @@ class AdminOptimizationServiceTest {
 
         when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
         when(schedulePeriodRepository.findDetailById(5L)).thenReturn(Optional.of(period));
-        when(payloadBuilder.prepareSnapshot(eq(period), eq(null))).thenReturn(snapshot);
+        when(payloadBuilder.prepareSnapshot(eq(period), eq(null), eq(List.of(31L)))).thenReturn(snapshot);
         when(payloadBuilder.weightsSnapshotFrom(same(snapshot))).thenReturn(weights);
         when(optimizationRunRecorder.start(eq(period), eq(manager), eq(weights))).thenReturn(startedRun);
         when(payloadBuilder.buildFrom(same(snapshot), eq(period), eq(900L))).thenReturn(payload);
@@ -119,7 +121,7 @@ class AdminOptimizationServiceTest {
         assertThat(response.finishedAt()).isEqualTo(LocalDateTime.of(2026, 9, 21, 9, 1));
 
         InOrder inOrder = inOrder(payloadBuilder, optimizationRunRecorder, aiSchedulingClient);
-        inOrder.verify(payloadBuilder).prepareSnapshot(eq(period), eq(null));
+        inOrder.verify(payloadBuilder).prepareSnapshot(eq(period), eq(null), eq(List.of(31L)));
         inOrder.verify(payloadBuilder).weightsSnapshotFrom(same(snapshot));
         inOrder.verify(optimizationRunRecorder).start(eq(period), eq(manager), eq(weights));
         inOrder.verify(payloadBuilder).buildFrom(same(snapshot), eq(period), eq(900L));
@@ -158,7 +160,7 @@ class AdminOptimizationServiceTest {
 
         when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
         when(schedulePeriodRepository.findDetailById(5L)).thenReturn(Optional.of(period));
-        when(payloadBuilder.prepareSnapshot(eq(period), eq(null))).thenReturn(snapshot);
+        when(payloadBuilder.prepareSnapshot(eq(period), eq(null), eq(List.of(31L)))).thenReturn(snapshot);
         when(payloadBuilder.weightsSnapshotFrom(same(snapshot))).thenReturn(weights);
         when(optimizationRunRecorder.start(eq(period), eq(manager), eq(weights))).thenReturn(startedRun);
         when(payloadBuilder.buildFrom(same(snapshot), eq(period), eq(900L))).thenReturn(payload);
@@ -172,7 +174,7 @@ class AdminOptimizationServiceTest {
         assertThat(response.aiStatus()).isEqualTo("SUCCESS");
 
         InOrder inOrder = inOrder(payloadBuilder, optimizationRunRecorder, aiSchedulingClient, assignmentPersistenceService);
-        inOrder.verify(payloadBuilder).prepareSnapshot(eq(period), eq(null));
+        inOrder.verify(payloadBuilder).prepareSnapshot(eq(period), eq(null), eq(List.of(31L)));
         inOrder.verify(payloadBuilder).weightsSnapshotFrom(same(snapshot));
         inOrder.verify(optimizationRunRecorder).start(eq(period), eq(manager), eq(weights));
         inOrder.verify(payloadBuilder).buildFrom(same(snapshot), eq(period), eq(900L));
@@ -210,7 +212,7 @@ class AdminOptimizationServiceTest {
 
         when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
         when(schedulePeriodRepository.findDetailById(5L)).thenReturn(Optional.of(period));
-        when(payloadBuilder.prepareSnapshot(eq(period), eq(null))).thenReturn(snapshot);
+        when(payloadBuilder.prepareSnapshot(eq(period), eq(null), eq(List.of(31L)))).thenReturn(snapshot);
         when(payloadBuilder.weightsSnapshotFrom(same(snapshot))).thenReturn(weights);
         when(optimizationRunRecorder.start(eq(period), eq(manager), eq(weights))).thenReturn(startedRun);
         when(payloadBuilder.buildFrom(same(snapshot), eq(period), eq(900L))).thenReturn(payload);
@@ -255,7 +257,7 @@ class AdminOptimizationServiceTest {
 
         when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
         when(schedulePeriodRepository.findDetailById(5L)).thenReturn(Optional.of(period));
-        when(payloadBuilder.prepareSnapshot(eq(period), eq(null))).thenReturn(testSnapshot());
+        when(payloadBuilder.prepareSnapshot(eq(period), eq(null), eq(List.of(31L)))).thenReturn(testSnapshot());
         when(payloadBuilder.weightsSnapshotFrom(any())).thenReturn(weights);
         when(optimizationRunRecorder.start(eq(period), eq(manager), eq(weights))).thenReturn(startedRun);
         when(payloadBuilder.buildFrom(any(), eq(period), eq(900L))).thenReturn(payload);
@@ -300,7 +302,7 @@ class AdminOptimizationServiceTest {
 
         when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
         when(schedulePeriodRepository.findDetailById(5L)).thenReturn(Optional.of(period));
-        when(payloadBuilder.prepareSnapshot(eq(period), eq(null))).thenReturn(testSnapshot());
+        when(payloadBuilder.prepareSnapshot(eq(period), eq(null), eq(List.of(31L)))).thenReturn(testSnapshot());
         when(payloadBuilder.weightsSnapshotFrom(any())).thenReturn(weights);
         when(optimizationRunRecorder.start(eq(period), eq(manager), eq(weights))).thenReturn(startedRun);
         when(payloadBuilder.buildFrom(any(), eq(period), eq(900L))).thenReturn(payload);
@@ -343,7 +345,7 @@ class AdminOptimizationServiceTest {
 
         when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
         when(schedulePeriodRepository.findDetailById(5L)).thenReturn(Optional.of(period));
-        when(payloadBuilder.prepareSnapshot(eq(period), eq(null))).thenReturn(testSnapshot());
+        when(payloadBuilder.prepareSnapshot(eq(period), eq(null), eq(List.of(31L)))).thenReturn(testSnapshot());
         when(payloadBuilder.weightsSnapshotFrom(any())).thenReturn(weights);
         when(optimizationRunRecorder.start(eq(period), eq(manager), eq(weights))).thenReturn(startedRun);
         when(payloadBuilder.buildFrom(any(), eq(period), eq(900L))).thenReturn(payload);
@@ -386,7 +388,7 @@ class AdminOptimizationServiceTest {
 
         when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
         when(schedulePeriodRepository.findDetailById(5L)).thenReturn(Optional.of(period));
-        when(payloadBuilder.prepareSnapshot(eq(period), eq(null))).thenReturn(testSnapshot());
+        when(payloadBuilder.prepareSnapshot(eq(period), eq(null), eq(List.of(31L)))).thenReturn(testSnapshot());
         when(payloadBuilder.weightsSnapshotFrom(any())).thenReturn(weights);
         when(optimizationRunRecorder.start(eq(period), eq(manager), eq(weights))).thenReturn(startedRun);
         when(payloadBuilder.buildFrom(any(), eq(period), eq(900L))).thenReturn(payload);
@@ -429,7 +431,7 @@ class AdminOptimizationServiceTest {
 
         when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
         when(schedulePeriodRepository.findDetailById(5L)).thenReturn(Optional.of(period));
-        when(payloadBuilder.prepareSnapshot(eq(period), eq(null))).thenReturn(testSnapshot());
+        when(payloadBuilder.prepareSnapshot(eq(period), eq(null), eq(List.of(31L)))).thenReturn(testSnapshot());
         when(payloadBuilder.weightsSnapshotFrom(any())).thenReturn(weights);
         when(optimizationRunRecorder.start(eq(period), eq(manager), eq(weights))).thenReturn(startedRun);
         when(payloadBuilder.buildFrom(any(), eq(period), eq(900L))).thenReturn(payload);
@@ -474,7 +476,7 @@ class AdminOptimizationServiceTest {
 
         when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
         when(schedulePeriodRepository.findDetailById(5L)).thenReturn(Optional.of(period));
-        when(payloadBuilder.prepareSnapshot(eq(period), eq(null))).thenReturn(testSnapshot());
+        when(payloadBuilder.prepareSnapshot(eq(period), eq(null), eq(List.of(31L)))).thenReturn(testSnapshot());
         when(payloadBuilder.weightsSnapshotFrom(any())).thenReturn(weights);
         when(optimizationRunRecorder.start(eq(period), eq(manager), eq(weights))).thenReturn(startedRun);
         when(payloadBuilder.buildFrom(any(), eq(period), eq(900L))).thenReturn(payload);
@@ -517,7 +519,7 @@ class AdminOptimizationServiceTest {
 
         when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
         when(schedulePeriodRepository.findDetailById(5L)).thenReturn(Optional.of(period));
-        when(payloadBuilder.prepareSnapshot(eq(period), eq(null))).thenReturn(testSnapshot());
+        when(payloadBuilder.prepareSnapshot(eq(period), eq(null), eq(List.of(31L)))).thenReturn(testSnapshot());
         when(payloadBuilder.weightsSnapshotFrom(any())).thenReturn(weights);
         when(optimizationRunRecorder.start(eq(period), eq(manager), eq(weights))).thenReturn(startedRun);
         when(payloadBuilder.buildFrom(any(), eq(period), eq(900L))).thenReturn(payload);
@@ -539,7 +541,7 @@ class AdminOptimizationServiceTest {
         verifyNoInteractions(assignmentPersistenceService);
 
         InOrder inOrder = inOrder(payloadBuilder, optimizationRunRecorder, aiSchedulingClient);
-        inOrder.verify(payloadBuilder).prepareSnapshot(eq(period), eq(null));
+        inOrder.verify(payloadBuilder).prepareSnapshot(eq(period), eq(null), eq(List.of(31L)));
         inOrder.verify(optimizationRunRecorder).start(eq(period), eq(manager), eq(weights));
         inOrder.verify(payloadBuilder).buildFrom(any(), eq(period), eq(900L));
         inOrder.verify(aiSchedulingClient).optimize(eq(payload));
@@ -580,7 +582,7 @@ class AdminOptimizationServiceTest {
 
         when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
         when(schedulePeriodRepository.findDetailById(5L)).thenReturn(Optional.of(period));
-        when(payloadBuilder.prepareSnapshot(eq(period), eq(null))).thenReturn(testSnapshot());
+        when(payloadBuilder.prepareSnapshot(eq(period), eq(null), eq(List.of(31L)))).thenReturn(testSnapshot());
         when(payloadBuilder.weightsSnapshotFrom(any())).thenReturn(weights);
         when(optimizationRunRecorder.start(eq(period), eq(manager), eq(weights))).thenReturn(startedRun);
         when(payloadBuilder.buildFrom(any(), eq(period), eq(900L))).thenReturn(payload);
@@ -626,7 +628,7 @@ class AdminOptimizationServiceTest {
 
         when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
         when(schedulePeriodRepository.findDetailById(5L)).thenReturn(Optional.of(period));
-        when(payloadBuilder.prepareSnapshot(eq(period), eq(null))).thenReturn(testSnapshot());
+        when(payloadBuilder.prepareSnapshot(eq(period), eq(null), eq(List.of(31L)))).thenReturn(testSnapshot());
         when(payloadBuilder.weightsSnapshotFrom(any())).thenReturn(weights);
         when(optimizationRunRecorder.start(eq(period), eq(manager), eq(weights))).thenReturn(startedRun);
         when(payloadBuilder.buildFrom(any(), eq(period), eq(900L))).thenReturn(payload);
@@ -657,7 +659,7 @@ class AdminOptimizationServiceTest {
 
         when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
         when(schedulePeriodRepository.findDetailById(5L)).thenReturn(Optional.of(period));
-        when(payloadBuilder.prepareSnapshot(eq(period), eq(null))).thenReturn(testSnapshot());
+        when(payloadBuilder.prepareSnapshot(eq(period), eq(null), eq(List.of(31L)))).thenReturn(testSnapshot());
         when(payloadBuilder.weightsSnapshotFrom(any())).thenReturn(weights);
         when(optimizationRunRecorder.start(eq(period), eq(manager), eq(weights))).thenReturn(startedRun);
         when(payloadBuilder.buildFrom(any(), eq(period), eq(900L))).thenReturn(payload);
@@ -675,7 +677,7 @@ class AdminOptimizationServiceTest {
         verifyNoInteractions(assignmentPersistenceService);
 
         InOrder inOrder = inOrder(payloadBuilder, optimizationRunRecorder, aiSchedulingClient);
-        inOrder.verify(payloadBuilder).prepareSnapshot(eq(period), eq(null));
+        inOrder.verify(payloadBuilder).prepareSnapshot(eq(period), eq(null), eq(List.of(31L)));
         inOrder.verify(optimizationRunRecorder).start(eq(period), eq(manager), eq(weights));
         inOrder.verify(payloadBuilder).buildFrom(any(), eq(period), eq(900L));
         inOrder.verify(aiSchedulingClient).optimize(eq(payload));
@@ -694,7 +696,7 @@ class AdminOptimizationServiceTest {
 
         when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
         when(schedulePeriodRepository.findDetailById(5L)).thenReturn(Optional.of(period));
-        when(payloadBuilder.prepareSnapshot(eq(period), eq(null))).thenReturn(testSnapshot());
+        when(payloadBuilder.prepareSnapshot(eq(period), eq(null), eq(List.of(31L)))).thenReturn(testSnapshot());
         when(payloadBuilder.weightsSnapshotFrom(any())).thenReturn(weights);
         when(optimizationRunRecorder.start(eq(period), eq(manager), eq(weights))).thenReturn(startedRun);
         when(payloadBuilder.buildFrom(any(), eq(period), eq(900L))).thenReturn(payload);
@@ -738,7 +740,7 @@ class AdminOptimizationServiceTest {
 
         when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
         when(schedulePeriodRepository.findDetailById(5L)).thenReturn(Optional.of(period));
-        when(payloadBuilder.prepareSnapshot(eq(period), eq(null))).thenReturn(testSnapshot());
+        when(payloadBuilder.prepareSnapshot(eq(period), eq(null), eq(List.of(31L)))).thenReturn(testSnapshot());
         when(payloadBuilder.weightsSnapshotFrom(any())).thenReturn(weights);
         when(optimizationRunRecorder.start(eq(period), eq(manager), eq(weights))).thenReturn(startedRun);
         when(payloadBuilder.buildFrom(any(), eq(period), eq(900L))).thenReturn(payload);
@@ -764,7 +766,7 @@ class AdminOptimizationServiceTest {
 
         when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
         when(schedulePeriodRepository.findDetailById(5L)).thenReturn(Optional.of(period));
-        when(payloadBuilder.prepareSnapshot(any(), any()))
+        when(payloadBuilder.prepareSnapshot(any(), any(), any()))
                 .thenThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "No active employees to schedule"));
 
         assertThatThrownBy(() -> service.optimize(principal, 5L, new OptimizeScheduleRequest(null)))
@@ -850,7 +852,7 @@ class AdminOptimizationServiceTest {
 
         when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
         when(schedulePeriodRepository.findDetailById(5L)).thenReturn(Optional.of(period));
-        when(payloadBuilder.prepareSnapshot(eq(period), eq(null))).thenReturn(testSnapshot());
+        when(payloadBuilder.prepareSnapshot(eq(period), eq(null), eq(List.of(31L)))).thenReturn(testSnapshot());
         when(payloadBuilder.weightsSnapshotFrom(any())).thenReturn(weights);
         when(optimizationRunRecorder.start(eq(period), eq(manager), eq(weights))).thenReturn(startedRun);
         when(payloadBuilder.buildFrom(any(), eq(period), eq(900L))).thenReturn(payload);
@@ -872,6 +874,50 @@ class AdminOptimizationServiceTest {
         }
         verify(optimizationRunRecorder, never()).finishSuccess(any(), any());
         verifyNoInteractions(assignmentPersistenceService);
+    }
+
+    @Test
+    void optimizeWithoutEmployeeIdsUsesThePeriodEmployeePool() {
+        CurrentAccountPrincipal principal = new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
+        Account manager = managerAccount(principal);
+        SchedulePeriod period = draftPeriod(5L, manager);
+        period.setEmployeePool(new LinkedHashSet<>(List.of(employee(31L), employee(32L))));
+
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
+        when(schedulePeriodRepository.findDetailById(5L)).thenReturn(Optional.of(period));
+        when(payloadBuilder.prepareSnapshot(eq(period), eq(null), eq(List.of(31L, 32L))))
+                .thenThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "stop here"));
+
+        assertThatThrownBy(() -> service.optimize(principal, 5L, new OptimizeScheduleRequest(null, null)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(payloadBuilder).prepareSnapshot(eq(period), eq(null), eq(List.of(31L, 32L)));
+        verify(payloadBuilder, never()).prepareSnapshot(any(), any());
+    }
+
+    @Test
+    void optimizeRejectsWhenPoolIsEmptyAndNoEmployeeIdsGiven() {
+        CurrentAccountPrincipal principal = new CurrentAccountPrincipal(1L, "manager01", AccountRole.MANAGER);
+        Account manager = managerAccount(principal);
+        SchedulePeriod period = draftPeriod(5L, manager);
+        period.setEmployeePool(new LinkedHashSet<>());
+
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
+        when(schedulePeriodRepository.findDetailById(5L)).thenReturn(Optional.of(period));
+
+        assertThatThrownBy(() -> service.optimize(principal, 5L, new OptimizeScheduleRequest(null, null)))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Kỳ lịch chưa có pool nhân viên. Vui lòng chọn nhân viên trước khi tối ưu.")
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(payloadBuilder, never()).prepareSnapshot(any(), any());
+        verify(payloadBuilder, never()).prepareSnapshot(any(), any(), any());
+        verifyNoInteractions(optimizationRunRecorder, aiSchedulingClient);
+        verifyNoInteractions(assignmentPersistenceService);
+        verifyNoInteractions(activityLogService);
     }
 
     @Test
@@ -1168,7 +1214,7 @@ class AdminOptimizationServiceTest {
         Map<String, Object> weights = Map.of("fairness", BigDecimal.ONE);
         when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
         when(schedulePeriodRepository.findDetailById(5L)).thenReturn(Optional.of(period));
-        when(payloadBuilder.prepareSnapshot(eq(period), eq(null))).thenReturn(snapshot);
+        when(payloadBuilder.prepareSnapshot(eq(period), eq(null), eq(List.of(31L)))).thenReturn(snapshot);
         when(payloadBuilder.weightsSnapshotFrom(any())).thenReturn(weights);
         when(optimizationRunRecorder.start(eq(period), eq(manager), eq(weights))).thenReturn(startedRun);
         when(payloadBuilder.buildFrom(any(), eq(period), eq(900L))).thenReturn(payload);
@@ -1277,6 +1323,16 @@ class AdminOptimizationServiceTest {
         return account;
     }
 
+    private static Employee employee(Long id) {
+        Employee employee = Employee.builder()
+                .employeeCode("EMP" + id)
+                .fullName("Employee " + id)
+                .status("ACTIVE")
+                .build();
+        employee.setId(id);
+        return employee;
+    }
+
     private static SchedulePeriod draftPeriod(Long id, Account manager) {
         SchedulePeriod period = SchedulePeriod.builder()
                 .periodName("Week 38")
@@ -1285,6 +1341,7 @@ class AdminOptimizationServiceTest {
                 .versionNo(1)
                 .status("DRAFT")
                 .createdBy(manager)
+                .employeePool(new LinkedHashSet<>(List.of(employee(31L))))
                 .build();
         period.setId(id);
         return period;

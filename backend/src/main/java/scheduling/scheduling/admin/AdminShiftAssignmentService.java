@@ -241,8 +241,47 @@ public class AdminShiftAssignmentService {
                         run.getTotalPenalty(),
                         run.getPenaltyDetailsJson(),
                         run.getErrorMessage(),
-                        parseDiagnostics(run)))
+                        parseDiagnostics(run),
+                        parseStaffingAdvice(run)))
                 .orElse(null);
+    }
+
+    private static AdminPeriodScheduleResponse.StaffingAdvice parseStaffingAdvice(OptimizationRun run) {
+        if (run == null || run.getStaffingAdviceJson() == null || run.getStaffingAdviceJson().isBlank()) {
+            return null;
+        }
+        try {
+            JsonNode node = OBJECT_MAPPER.readTree(run.getStaffingAdviceJson());
+            List<String> reasons = new ArrayList<>();
+            JsonNode reasonNodes = node.get("reasons");
+            if (reasonNodes != null) {
+                for (JsonNode reasonNode : reasonNodes) {
+                    JsonNode code = reasonNode.get("code");
+                    if (code != null && !code.isNull()) {
+                        reasons.add(code.asText());
+                    }
+                }
+            }
+            return new AdminPeriodScheduleResponse.StaffingAdvice(
+                    readInteger(node, "requiredEmployees"),
+                    readInteger(node, "availableEmployees"),
+                    readInteger(node, "totalShifts"),
+                    readBoolean(node, "exact"),
+                    readBoolean(node, "unreachable"),
+                    reasons);
+        } catch (JsonProcessingException exception) {
+            return null;
+        }
+    }
+
+    private static Integer readInteger(JsonNode node, String field) {
+        JsonNode value = node.get(field);
+        return value == null || value.isNull() ? null : value.asInt();
+    }
+
+    private static Boolean readBoolean(JsonNode node, String field) {
+        JsonNode value = node.get(field);
+        return value == null || value.isNull() ? null : value.asBoolean();
     }
 
     private List<AdminPeriodScheduleResponse.OptimizationDiagnostic> parseDiagnostics(OptimizationRun run) {

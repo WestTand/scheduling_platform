@@ -51,6 +51,15 @@
 			<artifactId>spring-boot-starter-mail</artifactId>
 		</dependency>
 		<dependency>
+			<groupId>org.flywaydb</groupId>
+			<artifactId>flyway-core</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.flywaydb</groupId>
+			<artifactId>flyway-database-postgresql</artifactId>
+			<scope>runtime</scope>
+		</dependency>
+		<dependency>
 			<groupId>io.jsonwebtoken</groupId>
 			<artifactId>jjwt-api</artifactId>
 			<version>0.12.6</version>
@@ -134,7 +143,7 @@
 					<!-- Pin test JVM timezone: pgjdbc sends the JVM default as the Postgres TimeZone
 						parameter, and legacy aliases like Asia/Saigon are rejected by PostgreSQL.
 						UTC keeps DB-backed tests deterministic on any machine. -->
-					<argLine>-Duser.timezone=UTC</argLine>
+					<argLine>-Duser.timezone=UTC -Dspring.profiles.active=test</argLine>
 				</configuration>
 			</plugin>
 			<plugin>

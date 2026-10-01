@@ -55,7 +55,7 @@ export const swapRequestService = {
     if (!apiConfig.useMockApi) return backendSwapRequestService.listMyAssignments()
     await delay(150)
     return [
-      { id: 'assignment-01', workDate: '2026-09-22', shiftName: 'Thông tầm', shiftStartTime: '08:00:00', shiftEndTime: '17:00:00', periodName: 'Mock period', periodStatus: 'PUBLISHED' },
+      { id: '101', workDate: '2026-09-22', shiftName: 'Thông tầm', shiftStartTime: '08:00:00', shiftEndTime: '17:00:00', periodName: 'Mock period', periodStatus: 'PUBLISHED' },
     ]
   },
 
@@ -99,13 +99,14 @@ export const swapRequestService = {
     return request
   },
 
-  async respondMine(id: string, accept: boolean) {
-    if (!apiConfig.useMockApi) return backendSwapRequestService.respondForEmployee(id, accept)
+  async respondMine(id: string, accept: boolean, targetAssignmentId?: number) {
+    if (!apiConfig.useMockApi) return backendSwapRequestService.respondForEmployee(id, accept, targetAssignmentId)
     await delay(200)
     const request = swapRequests.find((item) => item.id === id)
     if (!request) throw new Error('Yêu cầu đổi ca không tồn tại.')
     if (request.status !== 'PENDING_TARGET') throw new Error('Yêu cầu không còn chờ phản hồi.')
     request.status = accept ? 'PENDING_APPROVAL' : 'REJECTED'
+    request.targetAssignmentId = targetAssignmentId === undefined ? undefined : String(targetAssignmentId)
     return request
   },
 

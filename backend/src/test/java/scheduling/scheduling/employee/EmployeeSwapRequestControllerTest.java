@@ -146,7 +146,8 @@ class EmployeeSwapRequestControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "accept": true
+                                  "accept": true,
+                                  "targetAssignmentId": 300
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -167,6 +168,42 @@ class EmployeeSwapRequestControllerTest {
                         .header(HttpHeaders.AUTHORIZATION, "Bearer employee-token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(employeeSwapRequestService);
+    }
+
+    @Test
+    void respondSwapRequestRejectsZeroTargetAssignmentId() throws Exception {
+        givenToken("employee-token", employee());
+
+        mockMvc.perform(post("/api/employee/swap-requests/50/respond")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer employee-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "accept": true,
+                                  "targetAssignmentId": 0
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(employeeSwapRequestService);
+    }
+
+    @Test
+    void respondSwapRequestRejectsNegativeTargetAssignmentId() throws Exception {
+        givenToken("employee-token", employee());
+
+        mockMvc.perform(post("/api/employee/swap-requests/50/respond")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer employee-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "accept": true,
+                                  "targetAssignmentId": -5
+                                }
+                                """))
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(employeeSwapRequestService);

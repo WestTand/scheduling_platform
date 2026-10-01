@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { buildGenerationNotice, canOptimizeSchedulePeriod, getScheduleGenerationNoticeClass, summarizeOptimizeResult } from './ScheduleGenerationPage.helpers'
+import { buildGenerationNotice, canEditSelectedPeriodPool, canOptimizeSchedulePeriod, getOptimizeErrorMessage, getScheduleGenerationNoticeClass, summarizeOptimizeResult } from './ScheduleGenerationPage.helpers'
 
 describe('ScheduleGenerationPage', () => {
   afterEach(() => {
@@ -22,6 +22,19 @@ describe('ScheduleGenerationPage', () => {
 
     expect(html).toContain('AI Optimize')
   })
+
+  it('shows a pool editor action in backend mode', async () => {
+    vi.stubEnv('VITE_USE_MOCK_API', 'false')
+
+    const { ScheduleGenerationPage } = await import('./ScheduleGenerationPage')
+    const html = renderToStaticMarkup(
+      <MemoryRouter>
+        <ScheduleGenerationPage />
+      </MemoryRouter>,
+    )
+
+    expect(html).toContain('Chỉnh sửa pool')
+  })
 })
 
 describe('ScheduleGenerationPage helpers', () => {
@@ -29,6 +42,22 @@ describe('ScheduleGenerationPage helpers', () => {
     expect(canOptimizeSchedulePeriod({ selectedPeriodId: '7', isSubmitting: false })).toBe(true)
     expect(canOptimizeSchedulePeriod({ selectedPeriodId: '', isSubmitting: false })).toBe(false)
     expect(canOptimizeSchedulePeriod({ selectedPeriodId: '7', isSubmitting: true })).toBe(false)
+  })
+
+  it('enables pool editing only when a backend period is selected and not submitting', () => {
+    expect(canEditSelectedPeriodPool({ selectedPeriodId: '7', isSubmitting: false })).toBe(true)
+    expect(canEditSelectedPeriodPool({ selectedPeriodId: '', isSubmitting: false })).toBe(false)
+    expect(canEditSelectedPeriodPool({ selectedPeriodId: '7', isSubmitting: true })).toBe(false)
+  })
+
+  it('hides Hibernate internals from optimize errors', () => {
+    expect(getOptimizeErrorMessage(new Error("Cannot lazily initialize collection of role 'scheduling.scheduling.entity.SchedulePeriod.employeePool' with key '269' (no session)")))
+      .toBe('Không thể tối ưu lịch. Vui lòng kiểm tra pool nhân viên hoặc thử lại.')
+  })
+
+  it('keeps user-facing backend optimize messages', () => {
+    expect(getOptimizeErrorMessage(new Error('Kỳ lịch chưa có pool nhân viên. Vui lòng chọn nhân viên trước khi tối ưu.')))
+      .toBe('Kỳ lịch chưa có pool nhân viên. Vui lòng chọn nhân viên trước khi tối ưu.')
   })
 
   it('styles success and error notices distinctly', () => {

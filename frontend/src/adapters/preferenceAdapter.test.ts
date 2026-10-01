@@ -16,7 +16,6 @@ describe('preferenceAdapter', () => {
       shiftName: 'Ca sang',
       shiftCode: 'THONG_TAM',
       priority: 1,
-      preferenceDate: '2026-09-14',
       note: 'Muon lam ca sang',
       status: 'PENDING',
     }

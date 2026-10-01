@@ -10,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.annotation.Order;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
@@ -18,6 +19,7 @@ import scheduling.scheduling.entity.ShiftType;
 import scheduling.scheduling.repository.ShiftTypeRepository;
 
 @Component
+@ConditionalOnProperty(name = "app.seed.legacy-runners.enabled", havingValue = "true")
 @Order(1)
 public class StandardShiftTypeSeeder implements ApplicationRunner {
 

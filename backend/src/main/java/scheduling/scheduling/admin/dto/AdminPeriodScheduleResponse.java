@@ -22,7 +22,17 @@ public record AdminPeriodScheduleResponse(
             BigDecimal totalPenalty,
             String penaltyDetailsJson,
             String errorMessage,
-            List<OptimizationDiagnostic> diagnostics) {
+            List<OptimizationDiagnostic> diagnostics,
+            StaffingAdvice staffingAdvice) {
+    }
+
+    public record StaffingAdvice(
+            Integer requiredEmployees,
+            Integer availableEmployees,
+            Integer totalShifts,
+            Boolean exact,
+            Boolean unreachable,
+            List<String> reasons) {
     }
 
     public record OptimizationDiagnostic(

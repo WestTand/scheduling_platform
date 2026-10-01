@@ -23,6 +23,7 @@ import scheduling.scheduling.admin.dto.AdminSchedulePeriodResponse;
 import scheduling.scheduling.admin.dto.GenerateScheduleRequest;
 import scheduling.scheduling.admin.dto.GenerateScheduleResponse;
 import scheduling.scheduling.admin.dto.SchedulePeriodRequest;
+import scheduling.scheduling.admin.dto.UpdateEmployeePoolRequest;
 import scheduling.scheduling.auth.CurrentAccountPrincipal;
 
 @RestController
@@ -101,6 +102,14 @@ public class AdminSchedulePeriodController {
             @AuthenticationPrincipal CurrentAccountPrincipal principal,
             @PathVariable Long periodId) {
         return ResponseEntity.ok(adminSchedulePeriodService.cancelSchedulePeriod(principal, periodId));
+    }
+
+    @PutMapping("/{periodId}/employee-pool")
+    ResponseEntity<AdminSchedulePeriodResponse> updateEmployeePool(
+            @AuthenticationPrincipal CurrentAccountPrincipal principal,
+            @PathVariable Long periodId,
+            @Valid @RequestBody UpdateEmployeePoolRequest request) {
+        return ResponseEntity.ok(adminSchedulePeriodService.updateEmployeePool(principal, periodId, request.employeeIds()));
     }
 
     private static String listStatus(String status) {

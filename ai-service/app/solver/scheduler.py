@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import timedelta
 from decimal import Decimal, ROUND_HALF_UP
 
 from ortools.sat.python import cp_model
@@ -13,6 +12,8 @@ from app.schemas.scheduling import (
     SchedulingResponse,
     SolverStatistics,
 )
+from app.solver.model_builder import build_model, conflict, leave_overlaps_shift, week_key
+from app.solver.staffing import estimate_required_employees
 
 WEIGHT_SCALE = Decimal("100")
 
@@ -23,18 +24,6 @@ class InvalidSchedulingInput(ValueError):
 
 def _weight(value: Decimal) -> int:
     return int((value * WEIGHT_SCALE).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
-
-
-def _week_key(moment) -> tuple[int, int]:
-    iso = moment.isocalendar()
-    return iso.year, iso.week
-
-
-def _conflict(first_start, first_end, second_start, second_end, rest_minutes: int) -> bool:
-    if second_start < first_start:
-        first_start, second_start = second_start, first_start
-        first_end, second_end = second_end, first_end
-    return second_start < first_end + timedelta(minutes=rest_minutes)
 
 
 def _validate_request(request: SchedulingRequest) -> None:
@@ -108,11 +97,6 @@ def _validate_request(request: SchedulingRequest) -> None:
             )
 
 
-def _leave_overlaps_shift(leave, shift) -> bool:
-    last_shift_date = (shift.ends_at - timedelta(microseconds=1)).date()
-    return leave.start_date <= last_shift_date and shift.starts_at.date() <= leave.end_date
-
-
 def _infeasible_diagnostics(request: SchedulingRequest) -> list[DiagnosticOutput]:
     diagnostics = [
         DiagnosticOutput(
@@ -132,7 +116,7 @@ def _infeasible_diagnostics(request: SchedulingRequest) -> list[DiagnosticOutput
         if shift is None:
             continue
         for leave in leaves_by_employee[locked.employee_id]:
-            if _leave_overlaps_shift(leave, shift):
+            if leave_overlaps_shift(leave, shift):
                 diagnostics.append(DiagnosticOutput(
                     code="LOCKED_ASSIGNMENT_CONFLICTS_WITH_LEAVE",
                     message="Locked assignment conflicts with approved leave",
@@ -144,7 +128,7 @@ def _infeasible_diagnostics(request: SchedulingRequest) -> list[DiagnosticOutput
         unavailable = {
             leave.employee_id
             for leave in request.approved_leaves
-            if _leave_overlaps_shift(leave, shift)
+            if leave_overlaps_shift(leave, shift)
         }
         if len(request.employees) - len(unavailable) < shift.required_staff:
             diagnostics.append(DiagnosticOutput(
@@ -157,7 +141,7 @@ def _infeasible_diagnostics(request: SchedulingRequest) -> list[DiagnosticOutput
     for employee_id in employees:
         for index, first in enumerate(request.work_shifts):
             for second in request.work_shifts[index + 1:]:
-                if _conflict(first.starts_at, first.ends_at, second.starts_at, second.ends_at, rest_minutes):
+                if conflict(first.starts_at, first.ends_at, second.starts_at, second.ends_at, rest_minutes):
                     diagnostics.append(DiagnosticOutput(
                         code="MIN_REST_CONFLICT",
                         message="Employee cannot cover both shifts because minimum rest would be violated",
@@ -168,7 +152,7 @@ def _infeasible_diagnostics(request: SchedulingRequest) -> list[DiagnosticOutput
             if boundary.employee_id != employee_id:
                 continue
             for shift in request.work_shifts:
-                if _conflict(boundary.starts_at, boundary.ends_at, shift.starts_at, shift.ends_at, rest_minutes):
+                if conflict(boundary.starts_at, boundary.ends_at, shift.starts_at, shift.ends_at, rest_minutes):
                     diagnostics.append(DiagnosticOutput(
                         code="MIN_REST_CONFLICT",
                         message="Existing assignment leaves insufficient rest before this shift",
@@ -180,14 +164,14 @@ def _infeasible_diagnostics(request: SchedulingRequest) -> list[DiagnosticOutput
     shifts_by_week = defaultdict(list)
     for shift in request.work_shifts:
         shifts_by_date[shift.work_date].append(shift)
-        shifts_by_week[_week_key(shift.work_date)].append(shift)
+        shifts_by_week[week_key(shift.work_date)].append(shift)
 
     boundaries_by_employee_date = defaultdict(int)
     boundaries_by_employee_week = defaultdict(int)
     for boundary in request.boundary_assignments:
         duration_minutes = int((boundary.ends_at - boundary.starts_at).total_seconds() // 60)
         boundaries_by_employee_date[boundary.employee_id, boundary.starts_at.date()] += duration_minutes
-        boundaries_by_employee_week[boundary.employee_id, _week_key(boundary.starts_at.date())] += 1
+        boundaries_by_employee_week[boundary.employee_id, week_key(boundary.starts_at.date())] += 1
 
     max_daily_minutes = request.rules.hard_rules.max_work_hours_per_day * 60
     for employee_id in employees:
@@ -225,7 +209,7 @@ def _infeasible_diagnostics(request: SchedulingRequest) -> list[DiagnosticOutput
                     boundary.starts_at.date()
                     for boundary in request.boundary_assignments
                     if boundary.employee_id == employee_id
-                    and _week_key(boundary.starts_at.date()) == week
+                    and week_key(boundary.starts_at.date()) == week
                     and shift_type_by_id[boundary.shift_type_id].quota_category == category
                 }
                 for shift in sorted(weekly_shifts, key=lambda item: item.starts_at):
@@ -275,148 +259,10 @@ def _infeasible_diagnostics(request: SchedulingRequest) -> list[DiagnosticOutput
 
 def solve_schedule(request: SchedulingRequest) -> SchedulingResponse:
     _validate_request(request)
-    model = cp_model.CpModel()
     employees = [item.employee_id for item in request.employees]
+    model, assigned = build_model(request, employees)
     shifts = request.work_shifts
     shift_type_by_id = {item.shift_type_id: item for item in request.shift_types}
-
-    assigned = {
-        (employee_id, shift.work_shift_id): model.new_bool_var(
-            f"employee_{employee_id}_shift_{shift.work_shift_id}"
-        )
-        for employee_id in employees
-        for shift in shifts
-    }
-
-    for shift in shifts:
-        model.add(
-            sum(assigned[employee_id, shift.work_shift_id] for employee_id in employees)
-            == shift.required_staff
-        )
-
-    for locked in request.locked_assignments:
-        model.add(assigned[locked.employee_id, locked.work_shift_id] == 1)
-
-    for leave in request.approved_leaves:
-        for shift in shifts:
-            if _leave_overlaps_shift(leave, shift):
-                model.add(assigned[leave.employee_id, shift.work_shift_id] == 0)
-
-    rest_minutes = request.rules.hard_rules.min_rest_hours_between_shifts * 60
-    for employee_id in employees:
-        for index, first in enumerate(shifts):
-            for second in shifts[index + 1 :]:
-                if _conflict(
-                    first.starts_at, first.ends_at, second.starts_at, second.ends_at, rest_minutes
-                ):
-                    model.add(
-                        assigned[employee_id, first.work_shift_id]
-                        + assigned[employee_id, second.work_shift_id]
-                        <= 1
-                    )
-
-        for boundary in request.boundary_assignments:
-            if boundary.employee_id != employee_id:
-                continue
-            for shift in shifts:
-                if _conflict(
-                    boundary.starts_at,
-                    boundary.ends_at,
-                    shift.starts_at,
-                    shift.ends_at,
-                    rest_minutes,
-                ):
-                    model.add(assigned[employee_id, shift.work_shift_id] == 0)
-
-    shifts_by_date = defaultdict(list)
-    shifts_by_week = defaultdict(list)
-    for shift in shifts:
-        shifts_by_date[shift.work_date].append(shift)
-        shifts_by_week[_week_key(shift.work_date)].append(shift)
-
-    boundaries_by_employee_date = defaultdict(int)
-    boundaries_by_employee_week = defaultdict(int)
-    for boundary in request.boundary_assignments:
-        duration_minutes = int((boundary.ends_at - boundary.starts_at).total_seconds() // 60)
-        boundaries_by_employee_date[boundary.employee_id, boundary.starts_at.date()] += duration_minutes
-        boundaries_by_employee_week[boundary.employee_id, _week_key(boundary.starts_at.date())] += 1
-
-    max_daily_minutes = request.rules.hard_rules.max_work_hours_per_day * 60
-    for employee_id in employees:
-        for work_date, daily_shifts in shifts_by_date.items():
-            fixed_minutes = boundaries_by_employee_date[employee_id, work_date]
-            model.add(
-                sum(
-                    shift_type_by_id[shift.shift_type_id].duration_minutes
-                    * assigned[employee_id, shift.work_shift_id]
-                    for shift in daily_shifts
-                )
-                + fixed_minutes
-                <= max_daily_minutes
-            )
-        for week, weekly_shifts in shifts_by_week.items():
-            fixed_count = boundaries_by_employee_week[employee_id, week]
-            model.add(
-                sum(assigned[employee_id, shift.work_shift_id] for shift in weekly_shifts)
-                + fixed_count
-                <= request.rules.hard_rules.max_shifts_per_week
-            )
-
-    quota_limits = {
-        "OVERTIME": request.rules.quotas.overtime_shifts_per_week,
-        "BATHING": request.rules.quotas.bathing_shifts_per_week,
-    }
-    for category, limit in quota_limits.items():
-        for employee_id in employees:
-            for week, weekly_shifts in shifts_by_week.items():
-                shifts_by_quota_date = defaultdict(list)
-                for shift in weekly_shifts:
-                    if shift_type_by_id[shift.shift_type_id].quota_category == category:
-                        shifts_by_quota_date[shift.work_date].append(shift)
-                boundary_dates = {
-                    boundary.starts_at.date()
-                    for boundary in request.boundary_assignments
-                    if boundary.employee_id == employee_id
-                    and _week_key(boundary.starts_at.date()) == week
-                    and shift_type_by_id[boundary.shift_type_id].quota_category == category
-                }
-                assigned_dates = []
-                for work_date, dated_shifts in shifts_by_quota_date.items():
-                    if work_date in boundary_dates:
-                        continue
-                    date_assigned = model.new_bool_var(
-                        f"{category.lower()}_{employee_id}_{work_date.isoformat()}_assigned"
-                    )
-                    model.add_max_equality(
-                        date_assigned,
-                        [assigned[employee_id, shift.work_shift_id] for shift in dated_shifts],
-                    )
-                    assigned_dates.append(date_assigned)
-                model.add(sum(assigned_dates) + len(boundary_dates) <= limit)
-
-    on_call_gap = request.rules.quotas.on_call_every_n_days
-    on_call_shifts = [
-        shift
-        for shift in shifts
-        if shift_type_by_id[shift.shift_type_id].quota_category == "ON_CALL"
-    ]
-    for employee_id in employees:
-        for index, first in enumerate(on_call_shifts):
-            for second in on_call_shifts[index + 1 :]:
-                if abs((second.work_date - first.work_date).days) < on_call_gap:
-                    model.add(
-                        assigned[employee_id, first.work_shift_id]
-                        + assigned[employee_id, second.work_shift_id]
-                        <= 1
-                    )
-        for boundary in request.boundary_assignments:
-            if (
-                boundary.employee_id == employee_id
-                and shift_type_by_id[boundary.shift_type_id].quota_category == "ON_CALL"
-            ):
-                for shift in on_call_shifts:
-                    if abs((shift.work_date - boundary.starts_at.date()).days) < on_call_gap:
-                        model.add(assigned[employee_id, shift.work_shift_id] == 0)
 
     penalty_terms: dict[str, list[tuple[int, cp_model.LinearExpr]]] = defaultdict(list)
     weights = request.rules.soft_weights
@@ -576,6 +422,7 @@ def solve_schedule(request: SchedulingRequest) -> SchedulingResponse:
             solver_status=solver_status,
             error_message="No feasible schedule found",
             diagnostics=diagnostics,
+            staffing_advice=estimate_required_employees(request),
             statistics=statistics,
         )
 
@@ -590,5 +437,6 @@ def solve_schedule(request: SchedulingRequest) -> SchedulingResponse:
         status="FAILED",
         solver_status=solver_status,
         error_message=error_message,
+        staffing_advice=estimate_required_employees(request),
         statistics=statistics,
     )

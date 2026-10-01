@@ -15,6 +15,7 @@ import static org.mockito.Mockito.when;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -35,6 +36,7 @@ import scheduling.scheduling.entity.WorkShift;
 import scheduling.scheduling.audit.ActivityLogService;
 import scheduling.scheduling.notification.NotificationService;
 import scheduling.scheduling.repository.AccountRepository;
+import scheduling.scheduling.repository.EmployeeRepository;
 import scheduling.scheduling.repository.OptimizationRunRepository;
 import scheduling.scheduling.repository.SchedulePeriodRepository;
 import scheduling.scheduling.repository.ShiftAssignmentRepository;
@@ -49,6 +51,7 @@ class AdminSchedulePeriodServiceTest {
     private final OptimizationRunRepository optimizationRunRepository = mock(OptimizationRunRepository.class);
     private final NotificationService notificationService = mock(NotificationService.class);
     private final ActivityLogService activityLogService = mock(ActivityLogService.class);
+    private final EmployeeRepository employeeRepository = mock(EmployeeRepository.class);
     private final AdminSchedulePeriodService service = new AdminSchedulePeriodService(
             schedulePeriodRepository,
             accountRepository,
@@ -56,7 +59,8 @@ class AdminSchedulePeriodServiceTest {
             shiftAssignmentRepository,
             optimizationRunRepository,
             notificationService,
-            activityLogService);
+            activityLogService,
+            employeeRepository);
 
     @Test
     void createSchedulePeriodCreatesDraftWithDefaultVersionAndCreator() {
@@ -207,6 +211,25 @@ class AdminSchedulePeriodServiceTest {
 
         assertThat(response).extracting(AdminSchedulePeriodResponse::id).containsExactly(20L);
         verify(schedulePeriodRepository).searchForAdmin("DRAFT", LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30));
+    }
+
+    @Test
+    void listSchedulePeriodsExposesLatestOptimizationStatus() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        SchedulePeriod period = draftPeriod(20L, account(principal));
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(schedulePeriodRepository.searchForAdmin("DRAFT", null, null)).thenReturn(List.of(period));
+        when(optimizationRunRepository.findTopBySchedulePeriodIdOrderByStartedAtDescIdDesc(20L))
+                .thenReturn(Optional.of(OptimizationRun.builder()
+                        .schedulePeriod(period)
+                        .status("INFEASIBLE")
+                        .startedAt(LocalDateTime.of(2026, 9, 20, 8, 0))
+                        .build()));
+
+        List<AdminSchedulePeriodResponse> response = service.listSchedulePeriods(principal, null, null, null);
+
+        assertThat(response).extracting(AdminSchedulePeriodResponse::optimizationStatus)
+                .containsExactly("INFEASIBLE");
     }
 
     @Test
@@ -626,6 +649,32 @@ class AdminSchedulePeriodServiceTest {
     }
 
     @Test
+    void approveSchedulePeriodReportsInfeasibleBeforeCheckingStaffing() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        Account manager = account(principal);
+        SchedulePeriod period = draftPeriod(20L, manager);
+        WorkShift shift = staffedShift(200L, 2);
+        Employee only = activeEmployee(10L, "EMP010", "Employee Ten");
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(period));
+        when(optimizationRunRepository.findTopBySchedulePeriodIdOrderByStartedAtDescIdDesc(20L))
+                .thenReturn(Optional.of(OptimizationRun.builder()
+                        .schedulePeriod(period)
+                        .status("INFEASIBLE")
+                        .startedAt(LocalDateTime.of(2026, 9, 20, 8, 0))
+                        .build()));
+        when(workShiftRepository.searchForPeriod(20L, null, null)).thenReturn(List.of(shift));
+        when(shiftAssignmentRepository.listForPeriod(20L))
+                .thenReturn(List.of(shiftAssignment(300L, shift, only)));
+
+        assertThatThrownBy(() -> service.approveSchedulePeriod(principal, 20L))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Lịch đang có ràng buộc chưa thỏa nên không thể duyệt.")
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
     void approveSchedulePeriodRejectsNonManagerAccount() {
         CurrentAccountPrincipal principal = new CurrentAccountPrincipal(2L, "employee01", AccountRole.EMPLOYEE);
         when(accountRepository.findById(2L)).thenReturn(Optional.of(account(principal)));
@@ -949,6 +998,183 @@ class AdminSchedulePeriodServiceTest {
         verify(schedulePeriodRepository, never()).findDetailById(any());
     }
 
+    @Test
+    void updateEmployeePoolReplacesTheDraftPool() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        SchedulePeriod period = draftPeriod(20L, account(principal));
+        period.setEmployeePool(new LinkedHashSet<>(List.of(schedulableEmployee(10L, "EMP010", "Employee Ten"))));
+        Employee first = schedulableEmployee(10L, "EMP010", "Employee Ten");
+        Employee second = schedulableEmployee(11L, "EMP011", "Employee Eleven");
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(period));
+        when(employeeRepository.findAllById(any())).thenReturn(List.of(first, second));
+        when(schedulePeriodRepository.saveAndFlush(period)).thenReturn(period);
+
+        AdminSchedulePeriodResponse response = service.updateEmployeePool(principal, 20L, List.of(10L, 11L));
+
+        assertThat(period.getEmployeePool()).extracting(Employee::getId).containsExactly(10L, 11L);
+        assertThat(response.id()).isEqualTo(20L);
+        verify(schedulePeriodRepository).saveAndFlush(period);
+    }
+
+    @Test
+    void updateEmployeePoolIgnoresDuplicateEmployeeIds() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        SchedulePeriod period = draftPeriod(20L, account(principal));
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(period));
+        when(employeeRepository.findAllById(any())).thenReturn(List.of(schedulableEmployee(10L, "EMP010", "Employee Ten")));
+        when(schedulePeriodRepository.saveAndFlush(period)).thenReturn(period);
+
+        service.updateEmployeePool(principal, 20L, List.of(10L, 10L));
+
+        assertThat(period.getEmployeePool()).extracting(Employee::getId).containsExactly(10L);
+    }
+
+    @Test
+    void updateEmployeePoolRejectsPublishedAndCancelledPeriods() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        Employee existing = schedulableEmployee(10L, "EMP010", "Employee Ten");
+        SchedulePeriod published = draftPeriod(20L, account(principal));
+        published.setStatus("PUBLISHED");
+        published.setEmployeePool(new LinkedHashSet<>(List.of(existing)));
+        SchedulePeriod cancelled = draftPeriod(21L, account(principal));
+        cancelled.setStatus("CANCELLED");
+        cancelled.setEmployeePool(new LinkedHashSet<>(List.of(existing)));
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(published));
+        when(schedulePeriodRepository.findDetailById(21L)).thenReturn(Optional.of(cancelled));
+
+        assertThatThrownBy(() -> service.updateEmployeePool(principal, 20L, List.of(10L, 11L)))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Invalid schedule period request")
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThatThrownBy(() -> service.updateEmployeePool(principal, 21L, List.of(10L, 11L)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        assertThat(published.getEmployeePool()).extracting(Employee::getId).containsExactly(10L);
+        assertThat(cancelled.getEmployeePool()).extracting(Employee::getId).containsExactly(10L);
+        verify(schedulePeriodRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void updateEmployeePoolRejectsUnknownEmployee() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        SchedulePeriod period = draftPeriod(20L, account(principal));
+        period.setEmployeePool(new LinkedHashSet<>(List.of(schedulableEmployee(10L, "EMP010", "Employee Ten"))));
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(period));
+        when(employeeRepository.findAllById(any()))
+                .thenReturn(List.of(schedulableEmployee(10L, "EMP010", "Employee Ten")));
+
+        assertThatThrownBy(() -> service.updateEmployeePool(principal, 20L, List.of(10L, 99L)))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Danh sách nhân viên không hợp lệ.")
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        assertThat(period.getEmployeePool()).extracting(Employee::getId).containsExactly(10L);
+        verify(schedulePeriodRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void updateEmployeePoolRejectsInactiveEmployee() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        SchedulePeriod period = draftPeriod(20L, account(principal));
+        Employee inactive = activeEmployee(11L, "EMP011", "Employee Eleven");
+        inactive.setStatus("INACTIVE");
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(period));
+        when(employeeRepository.findAllById(any()))
+                .thenReturn(List.of(schedulableEmployee(10L, "EMP010", "Employee Ten"), inactive));
+
+        assertThatThrownBy(() -> service.updateEmployeePool(principal, 20L, List.of(10L, 11L)))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Danh sách nhân viên không hợp lệ.")
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(schedulePeriodRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void updateEmployeePoolRejectsEmployeeWithoutActiveEmployeeAccount() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        SchedulePeriod period = draftPeriod(20L, account(principal));
+        Employee valid = schedulableEmployee(10L, "EMP010", "Employee Ten");
+        Employee missingAccount = activeEmployee(11L, "EMP011", "Employee Eleven");
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(period));
+        when(employeeRepository.findAllById(any())).thenReturn(List.of(valid, missingAccount));
+
+        assertThatThrownBy(() -> service.updateEmployeePool(principal, 20L, List.of(10L, 11L)))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Danh sách nhân viên không hợp lệ.")
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(schedulePeriodRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void updateEmployeePoolRejectsEmptyEmployeeIdList() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        SchedulePeriod period = draftPeriod(20L, account(principal));
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(period));
+
+        assertThatThrownBy(() -> service.updateEmployeePool(principal, 20L, List.of()))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Danh sách nhân viên không được để trống.")
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(employeeRepository, never()).findAllById(any());
+        verify(schedulePeriodRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void updateEmployeePoolRejectsNullEmployeeIdList() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        SchedulePeriod period = draftPeriod(20L, account(principal));
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(period));
+
+        assertThatThrownBy(() -> service.updateEmployeePool(principal, 20L, null))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Danh sách nhân viên không được để trống.")
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(employeeRepository, never()).findAllById(any());
+        verify(schedulePeriodRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void updateEmployeePoolRejectsNonManagerAccount() {
+        CurrentAccountPrincipal principal = new CurrentAccountPrincipal(2L, "employee01", AccountRole.EMPLOYEE);
+        when(accountRepository.findById(2L)).thenReturn(Optional.of(account(principal)));
+
+        assertForbidden(() -> service.updateEmployeePool(principal, 20L, List.of(10L, 11L)));
+
+        verify(schedulePeriodRepository, never()).findDetailById(any());
+    }
+
+    @Test
+    void updateEmployeePoolRejectsMissingPeriod() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.updateEmployeePool(principal, 20L, List.of(10L, 11L)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
     private static void assertForbidden(ThrowingServiceCall call) {
         assertThatThrownBy(call::execute)
                 .isInstanceOf(ResponseStatusException.class)
@@ -1006,6 +1232,20 @@ class AdminSchedulePeriodServiceTest {
                 .status("ACTIVE")
                 .build();
         employee.setId(id);
+        return employee;
+    }
+
+    private static Employee schedulableEmployee(Long id, String code, String name) {
+        Employee employee = activeEmployee(id, code, name);
+        Account account = Account.builder()
+                .username(code.toLowerCase() + "@example.com")
+                .passwordHash("hash")
+                .role(AccountRole.EMPLOYEE)
+                .status(AccountStatus.ACTIVE)
+                .isActive(true)
+                .build();
+        account.setId(id + 100L);
+        employee.setAccount(account);
         return employee;
     }
 
