@@ -151,8 +151,6 @@ export function WorkPreferencesPage() {
               <option value="ALL">Tất cả loại</option>
               <option value="PREFERRED">Muốn làm</option>
               <option value="AVOID">Không muốn làm</option>
-              <option value="PREFER_SHIFT">Ưu tiên ca</option>
-              <option value="AVOID_SHIFT">Tránh ca</option>
             </select>
           </div>
 

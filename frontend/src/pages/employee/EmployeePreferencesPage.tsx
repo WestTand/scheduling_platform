@@ -42,7 +42,8 @@ export function EmployeePreferencesPage() {
   const [showForm, setShowForm] = useState(() => searchParams.get('action') === 'create')
   const [selected, setSelected] = useState<WorkPreference | null>(null)
   const [search, setSearch] = useState('')
-  const [monthFilter, setMonthFilter] = useState('ALL')
+  const [fromFilter, setFromFilter] = useState('')
+  const [toFilter, setToFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState(() => searchParams.get('status') ?? 'ALL')
   const [preferences, setPreferences] = useState<WorkPreference[]>([])
   const [loading, setLoading] = useState(true)
@@ -112,8 +113,10 @@ export function EmployeePreferencesPage() {
         value.toLowerCase().includes(normalizedSearch),
       )
     const matchesStatus = statusFilter === 'ALL' || item.status === statusFilter
-    return matchesSearch && matchesStatus
-  }), [preferences, search, statusFilter])
+    const matchesFrom = !fromFilter || item.preferenceDate >= fromFilter
+    const matchesTo = !toFilter || item.preferenceDate <= toFilter
+    return matchesSearch && matchesStatus && matchesFrom && matchesTo
+  }), [preferences, search, statusFilter, fromFilter, toFilter])
 
   const handleEdit = (item: WorkPreference) => {
     setEditing(item)
@@ -173,17 +176,14 @@ export function EmployeePreferencesPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Đăng ký nguyện vọng" description="Gửi và quản lý nguyện vọng làm việc theo tháng." action={<Button onClick={() => { setEditing(null); setShowForm(true) }}><CalendarRange className="mr-2 h-4 w-4" />Đăng ký nguyện vọng</Button>} />
+      <PageHeader title="Đăng ký nguyện vọng" description="Gửi và quản lý nguyện vọng làm việc theo ngày." action={<Button onClick={() => { setEditing(null); setShowForm(true) }}><CalendarRange className="mr-2 h-4 w-4" />Đăng ký nguyện vọng</Button>} />
 
       <Card className="border-slate-200 bg-white shadow-sm">
         <CardContent className="space-y-4 p-4">
-          <div className="grid gap-3 md:grid-cols-[1.2fr_0.8fr_0.8fr]">
+          <div className="grid gap-3 md:grid-cols-[1.2fr_0.8fr_0.8fr_0.8fr]">
             <SearchInput value={search} placeholder="Tìm theo ca hoặc ghi chú" onChange={setSearch} />
-            <select value={monthFilter} onChange={(event) => setMonthFilter(event.target.value)} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm">
-              <option value="ALL">Tất cả tháng</option>
-              <option value="2026-09">09/2026</option>
-              <option value="2026-10">10/2026</option>
-            </select>
+            <input type="date" value={fromFilter} onChange={(event) => setFromFilter(event.target.value)} aria-label="Từ ngày" className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm" />
+            <input type="date" value={toFilter} onChange={(event) => setToFilter(event.target.value)} aria-label="Đến ngày" className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm" />
             <select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); const params = new URLSearchParams(searchParams); params.set('status', event.target.value); setSearchParams(params) }} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm">
               <option value="ALL">Tất cả trạng thái</option>
               <option value="PENDING">Chờ xét duyệt</option>
@@ -236,7 +236,7 @@ export function EmployeePreferencesPage() {
       >
         <div className="mt-4 grid gap-4">
           <div className="space-y-1">
-            <label className="text-sm text-slate-700">Khoảng thời gian áp dụng</label>
+            <label className="text-sm text-slate-700">Ngày áp dụng</label>
             <input type="date" value={form.preferenceDate} onChange={(event) => setForm((current) => ({ ...current, preferenceDate: event.target.value }))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
           </div>
           <div className="space-y-1">
