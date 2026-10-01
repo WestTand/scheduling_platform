@@ -2,7 +2,8 @@ import { CalendarClock, Check, Eye, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
-import { formatSwapAssignmentOptionLabel, getRespondBlockedMessage, resolvePublishedAssignmentId, SWAP_CONFIRM_BLOCKED_MESSAGE } from './EmployeeSwapRequestsPage.helpers'
+import type { RespondDialogState } from './EmployeeSwapRequestsPage.helpers'
+import { formatSwapAssignmentOptionLabel, getPublishedSwapAssignmentOptions, getRespondConfirmation, SWAP_NO_PUBLISHED_SHIFT_MESSAGE } from './EmployeeSwapRequestsPage.helpers'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { useAppDialog } from '@/components/common/AppDialogContext'
 import { DataTable } from '@/components/common/DataTable'
@@ -44,7 +45,7 @@ export function EmployeeSwapRequestsPage() {
   const [optionsLoading, setOptionsLoading] = useState(false)
   const [optionsError, setOptionsError] = useState('')
   const [form, setForm] = useState({ requesterAssignmentId: '', targetEmployeeId: '', reason: '' })
-  const [respondDialog, setRespondDialog] = useState<{ requestId: string; options: SwapAssignmentOption[]; selectedId: string; loading: boolean; error: string } | null>(null)
+  const [respondDialog, setRespondDialog] = useState<(RespondDialogState & { requestId: string; request: SwapRequest }) | null>(null)
 
   const { user } = useAuth()
   const [authoritativeEmployeeId, setAuthoritativeEmployeeId] = useState<string | null>(null)
@@ -225,7 +226,7 @@ export function EmployeeSwapRequestsPage() {
     }
   }
 
-const respondRequestId = respondDialog?.requestId ?? ''
+  const respondRequestId = respondDialog?.requestId ?? ''
 
   useEffect(() => {
     if (!respondRequestId) {
@@ -255,7 +256,7 @@ const respondRequestId = respondDialog?.requestId ?? ''
   }, [respondRequestId])
 
   const openRespondDialog = (request: SwapRequest) => {
-    setRespondDialog({ requestId: request.id, options: [], selectedId: '', loading: true, error: '' })
+    setRespondDialog({ requestId: request.id, request, options: [], selectedId: '', loading: true, error: '' })
   }
 
   const closeRespondDialog = () => {
@@ -267,37 +268,34 @@ const respondRequestId = respondDialog?.requestId ?? ''
       return
     }
 
-    const blockedMessage = getRespondBlockedMessage(respondDialog.options, respondDialog.selectedId, true, respondDialog.loading)
-    if (blockedMessage) {
-      showDialog({ variant: 'warning', description: blockedMessage })
-      return
-    }
-
-    if (respondDialog.error) {
-      showDialog({ variant: 'error', description: respondDialog.error })
-      return
-    }
-
-    const targetAssignmentId = resolvePublishedAssignmentId(respondDialog.options, respondDialog.selectedId)
-    if (!targetAssignmentId) {
-      showDialog({ variant: 'warning', description: SWAP_CONFIRM_BLOCKED_MESSAGE })
-      return
-    }
-
-    const { requestId } = respondDialog
-    closeRespondDialog()
-    await handleRespond(requestId, true, Number(targetAssignmentId))
+    await handleRespond(respondDialog.requestId, true, respondDialog)
   }
 
-  const handleRespond = async (id: string, accept: boolean, targetAssignmentId?: number) => {
+  const handleRespond = async (id: string, accept: boolean, dialog?: RespondDialogState) => {
+    const confirmation = getRespondConfirmation(accept, dialog ?? null)
+
+    if (!confirmation.allowed) {
+      showDialog({ variant: confirmation.variant, description: confirmation.message })
+      return
+    }
+
     try {
-      await swapRequestService.respondMine(id, accept, targetAssignmentId)
+      await swapRequestService.respondMine(id, accept, confirmation.targetAssignmentId)
+      closeRespondDialog()
       await loadData()
     } catch (respondError) {
       showDialog({ variant: 'error', description: respondError instanceof Error ? respondError.message : 'Không thể phản hồi yêu cầu.' })
     }
   }
 
+  const respondPublishedOptions = useMemo(
+    () => getPublishedSwapAssignmentOptions(respondDialog?.options ?? []),
+    [respondDialog],
+  )
+  const respondEmptyMessage =
+    respondDialog && !respondDialog.loading && !respondDialog.error && respondPublishedOptions.length === 0
+      ? SWAP_NO_PUBLISHED_SHIFT_MESSAGE
+      : ''
 
   return (
     <div className="space-y-6">
@@ -347,7 +345,7 @@ const respondRequestId = respondDialog?.requestId ?? ''
                           {canRespond && (
                             <>
                               <Button variant="ghost" size="icon" onClick={() => openRespondDialog(item)} aria-label="Đồng ý đổi ca"><Check className="h-4 w-4" /></Button>
-                              <Button variant="ghost" size="icon" onClick={() => handleRespond(item.id, false)} aria-label="Từ chối đổi ca"><X className="h-4 w-4" /></Button>
+                              <Button variant="ghost" size="icon" onClick={() => { void handleRespond(item.id, false) }} aria-label="Từ chối đổi ca"><X className="h-4 w-4" /></Button>
                             </>
                           )}
                         </div>
@@ -400,26 +398,35 @@ const respondRequestId = respondDialog?.requestId ?? ''
       <ConfirmDialog
         open={Boolean(respondDialog)}
         title="Xác nhận đổi ca"
-        description="Chọn ca của bạn để đổi với yêu cầu này. Yêu cầu sẽ được gửi để quản lý xem xét."
+        description={respondDialog
+          ? `Chọn ca của bạn để đổi lấy ca của ${respondDialog.request.employeeName}. Yêu cầu sẽ được gửi để quản lý xem xét.`
+          : 'Chọn ca của bạn để đổi với yêu cầu này. Yêu cầu sẽ được gửi để quản lý xem xét.'}
         onCancel={closeRespondDialog}
         onConfirm={() => { void handleConfirmRespond() }}
         confirmLabel="Xác nhận đổi ca"
       >
         {respondDialog && (
           <div className="mt-4 grid gap-4">
+            <div className="space-y-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+              <div className="flex justify-between"><span>Mã yêu cầu</span><strong className="text-slate-900">{respondDialog.request.id}</strong></div>
+              <div className="flex justify-between"><span>Người gửi</span><strong className="text-slate-900">{respondDialog.request.employeeName}</strong></div>
+              <div className="flex justify-between"><span>Ca của người gửi</span><strong className="text-slate-900">{respondDialog.request.currentShiftName ?? '—'}</strong></div>
+              <div className="flex justify-between"><span>Ngày mong muốn</span><strong className="text-slate-900">{respondDialog.request.requestedDate}</strong></div>
+            </div>
             <div className="space-y-1">
               <label className="text-sm text-slate-700">Ca của bạn muốn đổi</label>
               <select
                 value={respondDialog.selectedId}
-                disabled={respondDialog.loading || Boolean(respondDialog.error)}
+                disabled={respondDialog.loading || Boolean(respondDialog.error) || respondEmptyMessage !== ''}
                 onChange={(event) => setRespondDialog((current) => (current ? { ...current, selectedId: event.target.value } : current))}
                 className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <option value="">{respondDialog.loading ? 'Đang tải ca làm...' : 'Chọn ca của bạn'}</option>
-                {respondDialog.options.filter((assignment) => assignment.periodStatus === 'PUBLISHED').map((assignment) => (
+                {respondPublishedOptions.map((assignment) => (
                   <option key={assignment.id} value={assignment.id}>{formatSwapAssignmentOptionLabel(assignment)}</option>
                 ))}
               </select>
+              {respondEmptyMessage && <p className="text-sm text-slate-500">{respondEmptyMessage}</p>}
             </div>
             {respondDialog.error && <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{respondDialog.error}</div>}
           </div>
