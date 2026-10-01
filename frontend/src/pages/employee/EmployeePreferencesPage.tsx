@@ -105,6 +105,8 @@ export function EmployeePreferencesPage() {
     }
   }, [statusFilter])
 
+  const invalidDateRange = fromFilter !== '' && toFilter !== '' && fromFilter > toFilter
+
   const filtered = useMemo(() => preferences.filter((item) => {
     const normalizedSearch = search.trim().toLowerCase()
     const matchesSearch =
@@ -113,10 +115,10 @@ export function EmployeePreferencesPage() {
         value.toLowerCase().includes(normalizedSearch),
       )
     const matchesStatus = statusFilter === 'ALL' || item.status === statusFilter
-    const matchesFrom = !fromFilter || item.preferenceDate >= fromFilter
-    const matchesTo = !toFilter || item.preferenceDate <= toFilter
+    const matchesFrom = invalidDateRange || !fromFilter || item.preferenceDate >= fromFilter
+    const matchesTo = invalidDateRange || !toFilter || item.preferenceDate <= toFilter
     return matchesSearch && matchesStatus && matchesFrom && matchesTo
-  }), [preferences, search, statusFilter, fromFilter, toFilter])
+  }), [preferences, search, statusFilter, fromFilter, toFilter, invalidDateRange])
 
   const handleEdit = (item: WorkPreference) => {
     setEditing(item)
@@ -191,6 +193,8 @@ export function EmployeePreferencesPage() {
               <option value="REJECTED">Từ chối</option>
             </select>
           </div>
+
+          {invalidDateRange && <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">Khoảng ngày không hợp lệ: ngày bắt đầu phải trước hoặc bằng ngày kết thúc. Bộ lọc khoảng ngày đang tạm không được áp dụng.</div>}
 
           {loading ? (
             <LoadingState label="Đang tải nguyện vọng..." />

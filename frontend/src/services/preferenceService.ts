@@ -23,7 +23,7 @@ const paginate = (items: WorkPreference[], page: number, pageSize: number): Pagi
   }
 }
 
-const filterPreferences = (items: WorkPreference[], search: string, from: string, to: string, type: string, status: string) => {
+const filterPreferences = (items: WorkPreference[], search: string, type: string, status: string) => {
   const normalizedSearch = search.trim().toLowerCase()
   return items.filter((preference) => {
     const matchesSearch =
@@ -31,34 +31,30 @@ const filterPreferences = (items: WorkPreference[], search: string, from: string
       [preference.employeeName, preference.note ?? '', preference.targetLabel ?? '', preference.relatedShiftCode ?? ''].some((value) =>
         value.toLowerCase().includes(normalizedSearch),
       )
-    const matchesFrom = !from || preference.preferenceDate >= from
-    const matchesTo = !to || preference.preferenceDate <= to
     const matchesType = type === 'ALL' || preference.type === type
     const matchesStatus = status === 'ALL' || preference.status === status
 
-    return matchesSearch && matchesFrom && matchesTo && matchesType && matchesStatus
+    return matchesSearch && matchesType && matchesStatus
   })
 }
 
 export const preferenceService = {
-  async list({ page = 1, pageSize = 5, search = '', from = '', to = '', type = 'ALL', status = 'ALL' }: { page?: number; pageSize?: number; search?: string; from?: string; to?: string; type?: string; status?: string }) {
+  async list({ page = 1, pageSize = 5, search = '', type = 'ALL', status = 'ALL' }: { page?: number; pageSize?: number; search?: string; type?: string; status?: string }) {
     if (!apiConfig.useMockApi) {
       const response = await backendPreferenceService.listForManager({ status })
       // Backend adapter leaves employeeName empty, has no relatedShiftCode, and collapses
-      // type to PREFERRED|AVOID, so skip degraded local date/type filters here and only
+      // type to PREFERRED|AVOID, so skip the degraded local type filter here and only
       // search present fields (note/targetLabel/employeeName) before paginating.
-      return paginate(filterPreferences(response, search, '', '', 'ALL', 'ALL'), page, pageSize)
+      return paginate(filterPreferences(response, search, 'ALL', 'ALL'), page, pageSize)
     }
     await delay(350)
 
     const filtered = preferences.filter((preference) => {
       const matchesSearch = !search || preference.employeeName.toLowerCase().includes(search.toLowerCase())
-      const matchesFrom = !from || preference.preferenceDate >= from
-      const matchesTo = !to || preference.preferenceDate <= to
       const matchesType = type === 'ALL' || preference.type === type
       const matchesStatus = status === 'ALL' || preference.status === status
 
-      return matchesSearch && matchesFrom && matchesTo && matchesType && matchesStatus
+      return matchesSearch && matchesType && matchesStatus
     })
 
     const total = filtered.length
@@ -119,12 +115,12 @@ export const preferenceService = {
     return preference
   },
 
-  async listMine({ page = 1, pageSize = 50, search = '', from = '', to = '', status = 'ALL' }: { page?: number; pageSize?: number; search?: string; from?: string; to?: string; status?: string } = {}) {
+  async listMine({ page = 1, pageSize = 50, search = '', status = 'ALL' }: { page?: number; pageSize?: number; search?: string; status?: string } = {}) {
     if (!apiConfig.useMockApi) {
       const response = await backendPreferenceService.listForEmployee({ status })
-      return paginate(filterPreferences(response, search, from, to, 'ALL', 'ALL'), page, pageSize)
+      return paginate(filterPreferences(response, search, 'ALL', 'ALL'), page, pageSize)
     }
-    return this.list({ page, pageSize, search, from, to, status })
+    return this.list({ page, pageSize, search, status })
   },
 
   async createMine(input: { preferenceDate: string; type: PreferenceType; shiftTypeId?: number | null; relatedShiftCode?: string; priority: number; note: string }) {

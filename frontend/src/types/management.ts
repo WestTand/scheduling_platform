@@ -60,7 +60,6 @@ export type PreferenceType = (typeof PreferenceType)[keyof typeof PreferenceType
 
 export const PreferenceStatus = {
   PENDING: 'PENDING',
-  REVIEWED: 'REVIEWED',
   APPROVED: 'APPROVED',
   REJECTED: 'REJECTED',
   CANCELLED: 'CANCELLED',
