@@ -792,5 +792,4 @@ class EmployeeSwapRequestServiceTest {
         verify(swapRequestRepository, never()).save(any());
         verifyNoInteractions(notificationService);
     }
-
-    }
+}

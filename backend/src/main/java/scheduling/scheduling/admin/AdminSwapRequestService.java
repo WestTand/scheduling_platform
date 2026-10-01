@@ -110,11 +110,11 @@ public class AdminSwapRequestService {
         LockedAssignments locked = lockAssignments(swapRequest);
         ShiftAssignment requesterAssignment = locked.requesterAssignment();
         ShiftAssignment targetAssignment = locked.targetAssignment();
+        requireDifferentWorkShifts(requesterAssignment, targetAssignment);
+        requireNotAlreadySwapped(requesterAssignment, targetAssignment);
         requirePublishedPeriod(requesterAssignment);
         requirePublishedPeriod(targetAssignment);
         Employee target = requireTargetOwner(swapRequest, targetAssignment);
-        requireDifferentWorkShifts(requesterAssignment, targetAssignment);
-        requireNotAlreadySwapped(requesterAssignment, targetAssignment);
         Employee requester = requesterAssignment.getEmployee();
         requireNoCrossShiftCollision(requesterAssignment, targetAssignment, requester, target);
         // Must be resolved before the exchange: the assignment references are mutated in place below.
@@ -160,9 +160,6 @@ public class AdminSwapRequestService {
         ShiftAssignment targetAssignment = swapRequest.getTargetAssignment();
         if (targetAssignment == null) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, MISSING_TARGET_ASSIGNMENT);
-        }
-        if (requesterAssignment == null) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, MISSING_ASSIGNMENT);
         }
         List<Long> ids = Stream.of(requesterAssignment.getId(), targetAssignment.getId())
                 .filter(Objects::nonNull)

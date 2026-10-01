@@ -476,6 +476,8 @@ class AdminSwapRequestServiceTest {
 
         verify(activityLogService, never()).record(
                 any(Account.class), eq("APPROVE"), eq("swap_requests"), any(), any(), any());
+        verify(activityLogService, never()).record(
+                any(Account.class), eq("SWAP"), eq("shift_assignments"), any(), any(), any());
         verify(notificationService, never()).notifyAll(anyList(), any(), any(), any());
     }
 
@@ -713,6 +715,31 @@ class AdminSwapRequestServiceTest {
                 assignmentOnShift(100L, 300L, requester, "PUBLISHED", "SWAPPED");
         ShiftAssignment targetAssignment =
                 assignmentOnShift(200L, 300L, target, "PUBLISHED", "SWAPPED");
+        SwapRequest swapRequest = pendingApprovalSwapRequest(
+                5L, requesterAssignment, target, targetAssignment);
+        when(accountRepository.findById(1L))
+                .thenReturn(Optional.of(managerAccount(principal)));
+        when(swapRequestRepository.findDetailByIdForUpdate(5L)).thenReturn(Optional.of(swapRequest));
+        stubLockedAssignments(swapRequest);
+
+        assertThatThrownBy(() -> service.approveSwapRequest(principal, 5L))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Hai ca cần hoán đổi là cùng một ca")
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.CONFLICT);
+
+        verify(shiftAssignmentRepository, never()).saveAllAndFlush(anyList());
+    }
+
+    @Test
+    void approveSwapRequestReportsSameWorkShiftBeforePublishedPeriodCheck() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        Employee requester = employee(10L, "ACTIVE");
+        Employee target = employee(20L, "ACTIVE");
+        ShiftAssignment requesterAssignment =
+                assignmentOnShift(100L, 300L, requester, "DRAFT", "ASSIGNED");
+        ShiftAssignment targetAssignment =
+                assignmentOnShift(200L, 300L, target, "DRAFT", "ASSIGNED");
         SwapRequest swapRequest = pendingApprovalSwapRequest(
                 5L, requesterAssignment, target, targetAssignment);
         when(accountRepository.findById(1L))

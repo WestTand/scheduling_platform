@@ -5,11 +5,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceUnitUtil;
 import org.hibernate.resource.jdbc.spi.StatementInspector;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -40,12 +42,16 @@ class ShiftAssignmentLockQueryTest {
     /** Captures emitted SQL so the locking clause of the lock query can be asserted. */
     public static final class SqlRecorder implements StatementInspector {
 
-        private static final List<String> SQL = new ArrayList<>();
+        private static final List<String> SQL = new CopyOnWriteArrayList<>();
 
         @Override
         public String inspect(String sql) {
             SQL.add(sql);
             return sql;
+        }
+
+        static void clear() {
+            SQL.clear();
         }
 
         static String lastSelectAgainstShiftAssignments() {
@@ -55,6 +61,16 @@ class ShiftAssignmentLockQueryTest {
                     .reduce((first, second) -> second)
                     .orElseThrow();
         }
+    }
+
+    @BeforeEach
+    void clearRecordedSql() {
+        SqlRecorder.clear();
+    }
+
+    @AfterEach
+    void clearRecordedSqlAfterTest() {
+        SqlRecorder.clear();
     }
 
     @Autowired
@@ -143,6 +159,14 @@ class ShiftAssignmentLockQueryTest {
         List<ShiftAssignment> result = shiftAssignmentRepository.findAllByIdInForUpdate(
                 List.of(targetAssignment.getId(), requesterAssignment.getId()));
 
+        PersistenceUnitUtil loaded = entityManager.getEntityManagerFactory().getPersistenceUnitUtil();
+        assertThat(loaded.isLoaded(result.get(0), "workShift")).isTrue();
+        assertThat(loaded.isLoaded(result.get(0), "employee")).isTrue();
+        assertThat(loaded.isLoaded(result.get(1), "workShift")).isTrue();
+        assertThat(loaded.isLoaded(result.get(1), "employee")).isTrue();
+        assertThat(loaded.isLoaded(result.get(0).getWorkShift(), "schedulePeriod")).isTrue();
+        assertThat(loaded.isLoaded(result.get(1).getWorkShift(), "schedulePeriod")).isTrue();
+
         assertThat(result).extracting(ShiftAssignment::getId)
                 .containsExactly(requesterAssignment.getId(), targetAssignment.getId());
         assertThat(result.get(0).getWorkShift().getId()).isEqualTo(requesterShift.getId());
@@ -151,13 +175,6 @@ class ShiftAssignmentLockQueryTest {
         assertThat(result.get(1).getWorkShift().getId()).isEqualTo(targetShift.getId());
         assertThat(result.get(1).getWorkShift().getSchedulePeriod().getId()).isEqualTo(period.getId());
         assertThat(result.get(1).getEmployee().getId()).isEqualTo(target.getId());
-        PersistenceUnitUtil loaded = entityManager.getEntityManagerFactory().getPersistenceUnitUtil();
-        assertThat(loaded.isLoaded(result.get(0), "workShift")).isTrue();
-        assertThat(loaded.isLoaded(result.get(0).getWorkShift(), "schedulePeriod")).isTrue();
-        assertThat(loaded.isLoaded(result.get(0), "employee")).isTrue();
-        assertThat(loaded.isLoaded(result.get(1), "workShift")).isTrue();
-        assertThat(loaded.isLoaded(result.get(1).getWorkShift(), "schedulePeriod")).isTrue();
-        assertThat(loaded.isLoaded(result.get(1), "employee")).isTrue();
 
         String sql = SqlRecorder.lastSelectAgainstShiftAssignments();
         assertThat(sql).contains("for update");
