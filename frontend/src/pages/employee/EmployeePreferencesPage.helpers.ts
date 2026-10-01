@@ -23,6 +23,26 @@ export const getSelectableShiftCodes = (preferenceDate: string): ShiftCode[] => 
   return definitions.map((definition) => definition.code)
 }
 
+export const isShiftCodeApplicableToDate = (preferenceDate: string, code: string) =>
+  Boolean(code) && getSelectableShiftCodes(preferenceDate).includes(code as ShiftCode)
+
+export const getShiftCodeOptions = (preferenceDate: string, currentCode: string): ShiftCode[] => {
+  const selectable = getSelectableShiftCodes(preferenceDate)
+  if (currentCode && !selectable.includes(currentCode as ShiftCode)) {
+    return [...selectable, currentCode as ShiftCode]
+  }
+
+  return selectable
+}
+
+export const getShiftCodeWarning = (preferenceDate: string, currentCode: string) => {
+  if (isShiftCodeApplicableToDate(preferenceDate, currentCode)) {
+    return ''
+  }
+
+  return `Loại ca đang chọn (${currentCode}) không áp dụng cho ngày này. Nguyện vọng đã lưu sẽ không bị thay đổi, vui lòng chọn lại loại ca phù hợp trước khi gửi.`
+}
+
 export const resolveSelectedShiftCode = (preferenceDate: string, currentCode: string): string => {
   const selectable = getSelectableShiftCodes(preferenceDate)
   if (currentCode && selectable.includes(currentCode as ShiftCode)) {

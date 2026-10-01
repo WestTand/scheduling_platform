@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { getSelectableShiftCodes, getTodayDateInputValue, isDateRangeInverted, isPreferenceDateInRange, isPreferenceDateValid, normalizePriority, resolveSelectedShiftCode, validatePreferenceForm } from './EmployeePreferencesPage.helpers'
+import { getSelectableShiftCodes, getShiftCodeOptions, getShiftCodeWarning, getTodayDateInputValue, isDateRangeInverted, isPreferenceDateInRange, isPreferenceDateValid, isShiftCodeApplicableToDate, normalizePriority, resolveSelectedShiftCode, validatePreferenceForm } from './EmployeePreferencesPage.helpers'
 
 const ALL_SHIFT_CODES = ['THONG_TAM', 'NGOAI_GIO_1', 'NGOAI_GIO_2', 'TRUC_SANG', 'TRUC_CHIEU', 'TRUC_DEM']
 const WEEKEND_SHIFT_CODES = ['TRUC_SANG', 'TRUC_CHIEU', 'TRUC_DEM']
@@ -61,6 +61,68 @@ describe('resolveSelectedShiftCode', () => {
 
   it('falls back to the first selectable code when nothing is selected', () => {
     expect(resolveSelectedShiftCode('2026-09-19', '')).toBe('TRUC_SANG')
+  })
+})
+
+describe('isShiftCodeApplicableToDate', () => {
+  it('accepts a weekday code on a weekday', () => {
+    expect(isShiftCodeApplicableToDate('2026-09-14', 'THONG_TAM')).toBe(true)
+  })
+
+  it('accepts a weekend code on a weekend', () => {
+    expect(isShiftCodeApplicableToDate('2026-09-19', 'TRUC_DEM')).toBe(true)
+  })
+
+  it('rejects a stored weekend code on a weekday', () => {
+    expect(isShiftCodeApplicableToDate('2026-09-14', 'TRUC_DEM')).toBe(false)
+  })
+
+  it('rejects a stored weekday code on a weekend', () => {
+    expect(isShiftCodeApplicableToDate('2026-09-19', 'THONG_TAM')).toBe(false)
+  })
+
+  it('rejects an unknown code', () => {
+    expect(isShiftCodeApplicableToDate('2026-09-14', 'KHONG_CO')).toBe(false)
+  })
+
+  it('rejects an empty code', () => {
+    expect(isShiftCodeApplicableToDate('2026-09-14', '')).toBe(false)
+  })
+})
+
+describe('getShiftCodeOptions', () => {
+  it('returns only the applicable codes when the current code fits', () => {
+    expect(getShiftCodeOptions('2026-09-14', 'THONG_TAM')).toEqual(['THONG_TAM', 'NGOAI_GIO_1', 'NGOAI_GIO_2'])
+  })
+
+  it('appends an inapplicable stored code so the select keeps showing it', () => {
+    expect(getShiftCodeOptions('2026-09-14', 'TRUC_DEM')).toEqual(['THONG_TAM', 'NGOAI_GIO_1', 'NGOAI_GIO_2', 'TRUC_DEM'])
+  })
+
+  it('does not duplicate an applicable code', () => {
+    expect(getShiftCodeOptions('2026-09-19', 'TRUC_CHIEU')).toEqual(WEEKEND_SHIFT_CODES)
+  })
+
+  it('returns only the applicable codes when nothing is selected', () => {
+    expect(getShiftCodeOptions('2026-09-14', '')).toEqual(['THONG_TAM', 'NGOAI_GIO_1', 'NGOAI_GIO_2'])
+  })
+})
+
+describe('getShiftCodeWarning', () => {
+  it('warns when the stored code does not apply to the date', () => {
+    expect(getShiftCodeWarning('2026-09-14', 'TRUC_DEM')).toContain('TRUC_DEM')
+  })
+
+  it('stays empty when the code applies', () => {
+    expect(getShiftCodeWarning('2026-09-14', 'THONG_TAM')).toBe('')
+  })
+
+  it('stays empty when the code applies on a weekend', () => {
+    expect(getShiftCodeWarning('2026-09-19', 'TRUC_SANG')).toBe('')
+  })
+
+  it('warns when nothing is selected', () => {
+    expect(getShiftCodeWarning('2026-09-14', '')).not.toBe('')
   })
 })
 

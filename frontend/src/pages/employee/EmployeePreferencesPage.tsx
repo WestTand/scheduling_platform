@@ -17,7 +17,7 @@ import { getShiftDefinition, shiftDefinitions } from '@/configs/shiftDefinitions
 import { formatDateOnly } from '@/lib/dateFormat'
 import { preferenceService } from '@/services/preferenceService'
 import type { PreferenceType, WorkPreference } from '@/types/management'
-import { getSelectableShiftCodes, getTodayDateInputValue, isDateRangeInverted, isPreferenceDateInRange, normalizePriority, resolveSelectedShiftCode, validatePreferenceForm } from './EmployeePreferencesPage.helpers'
+import { getSelectableShiftCodes, getShiftCodeOptions, getShiftCodeWarning, getTodayDateInputValue, isDateRangeInverted, isPreferenceDateInRange, normalizePriority, resolveSelectedShiftCode, validatePreferenceForm } from './EmployeePreferencesPage.helpers'
 
 interface PreferenceFormState {
   preferenceDate: string
@@ -72,7 +72,8 @@ export function EmployeePreferencesPage() {
   const [editing, setEditing] = useState<WorkPreference | null>(null)
   const [form, setForm] = useState<PreferenceFormState>(createEmptyForm)
 
-  const selectableShiftCodes = useMemo(() => getSelectableShiftCodes(form.preferenceDate), [form.preferenceDate])
+  const selectableShiftCodes = useMemo(() => getShiftCodeOptions(form.preferenceDate, form.relatedShiftCode), [form.preferenceDate, form.relatedShiftCode])
+  const shiftCodeWarning = getShiftCodeWarning(form.preferenceDate, form.relatedShiftCode)
 
   const loadData = async () => {
     setLoading(true)
@@ -147,7 +148,7 @@ export function EmployeePreferencesPage() {
     setForm({
       preferenceDate: item.preferenceDate,
       type: item.type,
-      relatedShiftCode: resolveSelectedShiftCode(item.preferenceDate, item.relatedShiftCode ?? ''),
+      relatedShiftCode: item.relatedShiftCode ? item.relatedShiftCode : resolveSelectedShiftCode(item.preferenceDate, ''),
       priority: String(item.priority),
       note: item.note ?? '',
     })
@@ -168,7 +169,7 @@ const handleSubmit = async () => {
         shiftTypeId: resolveShiftTypeId(form.relatedShiftCode),
         // Kept for mock-mode display (relatedShiftCode/targetLabel); backend branch forwards it as shiftCode.
         relatedShiftCode: form.relatedShiftCode,
-        priority: normalizePriority(form.priority) ?? 1,
+        priority: normalizePriority(form.priority) as number,
         note: form.note.trim(),
       }
 
@@ -262,7 +263,7 @@ const handleSubmit = async () => {
         <div className="mt-4 grid gap-4">
           <div className="space-y-1">
             <label className="text-sm text-slate-700">Ngày áp dụng</label>
-            <input type="date" value={form.preferenceDate} onChange={(event) => setForm((current) => { const preferenceDate = event.target.value; return { ...current, preferenceDate, relatedShiftCode: resolveSelectedShiftCode(preferenceDate, current.relatedShiftCode) } })} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+            <input type="date" value={form.preferenceDate} onChange={(event) => setForm((current) => { const preferenceDate = event.target.value; return { ...current, preferenceDate, relatedShiftCode: current.relatedShiftCode ? current.relatedShiftCode : resolveSelectedShiftCode(preferenceDate, '') } })} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
           </div>
           <div className="space-y-1">
             <label className="text-sm text-slate-700">Loại nguyện vọng</label>
@@ -274,8 +275,9 @@ const handleSubmit = async () => {
           <div className="space-y-1">
             <label className="text-sm text-slate-700">Loại ca liên quan</label>
             <select value={form.relatedShiftCode} onChange={(event) => setForm((current) => ({ ...current, relatedShiftCode: event.target.value }))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm">
-              {selectableShiftCodes.map((code) => <option key={code} value={code}>{getShiftDefinition(code)?.name ?? code}</option>)}
+              {selectableShiftCodes.map((code) => <option key={code} value={code}>{getShiftDefinition(code)?.name ?? code}{code === form.relatedShiftCode && !getSelectableShiftCodes(form.preferenceDate).includes(code) ? ' (không áp dụng cho ngày này)' : ''}</option>)}
             </select>
+            {shiftCodeWarning && <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">{shiftCodeWarning}</div>}
           </div>
           <div className="space-y-1">
             <label className="text-sm text-slate-700">Mức ưu tiên</label>
