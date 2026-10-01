@@ -51,6 +51,73 @@ describe('backendSwapRequestService', () => {
     expect(request?.body).toBe(JSON.stringify({ requesterAssignmentId: 100, targetEmployeeId: 9, targetAssignmentId: null, reason: 'Need swap' }))
   })
 
+  test('sends the chosen target assignment when the employee accepts', async () => {
+    const fetchMock = vi.mocked(fetch)
+    fetchMock.mockResolvedValueOnce(jsonResponse({
+      id: 5,
+      requesterAssignmentId: 100,
+      requesterWorkDate: '2026-09-24',
+      requesterEmployee: { id: 7, employeeCode: 'EMP007', fullName: 'A' },
+      targetAssignmentId: 42,
+      targetEmployee: { id: 9, employeeCode: 'EMP009', fullName: 'B' },
+      reason: null,
+      status: 'PENDING_APPROVAL',
+      reviewedByAccountId: null,
+      reviewedByUsername: null,
+      reviewedAt: null,
+    }))
+
+    const result = await backendSwapRequestService.respondForEmployee('5', true, 42)
+
+    const request = fetchMock.mock.calls[0]?.[1]
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('http://localhost:8080/api/employee/swap-requests/5/respond')
+    expect(request).toEqual(expect.objectContaining({ method: 'POST' }))
+    expect(JSON.parse(String(request?.body))).toStrictEqual({ accept: true, targetAssignmentId: 42 })
+    expect(result.targetAssignmentId).toBe('42')
+  })
+
+  test('omits the target assignment when the employee rejects', async () => {
+    const fetchMock = vi.mocked(fetch)
+    fetchMock.mockResolvedValueOnce(jsonResponse({
+      id: 5,
+      requesterAssignmentId: 100,
+      requesterWorkDate: '2026-09-24',
+      requesterEmployee: { id: 7, employeeCode: 'EMP007', fullName: 'A' },
+      targetAssignmentId: null,
+      targetEmployee: { id: 9, employeeCode: 'EMP009', fullName: 'B' },
+      reason: null,
+      status: 'REJECTED',
+      reviewedByAccountId: null,
+      reviewedByUsername: null,
+      reviewedAt: null,
+    }))
+
+    await backendSwapRequestService.respondForEmployee('5', false)
+
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toStrictEqual({ accept: false })
+  })
+
+  test('sends accept without a target assignment when none is chosen', async () => {
+    const fetchMock = vi.mocked(fetch)
+    fetchMock.mockResolvedValueOnce(jsonResponse({
+      id: 5,
+      requesterAssignmentId: 100,
+      requesterWorkDate: '2026-09-24',
+      requesterEmployee: { id: 7, employeeCode: 'EMP007', fullName: 'A' },
+      targetAssignmentId: null,
+      targetEmployee: { id: 9, employeeCode: 'EMP009', fullName: 'B' },
+      reason: null,
+      status: 'PENDING_APPROVAL',
+      reviewedByAccountId: null,
+      reviewedByUsername: null,
+      reviewedAt: null,
+    }))
+
+    await backendSwapRequestService.respondForEmployee('5', true)
+
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toStrictEqual({ accept: true })
+  })
+
   test('calls manager review endpoints', async () => {
     const fetchMock = vi.mocked(fetch)
     fetchMock.mockImplementation(() => Promise.resolve(jsonResponse({

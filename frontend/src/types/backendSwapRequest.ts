@@ -29,6 +29,7 @@ export interface BackendCreateSwapRequestRequest {
 
 export interface BackendRespondSwapRequestRequest {
   accept: boolean
+  targetAssignmentId?: number
 }
 
 export interface BackendEmployeeScheduleItemResponse {
