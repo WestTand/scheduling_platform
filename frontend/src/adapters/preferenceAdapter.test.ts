@@ -66,8 +66,11 @@ describe('preferenceAdapter', () => {
 
   test('maps frontend preference types to backend types', () => {
     expect(toBackendPreferenceType('PREFERRED')).toBe('WANT')
-    expect(toBackendPreferenceType('PREFER_SHIFT')).toBe('WANT')
     expect(toBackendPreferenceType('AVOID')).toBe('AVOID')
-    expect(toBackendPreferenceType('AVOID_SHIFT')).toBe('AVOID')
+  })
+
+  test('offers only the two distinct preference types', async () => {
+    const { PreferenceType } = await import('@/types/management')
+    expect(Object.keys(PreferenceType)).toEqual(['PREFERRED', 'AVOID'])
   })
 })

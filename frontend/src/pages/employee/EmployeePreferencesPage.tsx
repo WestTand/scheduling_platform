@@ -20,8 +20,6 @@ import type { PreferenceType, WorkPreference } from '@/types/management'
 const preferenceLabels: Record<string, string> = {
   PREFERRED: 'Muốn làm',
   AVOID: 'Không muốn làm',
-  PREFER_SHIFT: 'Ưu tiên ca',
-  AVOID_SHIFT: 'Tránh ca',
 }
 
 // NOTE: frontend shiftDefinitions carry no numeric id, and the only backend
@@ -50,7 +48,7 @@ export function EmployeePreferencesPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [editing, setEditing] = useState<WorkPreference | null>(null)
-  const [form, setForm] = useState({ month: '2026-10', type: 'PREFERRED', relatedShiftCode: 'THONG_TAM', priority: '1', note: '', })
+  const [form, setForm] = useState({ preferenceDate: '2026-10-01', type: 'PREFERRED', relatedShiftCode: 'THONG_TAM', priority: '1', note: '', })
 
   const loadData = async () => {
     setLoading(true)
@@ -113,15 +111,14 @@ export function EmployeePreferencesPage() {
       [item.note ?? '', item.relatedShiftCode ?? '', item.targetLabel ?? '', item.employeeName ?? ''].some((value) =>
         value.toLowerCase().includes(normalizedSearch),
       )
-    const matchesMonth = monthFilter === 'ALL' || item.month === monthFilter
     const matchesStatus = statusFilter === 'ALL' || item.status === statusFilter
-    return matchesSearch && matchesMonth && matchesStatus
-  }), [preferences, search, monthFilter, statusFilter])
+    return matchesSearch && matchesStatus
+  }), [preferences, search, statusFilter])
 
   const handleEdit = (item: WorkPreference) => {
     setEditing(item)
     setForm({
-      month: item.month,
+      preferenceDate: item.preferenceDate,
       type: item.type,
       relatedShiftCode: item.relatedShiftCode ?? 'THONG_TAM',
       priority: String(item.priority),
@@ -136,7 +133,7 @@ export function EmployeePreferencesPage() {
       return
     }
 
-    const preferenceDate = form.month.length === 7 ? `${form.month}-01` : form.month
+    const preferenceDate = form.preferenceDate
 
     try {
       const input = {
@@ -157,7 +154,7 @@ export function EmployeePreferencesPage() {
 
       setShowForm(false)
       setEditing(null)
-      setForm({ month: '2026-10', type: 'PREFERRED', relatedShiftCode: 'THONG_TAM', priority: '1', note: '' })
+      setForm({ preferenceDate: '2026-10-01', type: 'PREFERRED', relatedShiftCode: 'THONG_TAM', priority: '1', note: '' })
       await loadData()
       showDialog({ variant: 'success', description: 'Nguyện vọng đã được gửi và đang chờ xem xét.' })
     } catch (submitError) {
@@ -205,7 +202,7 @@ export function EmployeePreferencesPage() {
             <DataTable
               data={filtered}
               columns={[
-                { key: 'month', label: 'Tháng', render: (item: WorkPreference) => <span>{item.month}</span> },
+                { key: 'preferenceDate', label: 'Ngày', render: (item: WorkPreference) => <span>{item.preferenceDate}</span> },
                 { key: 'type', label: 'Loại nguyện vọng', render: (item: WorkPreference) => <span>{preferenceLabels[item.type] ?? item.type}</span> },
                 { key: 'relatedShiftCode', label: 'Ca liên quan', render: (item: WorkPreference) => {
                   const definition = item.relatedShiftCode ? getShiftDefinition(item.relatedShiftCode) : undefined
@@ -240,15 +237,13 @@ export function EmployeePreferencesPage() {
         <div className="mt-4 grid gap-4">
           <div className="space-y-1">
             <label className="text-sm text-slate-700">Khoảng thời gian áp dụng</label>
-            <input type="month" value={form.month} onChange={(event) => setForm((current) => ({ ...current, month: event.target.value }))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+            <input type="date" value={form.preferenceDate} onChange={(event) => setForm((current) => ({ ...current, preferenceDate: event.target.value }))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
           </div>
           <div className="space-y-1">
             <label className="text-sm text-slate-700">Loại nguyện vọng</label>
             <select value={form.type} onChange={(event) => setForm((current) => ({ ...current, type: event.target.value }))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm">
               <option value="PREFERRED">Muốn làm</option>
               <option value="AVOID">Không muốn làm</option>
-              <option value="PREFER_SHIFT">Ưu tiên ca</option>
-              <option value="AVOID_SHIFT">Tránh ca</option>
             </select>
           </div>
           <div className="space-y-1">
@@ -278,7 +273,7 @@ export function EmployeePreferencesPage() {
       >
         {selected && (
           <div className="mt-4 space-y-3 text-sm text-slate-600">
-            <div className="flex justify-between"><span>Tháng</span><strong>{selected.month}</strong></div>
+            <div className="flex justify-between"><span>Ngày</span><strong>{selected.preferenceDate}</strong></div>
             <div className="flex justify-between"><span>Loại</span><strong>{preferenceLabels[selected.type] ?? selected.type}</strong></div>
             <div className="flex justify-between"><span>Ca liên quan</span><strong>{selected.relatedShiftCode ? `${getShiftDefinition(selected.relatedShiftCode)?.name ?? selected.relatedShiftCode} (${selected.relatedShiftCode})` : (selected.targetLabel ?? '—')}</strong></div>
             <div className="flex justify-between"><span>Mức ưu tiên</span><strong>{selected.priority}</strong></div>

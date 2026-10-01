@@ -54,8 +54,6 @@ export type NotificationPriority = (typeof NotificationPriority)[keyof typeof No
 export const PreferenceType = {
   PREFERRED: 'PREFERRED',
   AVOID: 'AVOID',
-  PREFER_SHIFT: 'PREFER_SHIFT',
-  AVOID_SHIFT: 'AVOID_SHIFT',
 } as const
 
 export type PreferenceType = (typeof PreferenceType)[keyof typeof PreferenceType]

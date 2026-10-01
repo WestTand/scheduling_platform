@@ -2,12 +2,8 @@ import type { BackendPreferenceResponse, BackendPreferenceType } from '@/types/b
 import type { PreferenceType, WorkPreference } from '@/types/management'
 import type { ShiftCode } from '@/configs/shiftDefinitions'
 
-export const toBackendPreferenceType = (type: PreferenceType): BackendPreferenceType => {
-  if (type === 'AVOID' || type === 'AVOID_SHIFT') {
-    return 'AVOID'
-  }
-  return 'WANT'
-}
+export const toBackendPreferenceType = (type: PreferenceType): BackendPreferenceType =>
+  type === 'AVOID' ? 'AVOID' : 'WANT'
 
 export const adaptBackendPreference = (response: BackendPreferenceResponse): WorkPreference => ({
   id: String(response.id),
