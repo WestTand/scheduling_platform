@@ -17,7 +17,26 @@ import { getShiftDefinition, shiftDefinitions } from '@/configs/shiftDefinitions
 import { formatDateOnly } from '@/lib/dateFormat'
 import { preferenceService } from '@/services/preferenceService'
 import type { PreferenceType, WorkPreference } from '@/types/management'
-import { isDateRangeInverted, isPreferenceDateInRange } from './EmployeePreferencesPage.helpers'
+import { getSelectableShiftCodes, getTodayDateInputValue, isDateRangeInverted, isPreferenceDateInRange, normalizePriority, resolveSelectedShiftCode, validatePreferenceForm } from './EmployeePreferencesPage.helpers'
+
+interface PreferenceFormState {
+  preferenceDate: string
+  type: PreferenceType
+  relatedShiftCode: string
+  priority: string
+  note: string
+}
+
+const createEmptyForm = (): PreferenceFormState => {
+  const preferenceDate = getTodayDateInputValue()
+  return {
+    preferenceDate,
+    type: 'PREFERRED',
+    relatedShiftCode: resolveSelectedShiftCode(preferenceDate, 'THONG_TAM'),
+    priority: '1',
+    note: '',
+  }
+}
 
 const preferenceLabels: Record<PreferenceType, string> = {
   PREFERRED: 'Muốn làm',
@@ -51,7 +70,9 @@ export function EmployeePreferencesPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [editing, setEditing] = useState<WorkPreference | null>(null)
-  const [form, setForm] = useState({ preferenceDate: '2026-10-01', type: 'PREFERRED', relatedShiftCode: 'THONG_TAM', priority: '1', note: '', })
+  const [form, setForm] = useState<PreferenceFormState>(createEmptyForm)
+
+  const selectableShiftCodes = useMemo(() => getSelectableShiftCodes(form.preferenceDate), [form.preferenceDate])
 
   const loadData = async () => {
     setLoading(true)
@@ -126,27 +147,28 @@ export function EmployeePreferencesPage() {
     setForm({
       preferenceDate: item.preferenceDate,
       type: item.type,
-      relatedShiftCode: item.relatedShiftCode ?? 'THONG_TAM',
+      relatedShiftCode: resolveSelectedShiftCode(item.preferenceDate, item.relatedShiftCode ?? ''),
       priority: String(item.priority),
       note: item.note ?? '',
     })
     setShowForm(true)
   }
 
-  const handleSubmit = async () => {
-    if (!form.note.trim()) {
-      showDialog({ variant: 'warning', description: 'Nội dung ghi chú không được bỏ trống.' })
+const handleSubmit = async () => {
+    const validationMessage = validatePreferenceForm(form)
+    if (validationMessage) {
+      showDialog({ variant: 'warning', description: validationMessage })
       return
     }
 
     try {
       const input = {
         preferenceDate: form.preferenceDate,
-        type: form.type as PreferenceType,
+        type: form.type,
         shiftTypeId: resolveShiftTypeId(form.relatedShiftCode),
         // Kept for mock-mode display (relatedShiftCode/targetLabel); backend branch forwards it as shiftCode.
         relatedShiftCode: form.relatedShiftCode,
-        priority: Number(form.priority),
+        priority: normalizePriority(form.priority) ?? 1,
         note: form.note.trim(),
       }
 
@@ -158,7 +180,7 @@ export function EmployeePreferencesPage() {
 
       setShowForm(false)
       setEditing(null)
-      setForm({ preferenceDate: '2026-10-01', type: 'PREFERRED', relatedShiftCode: 'THONG_TAM', priority: '1', note: '' })
+      setForm(createEmptyForm())
       await loadData()
       showDialog({ variant: 'success', description: 'Nguyện vọng đã được gửi và đang chờ xem xét.' })
     } catch (submitError) {
@@ -240,11 +262,11 @@ export function EmployeePreferencesPage() {
         <div className="mt-4 grid gap-4">
           <div className="space-y-1">
             <label className="text-sm text-slate-700">Ngày áp dụng</label>
-            <input type="date" value={form.preferenceDate} onChange={(event) => setForm((current) => ({ ...current, preferenceDate: event.target.value }))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+            <input type="date" value={form.preferenceDate} onChange={(event) => setForm((current) => { const preferenceDate = event.target.value; return { ...current, preferenceDate, relatedShiftCode: resolveSelectedShiftCode(preferenceDate, current.relatedShiftCode) } })} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
           </div>
           <div className="space-y-1">
             <label className="text-sm text-slate-700">Loại nguyện vọng</label>
-            <select value={form.type} onChange={(event) => setForm((current) => ({ ...current, type: event.target.value }))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm">
+            <select value={form.type} onChange={(event) => setForm((current) => ({ ...current, type: event.target.value as PreferenceType }))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm">
               <option value="PREFERRED">Muốn làm</option>
               <option value="AVOID">Không muốn làm</option>
             </select>
@@ -252,7 +274,7 @@ export function EmployeePreferencesPage() {
           <div className="space-y-1">
             <label className="text-sm text-slate-700">Loại ca liên quan</label>
             <select value={form.relatedShiftCode} onChange={(event) => setForm((current) => ({ ...current, relatedShiftCode: event.target.value }))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm">
-              {shiftDefinitions.map((shift) => <option key={shift.code} value={shift.code}>{shift.name}</option>)}
+              {selectableShiftCodes.map((code) => <option key={code} value={code}>{getShiftDefinition(code)?.name ?? code}</option>)}
             </select>
           </div>
           <div className="space-y-1">
