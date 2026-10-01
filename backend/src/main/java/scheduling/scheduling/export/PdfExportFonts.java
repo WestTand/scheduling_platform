@@ -22,7 +22,7 @@ final class PdfExportFonts {
     }
 
     static Font bold(float size) {
-        return new Font(baseFont(BOLD_RESOURCE), size, Font.NORMAL);
+        return new Font(baseFont(BOLD_RESOURCE), size, Font.BOLD);
     }
 
     private static BaseFont baseFont(String resource) {
