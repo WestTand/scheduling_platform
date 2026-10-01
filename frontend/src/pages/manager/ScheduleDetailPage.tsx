@@ -136,7 +136,7 @@ export function ScheduleDetailPage() {
       {staffingMessage && <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{staffingMessage}</div>}
       {canEditEmployeePool && !apiConfig.useMockApi && (
         <div>
-          <Button variant="outline" onClick={() => setIsPoolEditorOpen(true)}><UserCog className="mr-2 h-4 w-4" />Chỉnh sửa pool nhân viên</Button>
+          <Button variant="outline" onClick={() => setIsPoolEditorOpen(true)}><UserCog className="mr-2 h-4 w-4" />Chỉnh sửa danh sách nhân viên đã chọn cho lịch</Button>
           <ScheduleEmployeePoolEditor
             // ConfirmDialog returns null when closed, so the editor itself stays mounted and would keep an
             // abandoned selection; keying it on the open prop forces a fresh instance for every dialog session.

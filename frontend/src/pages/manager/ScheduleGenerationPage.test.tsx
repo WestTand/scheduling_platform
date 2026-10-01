@@ -33,7 +33,7 @@ describe('ScheduleGenerationPage', () => {
       </MemoryRouter>,
     )
 
-    expect(html).toContain('Chỉnh sửa pool')
+    expect(html).toContain('Chỉnh sửa danh sách')
   })
 })
 
