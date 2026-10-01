@@ -13,7 +13,6 @@ export const adaptBackendPreference = (response: BackendPreferenceResponse): Wor
   id: String(response.id),
   employeeName: response.employeeName ?? '',
   employeeEmail: '',
-  month: response.preferenceDate.slice(0, 7),
   type: response.preferenceType === 'AVOID' ? 'AVOID' : 'PREFERRED',
   relatedShiftCode: response.shiftCode ? (response.shiftCode as ShiftCode) : undefined,
   note: response.note ?? '',

@@ -24,7 +24,7 @@ describe('preferenceAdapter', () => {
       id: '12',
       employeeName: 'Nhan vien 1',
       relatedShiftCode: 'THONG_TAM',
-      month: '2026-09',
+      preferenceDate: '2026-09-14',
       type: 'PREFERRED',
       targetLabel: 'Ca sang',
       priority: 1,
@@ -55,7 +55,6 @@ describe('preferenceAdapter', () => {
     expect(adapted.type).toBe('AVOID')
     expect(adapted.employeeName).toBe('')
     expect(adapted.relatedShiftCode).toBeUndefined()
-    expect(adapted.month).toBe('2026-09')
     expect(adapted.preferenceDate).toBe('2026-09-16')
     expect(adapted.submittedAt).toBe('')
     expect(adapted.targetLabel).toBe('Không có ca cụ thể')
