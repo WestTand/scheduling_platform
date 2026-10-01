@@ -50,6 +50,25 @@ describe('swapRequestService', () => {
     expect(backendSwapRequestService.respondForEmployee).toHaveBeenCalledWith('5', false, undefined)
   })
 
+  test('mock mode shift options resolve to a numeric id the accept path can submit', async () => {
+    vi.stubEnv('VITE_USE_MOCK_API', 'true')
+    const { swapRequestService } = await import('@/services/swapRequestService')
+    const { resolveTargetAssignmentId } = await import('@/pages/employee/EmployeeSwapRequestsPage.helpers')
+
+    const options = await swapRequestService.listMyAssignments()
+    const selectedId = options[0].id
+    const targetAssignmentId = resolveTargetAssignmentId(options, selectedId)
+
+    expect(targetAssignmentId).toBe(Number(selectedId))
+
+    const created = await swapRequestService.createMine({ requesterAssignmentId: '100', targetEmployeeId: '9', reason: 'Need swap' })
+    const result = await swapRequestService.respondMine(created.id, true, targetAssignmentId ?? undefined)
+
+    expect(backendSwapRequestService.respondForEmployee).not.toHaveBeenCalled()
+    expect(result.status).toBe('PENDING_APPROVAL')
+    expect(result.targetAssignmentId).toBe(String(selectedId))
+  })
+
   test('mock mode records the chosen target assignment on the request', async () => {
     vi.stubEnv('VITE_USE_MOCK_API', 'true')
     const { swapRequestService } = await import('@/services/swapRequestService')

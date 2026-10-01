@@ -55,7 +55,7 @@ export const swapRequestService = {
     if (!apiConfig.useMockApi) return backendSwapRequestService.listMyAssignments()
     await delay(150)
     return [
-      { id: 'assignment-01', workDate: '2026-09-22', shiftName: 'Thông tầm', shiftStartTime: '08:00:00', shiftEndTime: '17:00:00', periodName: 'Mock period', periodStatus: 'PUBLISHED' },
+      { id: '101', workDate: '2026-09-22', shiftName: 'Thông tầm', shiftStartTime: '08:00:00', shiftEndTime: '17:00:00', periodName: 'Mock period', periodStatus: 'PUBLISHED' },
     ]
   },
 
