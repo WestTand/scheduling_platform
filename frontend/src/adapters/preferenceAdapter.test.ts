@@ -20,7 +20,9 @@ describe('preferenceAdapter', () => {
       status: 'PENDING',
     }
 
-    expect(adaptBackendPreference(response)).toMatchObject({
+    const adapted = adaptBackendPreference(response)
+
+    expect(adapted).toMatchObject({
       id: '12',
       employeeName: 'Nhan vien 1',
       relatedShiftCode: 'THONG_TAM',
@@ -32,6 +34,7 @@ describe('preferenceAdapter', () => {
       status: 'PENDING',
       submittedAt: '',
     })
+    expect(adapted).not.toHaveProperty('month')
   })
 
   test('maps AVOID response to AVOID work preference', () => {
