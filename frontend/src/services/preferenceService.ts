@@ -192,8 +192,3 @@ export const preferenceService = {
     preferences = clone(preferenceSeed)
   },
 }
-
-export const preferenceTypes: Array<{ value: PreferenceType; label: string }> = [
-  { value: 'PREFERRED', label: 'Muốn làm' },
-  { value: 'AVOID', label: 'Không muốn làm' },
-]

@@ -14,10 +14,12 @@ import { StatusBadge } from '@/components/common/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { getShiftDefinition, shiftDefinitions } from '@/configs/shiftDefinitions'
+import { formatDateOnly } from '@/lib/dateFormat'
 import { preferenceService } from '@/services/preferenceService'
 import type { PreferenceType, WorkPreference } from '@/types/management'
+import { isDateRangeInverted, isPreferenceDateInRange } from './EmployeePreferencesPage.helpers'
 
-const preferenceLabels: Record<string, string> = {
+const preferenceLabels: Record<PreferenceType, string> = {
   PREFERRED: 'Muốn làm',
   AVOID: 'Không muốn làm',
 }
@@ -105,7 +107,7 @@ export function EmployeePreferencesPage() {
     }
   }, [statusFilter])
 
-  const invalidDateRange = fromFilter !== '' && toFilter !== '' && fromFilter > toFilter
+  const invalidDateRange = isDateRangeInverted(fromFilter, toFilter)
 
   const filtered = useMemo(() => preferences.filter((item) => {
     const normalizedSearch = search.trim().toLowerCase()
@@ -115,9 +117,8 @@ export function EmployeePreferencesPage() {
         value.toLowerCase().includes(normalizedSearch),
       )
     const matchesStatus = statusFilter === 'ALL' || item.status === statusFilter
-    const matchesFrom = invalidDateRange || !fromFilter || item.preferenceDate >= fromFilter
-    const matchesTo = invalidDateRange || !toFilter || item.preferenceDate <= toFilter
-    return matchesSearch && matchesStatus && matchesFrom && matchesTo
+    const matchesRange = invalidDateRange || isPreferenceDateInRange(item.preferenceDate, fromFilter, toFilter)
+    return matchesSearch && matchesStatus && matchesRange
   }), [preferences, search, statusFilter, fromFilter, toFilter, invalidDateRange])
 
   const handleEdit = (item: WorkPreference) => {
@@ -138,11 +139,9 @@ export function EmployeePreferencesPage() {
       return
     }
 
-    const preferenceDate = form.preferenceDate
-
     try {
       const input = {
-        preferenceDate,
+        preferenceDate: form.preferenceDate,
         type: form.type as PreferenceType,
         shiftTypeId: resolveShiftTypeId(form.relatedShiftCode),
         // Kept for mock-mode display (relatedShiftCode/targetLabel); backend branch forwards it as shiftCode.
@@ -206,8 +205,8 @@ export function EmployeePreferencesPage() {
             <DataTable
               data={filtered}
               columns={[
-                { key: 'preferenceDate', label: 'Ngày', render: (item: WorkPreference) => <span>{item.preferenceDate}</span> },
-                { key: 'type', label: 'Loại nguyện vọng', render: (item: WorkPreference) => <span>{preferenceLabels[item.type] ?? item.type}</span> },
+                { key: 'preferenceDate', label: 'Ngày', render: (item: WorkPreference) => <span>{formatDateOnly(item.preferenceDate)}</span> },
+                { key: 'type', label: 'Loại nguyện vọng', render: (item: WorkPreference) => <span>{preferenceLabels[item.type]}</span> },
                 { key: 'relatedShiftCode', label: 'Ca liên quan', render: (item: WorkPreference) => {
                   const definition = item.relatedShiftCode ? getShiftDefinition(item.relatedShiftCode) : undefined
                   if (definition) {
@@ -277,8 +276,8 @@ export function EmployeePreferencesPage() {
       >
         {selected && (
           <div className="mt-4 space-y-3 text-sm text-slate-600">
-            <div className="flex justify-between"><span>Ngày</span><strong>{selected.preferenceDate}</strong></div>
-            <div className="flex justify-between"><span>Loại</span><strong>{preferenceLabels[selected.type] ?? selected.type}</strong></div>
+            <div className="flex justify-between"><span>Ngày</span><strong>{formatDateOnly(selected.preferenceDate)}</strong></div>
+            <div className="flex justify-between"><span>Loại</span><strong>{preferenceLabels[selected.type]}</strong></div>
             <div className="flex justify-between"><span>Ca liên quan</span><strong>{selected.relatedShiftCode ? `${getShiftDefinition(selected.relatedShiftCode)?.name ?? selected.relatedShiftCode} (${selected.relatedShiftCode})` : (selected.targetLabel ?? '—')}</strong></div>
             <div className="flex justify-between"><span>Mức ưu tiên</span><strong>{selected.priority}</strong></div>
             <div className="flex justify-between"><span>Trạng thái</span><StatusBadge status={selected.status} /></div>

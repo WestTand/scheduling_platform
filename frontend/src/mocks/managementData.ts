@@ -104,7 +104,7 @@ export const preferenceSeed: WorkPreference[] = [
   {
     id: 'PREF-003',
     employeeName: 'Lê Thị Hòa',
-    preferenceDate: '2026-10-05',
+    preferenceDate: '2026-10-03',
     type: PreferenceType.PREFERRED,
     relatedShiftCode: 'TRUC_CHIEU',
     note: 'Muốn làm trực chiều do lịch học thêm.',

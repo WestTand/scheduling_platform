@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { apiConfig } from '@/config/api'
 import { getShiftDefinition } from '@/configs/shiftDefinitions'
+import { formatDateOnly } from '@/lib/dateFormat'
 import { preferenceService } from '@/services/preferenceService'
 import type { PaginatedResult, WorkPreference, WorkPreferenceDecision } from '@/types/management'
 
@@ -31,11 +32,6 @@ const statusOptions = [
 const preferenceTypeLabels: Record<WorkPreference['type'], string> = {
   PREFERRED: 'Muốn làm',
   AVOID: 'Không muốn làm',
-}
-
-const formatDateOnly = (value: string) => {
-  const [year, month, day] = value.split('-')
-  return day && month && year ? `${day}/${month}/${year}` : value
 }
 
 export function WorkPreferencesPage() {
