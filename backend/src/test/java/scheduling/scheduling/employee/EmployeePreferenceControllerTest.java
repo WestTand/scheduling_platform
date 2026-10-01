@@ -163,6 +163,86 @@ class EmployeePreferenceControllerTest {
     }
 
     @Test
+    void createPreferenceRejectsPriorityAboveFive() throws Exception {
+        givenToken("employee-token", employee());
+
+        mockMvc.perform(post("/api/employee/preferences")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer employee-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "preferenceDate": "2026-09-14",
+                                  "preferenceType": "WANT",
+                                  "shiftTypeId": 10,
+                                  "priority": 6
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(employeePreferenceService);
+    }
+
+    @Test
+    void createPreferenceRejectsPriorityBelowOne() throws Exception {
+        givenToken("employee-token", employee());
+
+        mockMvc.perform(post("/api/employee/preferences")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer employee-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "preferenceDate": "2026-09-14",
+                                  "preferenceType": "WANT",
+                                  "shiftTypeId": 10,
+                                  "priority": 0
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(employeePreferenceService);
+    }
+
+    @Test
+    void updatePreferenceRejectsPriorityAboveFive() throws Exception {
+        givenToken("employee-token", employee());
+
+        mockMvc.perform(put("/api/employee/preferences/20")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer employee-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "preferenceDate": "2026-09-14",
+                                  "preferenceType": "WANT",
+                                  "shiftTypeId": 10,
+                                  "priority": 6
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(employeePreferenceService);
+    }
+
+    @Test
+    void updatePreferenceRejectsPriorityBelowOne() throws Exception {
+        givenToken("employee-token", employee());
+
+        mockMvc.perform(put("/api/employee/preferences/20")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer employee-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "preferenceDate": "2026-09-14",
+                                  "preferenceType": "WANT",
+                                  "shiftTypeId": 10,
+                                  "priority": 0
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(employeePreferenceService);
+    }
+
+    @Test
     void employeeCancelsPreference() throws Exception {
         givenToken("employee-token", employee());
 
