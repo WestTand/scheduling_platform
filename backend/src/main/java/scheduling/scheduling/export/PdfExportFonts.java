@@ -5,8 +5,6 @@ import com.lowagie.text.Font;
 import com.lowagie.text.pdf.BaseFont;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -24,7 +22,7 @@ final class PdfExportFonts {
     }
 
     static Font bold(float size) {
-        return new Font(baseFont(BOLD_RESOURCE), size, Font.BOLD);
+        return new Font(baseFont(BOLD_RESOURCE), size, Font.NORMAL);
     }
 
     private static BaseFont baseFont(String resource) {
@@ -32,19 +30,12 @@ final class PdfExportFonts {
     }
 
     private static BaseFont load(String resource) {
+        byte[] ttf = readResource(resource);
         try {
-            Path fontFile = Files.createTempFile("scheduling-export-font-", ".ttf");
-            try {
-                fontFile.toFile().deleteOnExit();
-                Files.write(fontFile, readResource(resource));
-                return BaseFont.createFont(fontFile.toAbsolutePath().toString(), BaseFont.IDENTITY_H, BaseFont.EMBEDDED);
-            } catch (DocumentException | IOException exception) {
-                throw new IllegalStateException(
-                        "Failed to load embedded font resource " + resource + " required for the PDF export", exception);
-            }
-        } catch (IOException exception) {
+            return BaseFont.createFont(resource, BaseFont.IDENTITY_H, BaseFont.EMBEDDED, false, null, ttf);
+        } catch (DocumentException | IOException exception) {
             throw new IllegalStateException(
-                    "Failed to stage embedded font resource " + resource + " required for the PDF export", exception);
+                    "Failed to load embedded font resource " + resource + " required for the PDF export", exception);
         }
     }
 
