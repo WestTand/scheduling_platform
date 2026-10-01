@@ -214,6 +214,25 @@ class AdminSchedulePeriodServiceTest {
     }
 
     @Test
+    void listSchedulePeriodsExposesLatestOptimizationStatus() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        SchedulePeriod period = draftPeriod(20L, account(principal));
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
+        when(schedulePeriodRepository.searchForAdmin("DRAFT", null, null)).thenReturn(List.of(period));
+        when(optimizationRunRepository.findTopBySchedulePeriodIdOrderByStartedAtDescIdDesc(20L))
+                .thenReturn(Optional.of(OptimizationRun.builder()
+                        .schedulePeriod(period)
+                        .status("INFEASIBLE")
+                        .startedAt(LocalDateTime.of(2026, 9, 20, 8, 0))
+                        .build()));
+
+        List<AdminSchedulePeriodResponse> response = service.listSchedulePeriods(principal, null, null, null);
+
+        assertThat(response).extracting(AdminSchedulePeriodResponse::optimizationStatus)
+                .containsExactly("INFEASIBLE");
+    }
+
+    @Test
     void listSchedulePeriodsDefaultsBlankStatusToDraft() {
         CurrentAccountPrincipal principal = managerPrincipal();
         when(accountRepository.findById(1L)).thenReturn(Optional.of(account(principal)));
@@ -627,6 +646,32 @@ class AdminSchedulePeriodServiceTest {
                 .isEqualTo(HttpStatus.CONFLICT);
 
         verify(schedulePeriodRepository, never()).saveAndFlush(any(SchedulePeriod.class));
+    }
+
+    @Test
+    void approveSchedulePeriodReportsInfeasibleBeforeCheckingStaffing() {
+        CurrentAccountPrincipal principal = managerPrincipal();
+        Account manager = account(principal);
+        SchedulePeriod period = draftPeriod(20L, manager);
+        WorkShift shift = staffedShift(200L, 2);
+        Employee only = activeEmployee(10L, "EMP010", "Employee Ten");
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(manager));
+        when(schedulePeriodRepository.findDetailById(20L)).thenReturn(Optional.of(period));
+        when(optimizationRunRepository.findTopBySchedulePeriodIdOrderByStartedAtDescIdDesc(20L))
+                .thenReturn(Optional.of(OptimizationRun.builder()
+                        .schedulePeriod(period)
+                        .status("INFEASIBLE")
+                        .startedAt(LocalDateTime.of(2026, 9, 20, 8, 0))
+                        .build()));
+        when(workShiftRepository.searchForPeriod(20L, null, null)).thenReturn(List.of(shift));
+        when(shiftAssignmentRepository.listForPeriod(20L))
+                .thenReturn(List.of(shiftAssignment(300L, shift, only)));
+
+        assertThatThrownBy(() -> service.approveSchedulePeriod(principal, 20L))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Lịch đang có ràng buộc chưa thỏa nên không thể duyệt.")
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.CONFLICT);
     }
 
     @Test

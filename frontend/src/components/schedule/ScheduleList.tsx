@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { scheduleStatusLabels } from '@/mocks/schedules'
-import { canApproveSchedule } from '@/pages/manager/ScheduleDetailPage.helpers'
+import { canApproveSchedule, isInfeasibleOptimizationStatus } from '@/pages/manager/ScheduleDetailPage.helpers'
 import { ScheduleStatus, type WorkSchedule } from '@/types/schedule'
 
 interface ScheduleListProps {
@@ -41,10 +41,10 @@ export function ScheduleList({ schedules, onApprove, onPublish, onCancel }: Sche
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant={schedule.status === 'PUBLISHED' ? 'default' : schedule.status === 'DRAFT' ? 'secondary' : 'outline'}>{scheduleStatusLabels[schedule.status]}</Badge>
-              {schedule.optimizationStatus === 'INFEASIBLE' && <Badge variant="destructive">INFE</Badge>}
+              {isInfeasibleOptimizationStatus(schedule.optimizationStatus) && <Badge variant="destructive">INFE</Badge>}
               <Button variant="outline" size="sm" asChild><Link to={`/manager/schedules/${schedule.id}`}><Eye className="mr-2 h-4 w-4" />Xem chi tiết</Link></Button>
               <Button variant="outline" size="sm" asChild><Link to={`/manager/schedules/${schedule.id}/edit`}><Pencil className="mr-2 h-4 w-4" />Chỉnh sửa</Link></Button>
-              {schedule.status === ScheduleStatus.DRAFT && <Button variant="outline" size="sm" disabled={!canApproveSchedule(schedule.status, schedule.optimizationStatus)} title={schedule.optimizationStatus === 'INFEASIBLE' ? 'Lịch đang bị cảnh báo (INFE) nên không thể duyệt.' : undefined} onClick={() => onApprove(schedule)}><ShieldCheck className="mr-2 h-4 w-4" />Duyệt</Button>}
+              {schedule.status === ScheduleStatus.DRAFT && <Button variant="outline" size="sm" disabled={!canApproveSchedule(schedule.status, schedule.optimizationStatus)} title={isInfeasibleOptimizationStatus(schedule.optimizationStatus) ? 'Lịch đang bị cảnh báo (INFE) nên không thể duyệt.' : undefined} onClick={() => onApprove(schedule)}><ShieldCheck className="mr-2 h-4 w-4" />Duyệt</Button>}
               {schedule.status === ScheduleStatus.APPROVED && <Button variant="outline" size="sm" onClick={() => onPublish(schedule)}><Send className="mr-2 h-4 w-4" />Công bố</Button>}
               {(schedule.status === ScheduleStatus.DRAFT || schedule.status === ScheduleStatus.APPROVED) && <Button variant="outline" size="sm" className="text-red-600" onClick={() => onCancel(schedule)}><XCircle className="mr-2 h-4 w-4" />Hủy</Button>}
             </div>

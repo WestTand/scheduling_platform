@@ -107,7 +107,7 @@ public class AdminSchedulePeriodService {
         String normalizedStatus = normalizeStatus(status);
         validateFilterRange(from, to);
         return schedulePeriodRepository.searchForAdmin(normalizedStatus, from, to).stream()
-                .map(AdminSchedulePeriodResponse::from)
+                .map(period -> toResponse(period))
                 .toList();
     }
 
@@ -147,11 +147,11 @@ public class AdminSchedulePeriodService {
         if (!DRAFT.equals(period.getStatus()) && !APPROVED.equals(period.getStatus())) {
             throw invalidRequest();
         }
+        validateNotInfeasible(periodId);
         validateStaffing(periodId);
         if (APPROVED.equals(period.getStatus())) {
             return toResponse(period);
         }
-        validateNotInfeasible(periodId);
         period.setStatus(APPROVED);
         period.setApprovedBy(manager);
         return toResponse(savePeriod(period));
