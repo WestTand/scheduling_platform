@@ -3,6 +3,7 @@ from copy import deepcopy
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.schemas.scheduling import SchedulingRequest
 
 client = TestClient(app)
 
@@ -184,6 +185,44 @@ def test_preference_changes_selected_employee() -> None:
     assert response.json()["assignments"] == [
         {"employeeId": 2, "workShiftId": 1000}
     ]
+
+
+def test_preference_priority_above_five_is_rejected() -> None:
+    request = base_request()
+    request["preferences"] = [
+        {
+            "preferenceId": 70,
+            "employeeId": 2,
+            "shiftTypeId": 100,
+            "preferenceDate": "2026-09-14",
+            "preferenceType": "WANT",
+            "priority": 6,
+        }
+    ]
+
+    response = client.post("/api/v1/scheduling/optimize", json=request)
+
+    assert response.status_code == 422
+
+
+def test_preference_priority_five_is_accepted_and_round_trips() -> None:
+    request = base_request()
+    request["preferences"] = [
+        {
+            "preferenceId": 70,
+            "employeeId": 2,
+            "shiftTypeId": 100,
+            "preferenceDate": "2026-09-14",
+            "preferenceType": "WANT",
+            "priority": 5,
+        }
+    ]
+
+    response = client.post("/api/v1/scheduling/optimize", json=request)
+
+    assert response.status_code == 200
+    validated = SchedulingRequest.model_validate(request)
+    assert validated.preferences[0].priority == 5
 
 
 def test_unknown_reference_returns_validation_error() -> None:

@@ -54,15 +54,12 @@ export type NotificationPriority = (typeof NotificationPriority)[keyof typeof No
 export const PreferenceType = {
   PREFERRED: 'PREFERRED',
   AVOID: 'AVOID',
-  PREFER_SHIFT: 'PREFER_SHIFT',
-  AVOID_SHIFT: 'AVOID_SHIFT',
 } as const
 
 export type PreferenceType = (typeof PreferenceType)[keyof typeof PreferenceType]
 
 export const PreferenceStatus = {
   PENDING: 'PENDING',
-  REVIEWED: 'REVIEWED',
   APPROVED: 'APPROVED',
   REJECTED: 'REJECTED',
   CANCELLED: 'CANCELLED',
@@ -120,12 +117,11 @@ export interface WorkPreference {
   id: string
   employeeName: string
   employeeEmail?: string
-  month: string
   type: PreferenceType
   relatedShiftCode?: ShiftCode
   note: string
   priority: number
-  preferenceDate?: string
+  preferenceDate: string
   submittedAt: string
   status: PreferenceStatus
   preferenceTypeLabel?: string

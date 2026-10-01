@@ -20,11 +20,13 @@ describe('preferenceAdapter', () => {
       status: 'PENDING',
     }
 
-    expect(adaptBackendPreference(response)).toMatchObject({
+    const adapted = adaptBackendPreference(response)
+
+    expect(adapted).toMatchObject({
       id: '12',
       employeeName: 'Nhan vien 1',
       relatedShiftCode: 'THONG_TAM',
-      month: '2026-09',
+      preferenceDate: '2026-09-14',
       type: 'PREFERRED',
       targetLabel: 'Ca sang',
       priority: 1,
@@ -32,6 +34,7 @@ describe('preferenceAdapter', () => {
       status: 'PENDING',
       submittedAt: '',
     })
+    expect(adapted).not.toHaveProperty('month')
   })
 
   test('maps AVOID response to AVOID work preference', () => {
@@ -55,7 +58,6 @@ describe('preferenceAdapter', () => {
     expect(adapted.type).toBe('AVOID')
     expect(adapted.employeeName).toBe('')
     expect(adapted.relatedShiftCode).toBeUndefined()
-    expect(adapted.month).toBe('2026-09')
     expect(adapted.preferenceDate).toBe('2026-09-16')
     expect(adapted.submittedAt).toBe('')
     expect(adapted.targetLabel).toBe('Không có ca cụ thể')
@@ -64,8 +66,11 @@ describe('preferenceAdapter', () => {
 
   test('maps frontend preference types to backend types', () => {
     expect(toBackendPreferenceType('PREFERRED')).toBe('WANT')
-    expect(toBackendPreferenceType('PREFER_SHIFT')).toBe('WANT')
     expect(toBackendPreferenceType('AVOID')).toBe('AVOID')
-    expect(toBackendPreferenceType('AVOID_SHIFT')).toBe('AVOID')
+  })
+
+  test('offers only the two distinct preference types', async () => {
+    const { PreferenceType } = await import('@/types/management')
+    expect(Object.keys(PreferenceType)).toEqual(['PREFERRED', 'AVOID'])
   })
 })

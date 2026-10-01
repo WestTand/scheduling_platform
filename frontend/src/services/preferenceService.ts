@@ -23,7 +23,7 @@ const paginate = (items: WorkPreference[], page: number, pageSize: number): Pagi
   }
 }
 
-const filterPreferences = (items: WorkPreference[], search: string, month: string, type: string, status: string) => {
+const filterPreferences = (items: WorkPreference[], search: string, type: string, status: string) => {
   const normalizedSearch = search.trim().toLowerCase()
   return items.filter((preference) => {
     const matchesSearch =
@@ -31,32 +31,30 @@ const filterPreferences = (items: WorkPreference[], search: string, month: strin
       [preference.employeeName, preference.note ?? '', preference.targetLabel ?? '', preference.relatedShiftCode ?? ''].some((value) =>
         value.toLowerCase().includes(normalizedSearch),
       )
-    const matchesMonth = month === 'ALL' || preference.month === month
     const matchesType = type === 'ALL' || preference.type === type
     const matchesStatus = status === 'ALL' || preference.status === status
 
-    return matchesSearch && matchesMonth && matchesType && matchesStatus
+    return matchesSearch && matchesType && matchesStatus
   })
 }
 
 export const preferenceService = {
-  async list({ page = 1, pageSize = 5, search = '', month = 'ALL', type = 'ALL', status = 'ALL' }: { page?: number; pageSize?: number; search?: string; month?: string; type?: string; status?: string }) {
+  async list({ page = 1, pageSize = 5, search = '', type = 'ALL', status = 'ALL' }: { page?: number; pageSize?: number; search?: string; type?: string; status?: string }) {
     if (!apiConfig.useMockApi) {
       const response = await backendPreferenceService.listForManager({ status })
       // Backend adapter leaves employeeName empty, has no relatedShiftCode, and collapses
-      // type to PREFERRED|AVOID, so skip degraded local month/type filters here and only
+      // type to PREFERRED|AVOID, so skip the degraded local type filter here and only
       // search present fields (note/targetLabel/employeeName) before paginating.
-      return paginate(filterPreferences(response, search, 'ALL', 'ALL', 'ALL'), page, pageSize)
+      return paginate(filterPreferences(response, search, 'ALL', 'ALL'), page, pageSize)
     }
     await delay(350)
 
     const filtered = preferences.filter((preference) => {
       const matchesSearch = !search || preference.employeeName.toLowerCase().includes(search.toLowerCase())
-      const matchesMonth = month === 'ALL' || preference.month === month
       const matchesType = type === 'ALL' || preference.type === type
       const matchesStatus = status === 'ALL' || preference.status === status
 
-      return matchesSearch && matchesMonth && matchesType && matchesStatus
+      return matchesSearch && matchesType && matchesStatus
     })
 
     const total = filtered.length
@@ -117,12 +115,12 @@ export const preferenceService = {
     return preference
   },
 
-  async listMine({ page = 1, pageSize = 50, search = '', month = 'ALL', status = 'ALL' }: { page?: number; pageSize?: number; search?: string; month?: string; status?: string } = {}) {
+  async listMine({ page = 1, pageSize = 50, search = '', status = 'ALL' }: { page?: number; pageSize?: number; search?: string; status?: string } = {}) {
     if (!apiConfig.useMockApi) {
       const response = await backendPreferenceService.listForEmployee({ status })
-      return paginate(filterPreferences(response, search, month, 'ALL', 'ALL'), page, pageSize)
+      return paginate(filterPreferences(response, search, 'ALL', 'ALL'), page, pageSize)
     }
-    return this.list({ page, pageSize, search, month, status })
+    return this.list({ page, pageSize, search, status })
   },
 
   async createMine(input: { preferenceDate: string; type: PreferenceType; shiftTypeId?: number | null; relatedShiftCode?: string; priority: number; note: string }) {
@@ -140,7 +138,7 @@ export const preferenceService = {
     const created: WorkPreference = {
       id: `PREF-${Date.now()}`,
       employeeName: 'Bạn',
-      month: input.preferenceDate.slice(0, 7),
+      preferenceDate: input.preferenceDate,
       type: input.type,
       note: input.note,
       priority: input.priority,
@@ -171,7 +169,7 @@ export const preferenceService = {
       throw new Error('Nguyện vọng không tồn tại.')
     }
 
-    preference.month = input.preferenceDate.slice(0, 7)
+    preference.preferenceDate = input.preferenceDate
     preference.type = input.type
     preference.note = input.note
     preference.priority = input.priority
@@ -194,10 +192,3 @@ export const preferenceService = {
     preferences = clone(preferenceSeed)
   },
 }
-
-export const preferenceTypes: Array<{ value: PreferenceType; label: string }> = [
-  { value: 'PREFERRED', label: 'Muốn làm' },
-  { value: 'AVOID', label: 'Không muốn làm' },
-  { value: 'PREFER_SHIFT', label: 'Ưu tiên ca' },
-  { value: 'AVOID_SHIFT', label: 'Tránh ca' },
-]

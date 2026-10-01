@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { apiConfig } from '@/config/api'
 import { getShiftDefinition } from '@/configs/shiftDefinitions'
+import { formatDateOnly } from '@/lib/dateFormat'
 import { preferenceService } from '@/services/preferenceService'
 import type { PaginatedResult, WorkPreference, WorkPreferenceDecision } from '@/types/management'
 
@@ -31,13 +32,6 @@ const statusOptions = [
 const preferenceTypeLabels: Record<WorkPreference['type'], string> = {
   PREFERRED: 'Muốn làm',
   AVOID: 'Không muốn làm',
-  PREFER_SHIFT: 'Ưu tiên ca',
-  AVOID_SHIFT: 'Tránh ca',
-}
-
-const formatDateOnly = (value: string) => {
-  const [year, month, day] = value.split('-')
-  return day && month && year ? `${day}/${month}/${year}` : value
 }
 
 export function WorkPreferencesPage() {
@@ -153,8 +147,6 @@ export function WorkPreferencesPage() {
               <option value="ALL">Tất cả loại</option>
               <option value="PREFERRED">Muốn làm</option>
               <option value="AVOID">Không muốn làm</option>
-              <option value="PREFER_SHIFT">Ưu tiên ca</option>
-              <option value="AVOID_SHIFT">Tránh ca</option>
             </select>
           </div>
 
@@ -172,7 +164,7 @@ export function WorkPreferencesPage() {
                   { key: 'employeeName', label: 'Nhân viên' },
                   { key: 'type', label: 'Loại', render: (item: WorkPreference) => <span>{preferenceTypeLabels[item.type]}</span> },
                   { key: 'relatedShiftCode', label: 'Ca liên quan', render: (item: WorkPreference) => <span>{item.relatedShiftCode ? `${getShiftDefinition(item.relatedShiftCode)?.name ?? item.targetLabel ?? item.relatedShiftCode} (${item.relatedShiftCode})` : (item.targetLabel ?? 'Không có')}</span> },
-                  { key: 'preferenceDate', label: 'Ngày nguyện vọng', render: (item: WorkPreference) => <span>{formatDateOnly(item.preferenceDate ?? item.submittedAt)}</span> },
+                  { key: 'preferenceDate', label: 'Ngày nguyện vọng', render: (item: WorkPreference) => <span>{formatDateOnly(item.preferenceDate)}</span> },
                   { key: 'status', label: 'Trạng thái', render: (item: WorkPreference) => <StatusBadge status={item.status} /> },
                   { key: 'actions', label: 'Thao tác', render: (item: WorkPreference) => (
                     <div className="flex items-center gap-2">
@@ -202,7 +194,7 @@ export function WorkPreferencesPage() {
             <div className="flex justify-between"><span>Nhân viên</span><strong>{selectedPreference.employeeName}</strong></div>
             <div className="flex justify-between"><span>Loại</span><strong>{preferenceTypeLabels[selectedPreference.type]}</strong></div>
             <div className="flex justify-between"><span>Ca liên quan</span><strong>{selectedPreference.relatedShiftCode ? `${getShiftDefinition(selectedPreference.relatedShiftCode)?.name ?? selectedPreference.targetLabel ?? selectedPreference.relatedShiftCode} (${selectedPreference.relatedShiftCode})` : (selectedPreference.targetLabel ?? 'Không có')}</strong></div>
-            <div className="flex justify-between"><span>Ngày nguyện vọng</span><strong>{formatDateOnly(selectedPreference.preferenceDate ?? selectedPreference.submittedAt)}</strong></div>
+            <div className="flex justify-between"><span>Ngày nguyện vọng</span><strong>{formatDateOnly(selectedPreference.preferenceDate)}</strong></div>
             <div className="flex justify-between"><span>Trạng thái</span><StatusBadge status={selectedPreference.status} /></div>
             <div className="flex justify-between"><span>Ghi chú</span><strong>{selectedPreference.note || 'Không có'}</strong></div>
             {selectedPreference.adminNote && <div className="flex justify-between"><span>Phản hồi quản lý</span><strong>{selectedPreference.adminNote}</strong></div>}

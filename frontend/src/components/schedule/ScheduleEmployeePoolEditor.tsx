@@ -61,7 +61,7 @@ export function ScheduleEmployeePoolEditor({ open, periodId, candidates, current
   return (
     <ConfirmDialog
       open={open}
-      title="Chỉnh sửa pool nhân viên"
+      title="Chỉnh sửa danh sách nhân viên đã chọn cho lịch"
       description="Pool nhân viên là tập người mà AI được phép xếp ca. Thêm người vào pool nếu lịch báo thiếu nhân lực."
       cancelLabel="Hủy"
       confirmLabel={isSaving ? 'Đang lưu...' : 'Lưu pool'}

@@ -86,7 +86,7 @@ class PreferenceInput(ApiModel):
     shift_type_id: int | None = None
     preference_date: date
     preference_type: Literal["WANT", "AVOID"]
-    priority: int = Field(default=1, ge=1)
+    priority: int = Field(default=1, ge=1, le=5)
 
 
 class LockedAssignmentInput(ApiModel):
