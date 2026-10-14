@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { getShiftDefinition, shiftDefinitions } from '@/configs/shiftDefinitions'
 import { formatDateOnly } from '@/lib/dateFormat'
+import { backendEmployeeShiftTypeService, type EmployeeShiftTypeOption } from '@/services/backendEmployeeShiftTypeService'
 import { preferenceService } from '@/services/preferenceService'
 import type { PreferenceType, WorkPreference } from '@/types/management'
 import { getShiftCodeOptions, getShiftCodeWarning, getTodayDateInputValue, isDateRangeInverted, isPreferenceDateInRange, isShiftCodeApplicableToDate, normalizePriority, resolveSelectedShiftCode, validatePreferenceForm } from './EmployeePreferencesPage.helpers'
@@ -43,17 +44,18 @@ const preferenceLabels: Record<PreferenceType, string> = {
   AVOID: 'Không muốn làm',
 }
 
-// NOTE: frontend shiftDefinitions carry no numeric id, and the only backend
-// shift-type list (GET /api/admin/shift-types) requires MANAGER/ADMIN, so it is
-// not usable from this EMPLOYEE page (would 403). Resolve therefore stays null
-// and relatedShiftCode is kept locally for display; backend creates send
-// shiftTypeId only (null) without silent loss of the local code.
-const resolveShiftTypeId = (code: string): number | null => {
-  const found = shiftDefinitions.find((shift) => shift.code === code) as unknown as { id?: unknown } | undefined
-  if (!found || found.id === undefined || found.id === null || found.id === '') {
+// NOTE: shift-type ids are resolved from GET /api/employee/shift-types (EMPLOYEE-readable).
+// Falls back to null (whole-day preference) when the backend list is unavailable.
+const buildShiftTypeIdResolver = (options: EmployeeShiftTypeOption[]) => (code: string): number | null => {
+  const found = options.find((option) => option.shiftCode === code)
+  if (found) {
+    return found.id
+  }
+  const legacy = shiftDefinitions.find((shift) => shift.code === code) as unknown as { id?: unknown } | undefined
+  if (!legacy || legacy.id === undefined || legacy.id === null || legacy.id === '') {
     return null
   }
-  const numeric = Number(found.id)
+  const numeric = Number(legacy.id)
   return Number.isNaN(numeric) ? null : numeric
 }
 
@@ -71,6 +73,8 @@ export function EmployeePreferencesPage() {
   const [error, setError] = useState('')
   const [editing, setEditing] = useState<WorkPreference | null>(null)
   const [form, setForm] = useState<PreferenceFormState>(createEmptyForm)
+  const [shiftTypeOptions, setShiftTypeOptions] = useState<EmployeeShiftTypeOption[]>([])
+  const resolveShiftTypeId = useMemo(() => buildShiftTypeIdResolver(shiftTypeOptions), [shiftTypeOptions])
 
   const selectableShiftCodes = useMemo(() => getShiftCodeOptions(form.preferenceDate, form.relatedShiftCode), [form.preferenceDate, form.relatedShiftCode])
   const shiftCodeWarning = getShiftCodeWarning(form.preferenceDate, form.relatedShiftCode)
@@ -124,6 +128,21 @@ export function EmployeePreferencesPage() {
 
     void fetchPreferences()
 
+    const fetchShiftTypes = async () => {
+      try {
+        const options = await backendEmployeeShiftTypeService.listActive()
+        if (mounted) {
+          setShiftTypeOptions(options)
+        }
+      } catch {
+        if (mounted) {
+          setShiftTypeOptions([])
+        }
+      }
+    }
+
+    void fetchShiftTypes()
+
     return () => {
       mounted = false
     }
@@ -141,7 +160,7 @@ export function EmployeePreferencesPage() {
     const matchesStatus = statusFilter === 'ALL' || item.status === statusFilter
     const matchesRange = invalidDateRange || isPreferenceDateInRange(item.preferenceDate, fromFilter, toFilter)
     return matchesSearch && matchesStatus && matchesRange
-  }), [preferences, search, statusFilter, fromFilter, toFilter, invalidDateRange])
+  }).sort((a, b) => (b.preferenceDate > a.preferenceDate ? 1 : b.preferenceDate < a.preferenceDate ? -1 : 0)), [preferences, search, statusFilter, fromFilter, toFilter, invalidDateRange])
 
   const handleEdit = (item: WorkPreference) => {
     setEditing(item)

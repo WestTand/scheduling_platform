@@ -25,17 +25,19 @@ const paginate = (items: WorkPreference[], page: number, pageSize: number): Pagi
 
 const filterPreferences = (items: WorkPreference[], search: string, type: string, status: string) => {
   const normalizedSearch = search.trim().toLowerCase()
-  return items.filter((preference) => {
-    const matchesSearch =
-      !normalizedSearch ||
-      [preference.employeeName, preference.note ?? '', preference.targetLabel ?? '', preference.relatedShiftCode ?? ''].some((value) =>
-        value.toLowerCase().includes(normalizedSearch),
-      )
-    const matchesType = type === 'ALL' || preference.type === type
-    const matchesStatus = status === 'ALL' || preference.status === status
+  return items
+    .filter((preference) => {
+      const matchesSearch =
+        !normalizedSearch ||
+        [preference.employeeName, preference.note ?? '', preference.targetLabel ?? '', preference.relatedShiftCode ?? ''].some((value) =>
+          value.toLowerCase().includes(normalizedSearch),
+        )
+      const matchesType = type === 'ALL' || preference.type === type
+      const matchesStatus = status === 'ALL' || preference.status === status
 
-    return matchesSearch && matchesType && matchesStatus
-  })
+      return matchesSearch && matchesType && matchesStatus
+    })
+    .sort((a, b) => (b.preferenceDate > a.preferenceDate ? 1 : b.preferenceDate < a.preferenceDate ? -1 : 0))
 }
 
 export const preferenceService = {
@@ -49,13 +51,15 @@ export const preferenceService = {
     }
     await delay(350)
 
-    const filtered = preferences.filter((preference) => {
-      const matchesSearch = !search || preference.employeeName.toLowerCase().includes(search.toLowerCase())
-      const matchesType = type === 'ALL' || preference.type === type
-      const matchesStatus = status === 'ALL' || preference.status === status
+    const filtered = preferences
+      .filter((preference) => {
+        const matchesSearch = !search || preference.employeeName.toLowerCase().includes(search.toLowerCase())
+        const matchesType = type === 'ALL' || preference.type === type
+        const matchesStatus = status === 'ALL' || preference.status === status
 
-      return matchesSearch && matchesType && matchesStatus
-    })
+        return matchesSearch && matchesType && matchesStatus
+      })
+      .sort((a, b) => (b.preferenceDate > a.preferenceDate ? 1 : b.preferenceDate < a.preferenceDate ? -1 : 0))
 
     const total = filtered.length
     const totalPages = Math.max(1, Math.ceil(total / pageSize))

@@ -1,4 +1,4 @@
-import { Clock3, Edit3, Eye, Palette, Search, Trash2 } from 'lucide-react'
+import { Clock3, Edit3, Eye, Palette, Power, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
@@ -54,6 +54,7 @@ export function ShiftTypesPage() {
   const [data, setData] = useState<PaginatedResult<ShiftType>>({ data: [], page: 1, pageSize: 5, total: 0, totalPages: 1 })
   const [formOpen, setFormOpen] = useState(false)
   const [selectedShift, setSelectedShift] = useState<ShiftType | null>(null)
+  const [viewTarget, setViewTarget] = useState<ShiftType | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<ShiftType | null>(null)
   const [formState, setFormState] = useState<ShiftTypeFormValues>(emptyForm)
   const [formError, setFormError] = useState('')
@@ -142,6 +143,12 @@ export function ShiftTypesPage() {
     setFormOpen(true)
   }
 
+  const closeEdit = () => {
+    setFormOpen(false)
+    setSelectedShift(null)
+    setFormError('')
+  }
+
   const handleSubmit = async () => {
     const validation = validateForm()
     if (validation) {
@@ -154,14 +161,18 @@ export function ShiftTypesPage() {
 
     try {
       if (selectedShift) {
+        const updatedName = formState.name.trim()
         await shiftTypeService.update(selectedShift.id, formState)
+        showDialog({ variant: 'success', title: 'Cập nhật thành công', description: `Loại ca ${updatedName} đã được cập nhật.` })
       }
 
-      setFormOpen(false)
+      closeEdit()
       setPage(1)
       await fetchData()
     } catch (submitError) {
-      setFormError(submitError instanceof Error ? submitError.message : 'Không thể lưu loại ca.')
+      const message = submitError instanceof Error ? submitError.message : 'Không thể lưu loại ca.'
+      setFormError(message)
+      showDialog({ variant: 'error', title: 'Cập nhật thất bại', description: message })
     } finally {
       setIsSubmitting(false)
     }
@@ -170,6 +181,11 @@ export function ShiftTypesPage() {
   const toggleStatus = async (shiftType: ShiftType) => {
     try {
       await shiftTypeService.toggleStatus(shiftType.id)
+      showDialog({
+        variant: 'success',
+        title: 'Đổi trạng thái thành công',
+        description: `Loại ca ${shiftType.name} đã chuyển sang ${shiftType.status === 'ACTIVE' ? 'tạm ngưng' : 'hoạt động'}.`,
+      })
       await fetchData()
     } catch (toggleError) {
       showDialog({ variant: 'error', description: toggleError instanceof Error ? toggleError.message : 'Không thể thay đổi trạng thái ca.' })
@@ -242,16 +258,16 @@ export function ShiftTypesPage() {
                   { key: 'status', label: 'Trạng thái', render: (item: ShiftType) => <StatusBadge status={item.status} /> },
                   { key: 'actions', label: 'Thao tác', render: (item: ShiftType) => (
                     <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="icon" onClick={() => setSelectedShift(item)} aria-label="Xem chi tiết">
+                      <Button variant="ghost" size="icon" title="Xem chi tiết" onClick={() => setViewTarget(item)} aria-label="Xem chi tiết">
                         <Eye className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => openEdit(item)} aria-label="Chỉnh sửa ca">
+                      <Button variant="ghost" size="icon" title="Chỉnh sửa" onClick={() => openEdit(item)} aria-label="Chỉnh sửa ca">
                         <Edit3 className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => toggleStatus(item)} aria-label="Thay đổi trạng thái ca">
-                        <Search className="h-4 w-4" />
+                      <Button variant="ghost" size="icon" title={item.status === 'ACTIVE' ? 'Tạm ngưng' : 'Kích hoạt lại'} onClick={() => toggleStatus(item)} aria-label="Thay đổi trạng thái ca">
+                        <Power className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(item)} aria-label="Tạm ngưng ca">
+                      <Button variant="ghost" size="icon" title="Xóa" onClick={() => setDeleteTarget(item)} aria-label="Xóa loại ca">
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
@@ -269,9 +285,9 @@ export function ShiftTypesPage() {
         open={formOpen}
         title="Chỉnh sửa loại ca"
         description="Hỗ trợ ca kéo dài qua ngày hôm sau và hiển thị màu trên lịch."
-        onClose={() => setFormOpen(false)}
+        onClose={closeEdit}
         onSubmit={handleSubmit}
-        submitLabel={isSubmitting ? 'Đang lưu...' : 'Lưu'}
+        submitLabel={isSubmitting ? 'Đang lưu...' : 'Lưu thay đổi'}
       >
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-1">
@@ -351,19 +367,19 @@ export function ShiftTypesPage() {
         onConfirm={handleDelete}
       />
 
-      {selectedShift && (
-        <FormDialog open={Boolean(selectedShift)} title="Chi tiết loại ca" description="Thông tin chi tiết của loại ca trực." onClose={() => setSelectedShift(null)} onSubmit={() => setSelectedShift(null)} submitLabel="Đóng">
+      {viewTarget && (
+        <FormDialog open={Boolean(viewTarget)} title="Chi tiết loại ca" description="Thông tin chi tiết của loại ca trực." onClose={() => setViewTarget(null)} onSubmit={() => setViewTarget(null)} submitLabel="Đóng">
           <div className="space-y-3 text-sm text-slate-600">
-            <div className="flex justify-between"><span>Mã ca</span><strong>{selectedShift.code}</strong></div>
-            <div className="flex justify-between"><span>Tên ca</span><strong>{selectedShift.name}</strong></div>
-            <div className="flex justify-between"><span>Nhóm ca</span><strong>{selectedShift.group}</strong></div>
-            <div className="flex justify-between"><span>Thời gian</span><strong>{selectedShift.startTime} - {selectedShift.endTime}</strong></div>
-            <div className="flex justify-between"><span>Thời gian nghỉ</span><strong>{selectedShift.breakMinutes} phút</strong></div>
-            <div className="flex justify-between"><span>Thời gian làm thực tế</span><strong>{Math.round(selectedShift.workMinutes / 60)} giờ</strong></div>
-            <div className="flex justify-between"><span>Loại ngày</span><strong>{selectedShift.applicableDayType === 'WEEKDAY' ? 'Thứ Hai đến Thứ Sáu' : 'Thứ Bảy, Chủ nhật và ngày lễ'}</strong></div>
-            <div className="flex justify-between"><span>Qua ngày hôm sau</span><strong>{selectedShift.crossesMidnight ? 'Có' : 'Không'}</strong></div>
-            <div className="flex justify-between"><span>Trạng thái</span><StatusBadge status={selectedShift.status} /></div>
-            <div className="flex justify-between"><span>Mô tả</span><strong>{selectedShift.description}</strong></div>
+            <div className="flex justify-between"><span>Mã ca</span><strong>{viewTarget.code}</strong></div>
+            <div className="flex justify-between"><span>Tên ca</span><strong>{viewTarget.name}</strong></div>
+            <div className="flex justify-between"><span>Nhóm ca</span><strong>{viewTarget.group}</strong></div>
+            <div className="flex justify-between"><span>Thời gian</span><strong>{viewTarget.startTime} - {viewTarget.endTime}</strong></div>
+            <div className="flex justify-between"><span>Thời gian nghỉ</span><strong>{viewTarget.breakMinutes} phút</strong></div>
+            <div className="flex justify-between"><span>Thời gian làm thực tế</span><strong>{Math.round(viewTarget.workMinutes / 60)} giờ</strong></div>
+            <div className="flex justify-between"><span>Loại ngày</span><strong>{viewTarget.applicableDayType === 'WEEKDAY' ? 'Thứ Hai đến Thứ Sáu' : 'Thứ Bảy, Chủ nhật và ngày lễ'}</strong></div>
+            <div className="flex justify-between"><span>Qua ngày hôm sau</span><strong>{viewTarget.crossesMidnight ? 'Có' : 'Không'}</strong></div>
+            <div className="flex justify-between"><span>Trạng thái</span><StatusBadge status={viewTarget.status} /></div>
+            <div className="flex justify-between"><span>Mô tả</span><strong>{viewTarget.description}</strong></div>
           </div>
         </FormDialog>
       )}
